@@ -37,7 +37,8 @@ QUALIDADE OBRIGATORIA
 RESTRICOES
 - Nao trocar Minecraft, Forge ou Java sem autorizacao explicita.
 - Nao misturar este projeto com Skyheros ou HeroPort.
-- Nao presumir que existe um repositorio GitHub conectado.
+- Verificar o remoto e a acessibilidade do GitHub em cada sessao; nao presumir
+  sincronizacao apenas pela existencia de um remote configurado.
 - Nao sobrescrever trabalho alheio sem revisar e preservar alteracoes.
 - Consultar a API real do Forge 1.20.1 antes de usar classes ou metodos.
 - Otimizar tokens e tempo por meio de lotes coerentes, sem sacrificar qualidade.
@@ -56,8 +57,9 @@ ESTADO VERIFICADO EM 2026-10-19
   17.0.20.1. Ainda nao simula um respawn completo pelo servidor.
 - O terminal aponta por padrao para Java 8u51, antigo demais para ForgeGradle.
   O projeto deve ser executado com Java 17 conforme sua configuracao.
-- A pasta nao e um repositorio Git (`git status` retorna fatal: not a git
-  repository). Nao ha estado de commit ou remoto verificavel nesta raiz.
+- A pasta e um repositorio Git na branch `main`, com `origin` configurado para
+  `https://github.com/srkaiohshin-droid/Ascendent.git`. O estado de sincronizacao
+  deve ser confirmado com fetch/status no inicio de cada sessao.
 - Identidade do mod e metadados correspondem entre `gradle.properties`,
   `Ascendant.java` e `mods.toml`.
 

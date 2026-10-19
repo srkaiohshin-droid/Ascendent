@@ -55,3 +55,27 @@ VALIDACAO DO CLONE DE JOGADOR
 - Pendencias: manter ASC-002 aberta; definir cooldowns/permissoes e, se
   necessario, testar o ciclo completo de respawn antes do voo.
 - Commit/sincronizacao: pendente desta validacao.
+
+CONFIGURACAO DE INSTRUCOES E AUDITORIA INICIAL
+- Data e hora local: 2026-10-19 17:11 -03:00 (America/Sao_Paulo).
+- Lidos integralmente: Master.txt, AI_CONTEXT.txt, AGENT_COORDINATION.txt,
+  AGENT_LOG.txt, TODO.md, build.gradle, settings.gradle, gradle.properties e
+  gradlew.bat. AGENTS.md nao existia antes desta tarefa.
+- Criado AGENTS.md com regras permanentes compactas; AI_CONTEXT.txt atualizado
+  para refletir o repositorio e remoto atualmente verificados.
+- Git antes das alteracoes: branch main, origin
+  https://github.com/srkaiohshin-droid/Ascendent.git, arvore limpa, HEAD
+  bf8abf55cd2e119d9aa654e6ebd5cefc20a0b5f2 igual a origin/main. Fetch
+  concluido; 0 commits a frente e 0 atras. Sem alteracoes preexistentes.
+- Ambiente: Java padrao no PATH e Java 8u51; build e GameTest executados com
+  Temurin JDK 17.0.20.1.
+- Validacao: `gradlew.bat build` terminou em BUILD SUCCESSFUL; tarefa `test`
+  NO-SOURCE. `gradlew.bat runGameTestServer` terminou em BUILD SUCCESSFUL;
+  1 GameTest passou. O teste existente nao simula respawn completo no servidor.
+- Pendencias/bloqueios: nenhuma falha de build ou sincronizacao observada.
+  ASC-002 permanece em andamento; cooldowns/permissoes e teste do ciclo real de
+  respawn ainda requerem decisao/implementacao dentro da tarefa. Nenhum codigo
+  de funcionalidade foi alterado.
+- Proxima acao recomendada: concluir ASC-002 com cobertura adequada do ciclo de
+  respawn e regras pendentes; em seguida iniciar ASC-003 (voo).
+- Commit e push desta configuracao: ainda pendentes nesta etapa do registro.
