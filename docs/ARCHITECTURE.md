@@ -46,8 +46,9 @@ decisao apos a auditoria (Minecraft 1.20.1 / Forge 47.3.0):
 ## Primeira sequencia de implementacao
 
 1. ASC-002 (em andamento): capability de estado do jogador, NBT e GameTest de
-   serializacao/copia ja existem; falta validar o evento real de morte/respawn
-   e decidir cooldowns e permissoes. Nao ha API de ativacao ficticia.
+   serializacao/copia e dos dois ramos do handler `PlayerEvent.Clone` ja existem.
+   O teste instancia o evento e chama o handler, sem simular um respawn completo.
+   Faltam decisoes de cooldowns e permissoes. Nao ha API de ativacao ficticia.
 2. Rede de estado apenas quando definida a primeira transicao de gameplay que
    precise de input cliente ou observacao remota.
 3. ASC-003 voo: estados e movimento server-authoritative, colisao e interrupcao;

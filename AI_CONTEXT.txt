@@ -51,8 +51,9 @@ ESTADO VERIFICADO EM 2026-10-19
   sincronizacao de poderes.
 - Nao ha testes JUnit em `src/test`; `gradlew build` termina com sucesso e a
   tarefa `test` informa NO-SOURCE. Um GameTest Forge em `src/main` valida
-  capability de jogador, NBT, copia de estado e unlock idempotente; passou em
-  `runGameTestServer` com Temurin JDK 17.0.20.1.
+  capability de jogador, NBT, unlock idempotente e chamada dos dois ramos do
+  handler de `PlayerEvent.Clone`; passou em `runGameTestServer` com Temurin JDK
+  17.0.20.1. Ainda nao simula um respawn completo pelo servidor.
 - O terminal aponta por padrao para Java 8u51, antigo demais para ForgeGradle.
   O projeto deve ser executado com Java 17 conforme sua configuracao.
 - A pasta nao e um repositorio Git (`git status` retorna fatal: not a git
@@ -61,9 +62,9 @@ ESTADO VERIFICADO EM 2026-10-19
   `Ascendant.java` e `mods.toml`.
 
 PROXIMO LOTE AUTORIZADO
-ASC-002 permanece em andamento: testar a copia no evento real de morte/respawn;
-definir cooldowns/permissoes e integrar estado sincronizado somente quando uma
-habilidade real precisar dele. Depois, implementar voo.
+ASC-002 permanece em andamento: testar o ciclo completo de respawn pelo
+servidor; definir cooldowns/permissoes e integrar estado sincronizado somente
+quando uma habilidade real precisar dele. Depois, implementar voo.
 Forge 1.20.x documenta `AttachCapabilitiesEvent<Entity>`, `PlayerEvent.Clone`,
 `RegisterCapabilitiesEvent` e SimpleImpl como pontos de extensao pertinentes.
 

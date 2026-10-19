@@ -35,7 +35,23 @@ LOTE DE AUDITORIA E FUNDACAO INICIAL
   17.0.20.1 passaram. `test` e NO-SOURCE; `runGameTestServer` executou um
   GameTest, com NBT round-trip, capability acessivel em Player, copia do estado
   e unlock idempotente; 1 teste passou.
-- Pendencias/riscos: o GameTest ainda nao dispara `PlayerEvent.Clone`; validar
-  esse ciclo de vida, e decidir cooldowns, permissoes e sincronizacao conforme
-  a primeira habilidade. ASC-002 continua aberta.
+- Pendencias/riscos: o GameTest nao simula o ciclo completo de respawn; decidir
+  cooldowns, permissoes e sincronizacao conforme a primeira habilidade.
+  ASC-002 continua aberta.
 - Git: git status falhou porque a pasta nao e repositorio; sem commit/remoto.
+
+VALIDACAO DO CLONE DE JOGADOR
+- Data: 2026-10-19
+- Tarefa: ASC-002 (em andamento)
+- Arquivos: PlayerPowerDataGameTests.java, AI_CONTEXT.txt,
+  AGENT_COORDINATION.txt, AGENT_LOG.txt, docs/ARCHITECTURE.md e README.md.
+- Validacoes: `gradlew.bat runGameTestServer` com Temurin JDK 17.0.20.1;
+  1 GameTest passou. O teste chama o handler com `PlayerEvent.Clone` tanto com
+  `isWasDeath=true` quanto false, e cobre NBT e attachment.
+- Limite: o teste instancia o evento diretamente; nao simula o ciclo real de
+  respawn no servidor nem cliente multiplayer.
+- Resultado da compilacao: `gradlew.bat build` em Temurin JDK 17.0.20.1;
+  BUILD SUCCESSFUL; `test` NO-SOURCE.
+- Pendencias: manter ASC-002 aberta; definir cooldowns/permissoes e, se
+  necessario, testar o ciclo completo de respawn antes do voo.
+- Commit/sincronizacao: pendente desta validacao.

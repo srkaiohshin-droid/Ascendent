@@ -28,9 +28,9 @@ O artefato compilado deve ser procurado em `build/libs/`.
 
 ## Estado
 A capability armazena IDs de poderes desbloqueados por jogador, com persistencia
-NBT. Ainda nao ha habilidades de gameplay implementadas. Um GameTest verifica a
-persistencia NBT e a copia da capability; a copia pelo evento de morte ainda
-precisa de validacao direta.
+NBT. Ainda nao ha habilidades de gameplay implementadas. Um GameTest verifica
+a persistencia NBT, capability anexada, unlock idempotente e os ramos de copia
+do handler de clone. Ainda falta simular um respawn completo do servidor.
 
 ## Documentacao
 - `AI_CONTEXT.txt`: identidade, prioridades e restricoes.

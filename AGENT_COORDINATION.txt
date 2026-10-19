@@ -42,8 +42,9 @@ Criterios:
 - Propor testes de integracao e limites de desempenho.
 - Lote atual: capability de estado do jogador implementada em
   src/main/java/br/com/ascendant/powers/ com persistencia/copia em respawn.
-  Teste GameTest de NBT, capability anexada, copia e unlock idempotente passou.
-  Pendente: teste do evento de morte/respawn e decisao de cooldowns/permissoes.
+  GameTest de NBT, capability anexada, unlock idempotente e ambos os ramos de
+  PlayerEvent.Clone passou. O teste instancia o evento e chama o handler; nao
+  simula o ciclo completo de respawn do servidor. Permanecem cooldowns/permissoes.
   Arquivos alterados: Ascendant.java e novos arquivos no pacote powers.
 - Sincronizacao de habilidades sera incluida com o primeiro consumidor de
   gameplay, evitando protocolo sem dados ou fluxos reais para transportar.
