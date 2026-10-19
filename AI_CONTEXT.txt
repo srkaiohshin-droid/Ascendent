@@ -51,10 +51,11 @@ ESTADO VERIFICADO EM 2026-10-19
   em morte/respawn. Ainda nao ha definicoes, ativacao, movimento, combate ou
   sincronizacao de poderes.
 - Nao ha testes JUnit em `src/test`; `gradlew build` termina com sucesso e a
-  tarefa `test` informa NO-SOURCE. Um GameTest Forge em `src/main` valida
-  capability de jogador, NBT, unlock idempotente e chamada dos dois ramos do
-  handler de `PlayerEvent.Clone`; passou em `runGameTestServer` com Temurin JDK
-  17.0.20.1. Ainda nao simula um respawn completo pelo servidor.
+  tarefa `test` informa NO-SOURCE. Dois GameTests Forge em `src/main` cobrem
+  round-trip NBT, unlock idempotente e o ciclo de `PlayerList.respawn` nos
+  ramos de morte e retorno do End. O respawn usa o servidor real e um transporte
+  Netty embutido; nao e um teste multiplayer com cliente remoto. Ambos passaram
+  em `runGameTestServer` com Temurin JDK 17.0.20.1.
 - O terminal aponta por padrao para Java 8u51, antigo demais para ForgeGradle.
   O projeto deve ser executado com Java 17 conforme sua configuracao.
 - A pasta e um repositorio Git na branch `main`, com `origin` configurado para
@@ -63,10 +64,17 @@ ESTADO VERIFICADO EM 2026-10-19
 - Identidade do mod e metadados correspondem entre `gradle.properties`,
   `Ascendant.java` e `mods.toml`.
 
+ESTADO ASC-002
+Capability persistente, copia server-side nos dois ramos reais de clone e
+GameTests do ciclo de respawn estao concluidos. A politica de cooldowns,
+permissoes e sincronizacao esta definida em docs/ARCHITECTURE.md. O runtime de
+cooldown e pacotes de estado continuam deliberadamente adiados ate uma habilidade
+real os consumir; validar multiplayer quando houver estado de gameplay de rede.
+
 PROXIMO LOTE AUTORIZADO
-ASC-002 permanece em andamento: testar o ciclo completo de respawn pelo
-servidor; definir cooldowns/permissoes e integrar estado sincronizado somente
-quando uma habilidade real precisar dele. Depois, implementar voo.
+ASC-003: implementar voo funcional, com movimento/estado server-authoritative,
+sincronizacao dos campos que o cliente realmente consome, colisao e tratamento
+de interrupcoes conforme AGENT_COORDINATION.txt e Master.txt.
 Forge 1.20.x documenta `AttachCapabilitiesEvent<Entity>`, `PlayerEvent.Clone`,
 `RegisterCapabilitiesEvent` e SimpleImpl como pontos de extensao pertinentes.
 

@@ -64,3 +64,37 @@ registrado; `runGameTestServer` e o comando para executa-lo.
 - [SimpleImpl networking (Forge 1.20.x)](https://docs.minecraftforge.net/en/1.20.x/networking/simpleimpl/)
 - [Events (Forge 1.20.1)](https://docs.minecraftforge.net/en/1.20.1/concepts/events/)
 - [Sides (Forge 1.20.x)](https://docs.minecraftforge.net/en/1.20.x/concepts/sides/)
+
+## Politica de estado, cooldowns e permissoes
+
+- Poderes desbloqueados sao direitos duraveis do jogador. O capability serializa
+  IDs estaveis em NBT e a copia em `PlayerEvent.Clone` e substitutiva (set para
+  set), tanto na morte quanto no retorno do End; nao acumula nem duplica IDs.
+- A capability e autoridade do servidor. Nenhum pacote de sincronizacao e
+  necessario enquanto nao houver interface, input cliente ou observador remoto
+  que consuma esses dados. Quando houver consumidor, enviar apenas os campos
+  usados e continuar validando toda mudanca de gameplay no servidor.
+- Estado de execucao (por exemplo, voo ativo, carga de investida ou animacao)
+  nao sobrevive a morte, troca de dimensao nem desconexao por padrao. Cada
+  habilidade devera limpar seu estado nas transicoes do proprio ciclo de vida.
+- Quando uma habilidade ativa justificar recarga, seu cooldown sera indexado
+  pelo `ResourceLocation` da habilidade e guardara um tick de expiracao no
+  relogio de jogo do servidor (Overworld). Habilidades passivas ou sem recarga
+  de gameplay nao recebem cooldown artificial. O servidor decide disponibilidade;
+  clientes nao enviam nem reduzem cooldowns. Cooldowns iniciados persistem em
+  NBT e serao preservados em morte, retorno do End e reconexao, impedindo
+  contorno por respawn. Com o servidor desligado, o relogio para; nao ha reducao
+  de cooldown por tempo real offline. Consultas comparam o prazo de expiracao,
+  sem contador por jogador a cada tick; expirados podem ser removidos durante
+  consultas/mutacoes. Essa politica esta definida; armazenamento e runtime de
+  cooldown ainda aguardam a primeira habilidade consumidora.
+- Desbloquear um poder nao concede permissao para violar regras do mundo.
+  Ativacoes sao verificadas no servidor quanto a posse, estado e cooldown.
+  Alteracoes de blocos, dano e interacoes respeitam regras vanilla e hooks de
+  protecao/permissao Forge ou de outros mods. Poderes pessoais nao exigem OP por
+  padrao; uma permissao administrativa so sera registrada quando uma habilidade
+  concreta justificar configuracao do servidor. Nao confiar em permissao enviada
+  pelo cliente.
+- Os contratos de cooldown e permissao serao implementados junto da primeira
+  habilidade consumidora, evitando APIs sem uso. Antes disso, estes criterios
+  definem o comportamento esperado e os testes de aceitacao.

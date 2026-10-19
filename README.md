@@ -71,13 +71,13 @@ A proposta é priorizar **poucos poderes com profundidade real** em vez de muito
 - [x] Capability de jogador para armazenar IDs de poderes desbloqueados.
 - [x] Persistência do estado em NBT.
 - [x] Lógica de cópia do estado nos caminhos tratados por `PlayerEvent.Clone`.
-- [x] GameTest para capability, serialização NBT, desbloqueio idempotente e os dois ramos do handler de clone.
+- [x] GameTests para capability, serialização NBT, desbloqueio idempotente e respawn real do servidor após morte e retorno do End.
 - [x] Build e GameTest executados com sucesso no ambiente JDK 17 utilizado na validação.
 
 ### O que ainda falta
 
-- [ ] Testar o ciclo completo de morte e respawn pelo servidor.
-- [ ] Definir e integrar permissões e cooldowns.
+- [x] Testar o ciclo de morte e respawn pelo servidor, incluindo retorno do End; multiplayer com cliente remoto ainda não foi testado.
+- [x] Definir políticas de permissão e cooldown; integrar cooldown runtime quando uma habilidade ativa precisar dele.
 - [ ] Implementar a primeira habilidade de gameplay: **voo**.
 - [ ] Adicionar sincronização de rede quando houver estado real que precise ser compartilhado.
 - [ ] Desenvolver e validar os demais poderes.
@@ -180,7 +180,7 @@ No Linux/macOS:
 ```
 
 > [!NOTE]
-> Os GameTests atuais cobrem partes do estado do jogador e da persistência. Eles ainda não simulam um ciclo completo de respawn pelo servidor. A tarefa JUnit `test` pode informar `NO-SOURCE` porque não há testes JUnit em `src/test`; isso não substitui os GameTests do Forge.
+> Os GameTests cobrem persistência do estado e o ciclo real de respawn do servidor após morte e retorno do End. Não foi executado teste multiplayer com cliente remoto. A tarefa JUnit `test` pode informar `NO-SOURCE` porque não há testes JUnit em `src/test`; isso não substitui os GameTests do Forge.
 
 ## 🧱 Arquitetura
 

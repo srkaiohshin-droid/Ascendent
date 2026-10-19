@@ -79,3 +79,45 @@ CONFIGURACAO DE INSTRUCOES E AUDITORIA INICIAL
 - Proxima acao recomendada: concluir ASC-002 com cobertura adequada do ciclo de
   respawn e regras pendentes; em seguida iniciar ASC-003 (voo).
 - Commit e push desta configuracao: ainda pendentes nesta etapa do registro.
+
+CONCLUSAO ASC-002 - RESPAWN E POLITICAS DO NUCLEO
+- Data/hora local: 2026-10-19 17:43:07 -03:00 (America/Sao_Paulo).
+- Contexto e instrucoes revisados: AGENTS.md, AI_CONTEXT.txt,
+  AGENT_COORDINATION.txt, AGENT_LOG.txt, TODO.md, Master.txt (regras de
+  validacao, rede e sincronizacao); docs/ARCHITECTURE.md e codigo de powers.
+- Git inicial: main limpa em b1fbedfe97a9a8bad8a579ddf57d2e19d2c41d38,
+  origin esperado; fetch passou e local estava sincronizado com origin/main.
+- Implementacao: PlayerEvent.Clone agora copia estado duravel nos ramos de morte
+  e retorno do End. PlayerPowerDataProvider reabre um LazyOptional sobre os
+  mesmos dados durante a copia apos reviveCaps e invalida-o no fim do ciclo.
+- GameTest substitui a chamada manual de PlayerEvent.Clone por PlayerList.respawn
+  executado pelo servidor para morte e retorno do End. Um transporte Netty
+  embutido fornece canal ao fluxo de pacotes sem simular um cliente remoto.
+  O teste confirma identidade, unlock apos morte, preservacao no retorno do End
+  e ausencia de duplicacao. O teste anterior revelou perda real do estado; a
+  causa era o LazyOptional invalidado sem recriacao apos reviveCaps.
+- Politicas documentadas: ownership persistente; estado transiente limpo; cooldown
+  ativo persistido por prazo em ticks do Overworld, preservado em respawn/relogin
+  e sem reducao offline; permissao do mundo respeitada; autorizacao server-side;
+  sincronizacao por pacotes adiada ate um consumidor real. Cooldown runtime e
+  pacotes ainda nao implementados por nao haver habilidade consumidora.
+- Validacao final com Temurin JDK 17.0.20.1: .\gradlew.bat build BUILD SUCCESSFUL;
+  test task NO-SOURCE. .\gradlew.bat runGameTestServer BUILD SUCCESSFUL; 2/2
+  GameTests passaram. Nenhum teste multiplayer com clientes remotos foi executado.
+- Arquivos alterados: PlayerPowerDataProvider.java, PlayerPowerDataEvents.java,
+  PlayerPowerDataGameTests.java, docs/ARCHITECTURE.md, AI_CONTEXT.txt,
+  AGENT_COORDINATION.txt, TODO.md e AGENT_LOG.txt.
+- Estado: ASC-002 concluida conforme criterios de projeto/contratos e ciclo
+  server-side. Implementacao de cooldown e sincronizacao de gameplay permanece
+  para a habilidade que primeiro precisar delas. Nenhum sistema de poder foi
+  marcado como implementado.
+- Proximo passo: iniciar ASC-003, voo funcional, definindo movimento e estado
+  server-authoritative, colisao e sincronizacao apenas do estado consumido pelo
+  cliente. Commit/push deste lote ainda pendentes.
+
+INTEGRACAO DO AVANCO REMOTO E VALIDACAO FINAL ASC-002
+- Data/hora local: 2026-10-19 17:48:01 -03:00 (America/Sao_Paulo).
+- Fetch identificou origin/main avancada para e1bef6ea35faa24259587ab9c710df21031f44e9 por um commit somente de README. Fast-forward aplicado sem conflito; as alteracoes locais permaneceram intactas e main ficou alinhada ao remoto.
+- README revisado; somente as afirmacoes de estado sobre ciclo de respawn, politicas e GameTests foram atualizadas para refletir ASC-002, preservando o redesenho remoto.
+- Revalidacao apos integracao com Temurin JDK 17.0.20.1: gradlew.bat build terminou BUILD SUCCESSFUL; 	est e NO-SOURCE. gradlew.bat runGameTestServer terminou BUILD SUCCESSFUL e registrou 2/2 GameTests aprovados, incluindo respawn real do servidor. Sem teste com cliente remoto.
+- Arquivos deste lote incluem as alteracoes de ASC-002 em codigo, documentacao e contexto, mais README.md para corrigir o estado agora comprovado. Revisao de diff, git diff --check, commit e push pendentes.

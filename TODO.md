@@ -2,12 +2,15 @@
 
 - [x] Auditar a inicializacao e a configuracao do MDK.
 - [x] Definir arquitetura inicial de poderes baseada na API do Forge.
-- [ ] Definir estado persistente do jogador e sincronizacao.
+- [x] Definir estado persistente, politica de cooldown/permissoes e contrato de sincronizacao.
+- [ ] Implementar cooldown runtime junto da primeira habilidade ativa que o exija.
+- [ ] Implementar sincronizacao de gameplay quando houver consumidor cliente real.
 - [ ] Implementar voo funcional.
 - [ ] Implementar supervelocidade funcional.
 - [ ] Implementar superforca funcional.
 - [ ] Implementar super-resistencia funcional.
 - [ ] Implementar poderes aquaticos funcionais.
-- [ ] Criar testes de integracao e multiplayer.
+- [x] Cobrir capability NBT e respawn server-side com GameTest.
+- [ ] Validar gameplay multiplayer com dois jogadores quando houver mecanica de rede.
 - [ ] Planejar HeroPacks e extensibilidade apos estabilizar o nucleo.
-- [ ] Configurar Git remoto somente quando houver autorizacao e destino confirmado.
+- [x] Configurar e confirmar o remoto Git origin autorizado.

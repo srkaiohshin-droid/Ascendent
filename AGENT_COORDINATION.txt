@@ -32,7 +32,7 @@ Criterios:
 
 ASC-002
 Titulo: Projetar o nucleo de poderes e estado do jogador
-Status: IN_PROGRESS
+Status: DONE
 Prioridade: ALTA
 Dependencia: ASC-001
 Criterios:
@@ -40,20 +40,26 @@ Criterios:
 - Definir persistencia, sincronizacao, cooldowns e permissões.
 - Definir validacao server-authoritative.
 - Propor testes de integracao e limites de desempenho.
-- Lote atual: capability de estado do jogador implementada em
-  src/main/java/br/com/ascendant/powers/ com persistencia/copia em respawn.
-  GameTest de NBT, capability anexada, unlock idempotente e ambos os ramos de
-  PlayerEvent.Clone passou. O teste instancia o evento e chama o handler; nao
-  simula o ciclo completo de respawn do servidor. Permanecem cooldowns/permissoes.
-  Arquivos alterados: Ascendant.java e novos arquivos no pacote powers.
-- Sincronizacao de habilidades sera incluida com o primeiro consumidor de
-  gameplay, evitando protocolo sem dados ou fluxos reais para transportar.
+- Estado: capability de estado duravel implementada com NBT e clone real em
+  `PlayerList.respawn`. GameTests cobrem NBT/idempotencia e os ramos de morte e
+  retorno do End; o provider recria seu LazyOptional invalidado durante a janela
+  de copia, depois invalida novamente. Politica de cooldown/permissao e
+  sincronizacao definida em `docs/ARCHITECTURE.md`.
+- Sincronizacao runtime e cooldown runtime permanecem adiados ate existir a
+  primeira habilidade que os consuma; nao ha protocolo ou cooldown ficticio.
+- Arquivos deste lote: `PlayerPowerDataProvider.java`,
+  `PlayerPowerDataEvents.java`, `PlayerPowerDataGameTests.java`,
+  `docs/ARCHITECTURE.md`, `AI_CONTEXT.txt`, `AGENT_COORDINATION.txt`,
+  `AGENT_LOG.txt` e `TODO.md`.
+- Validacao: `gradlew.bat build` passou (`test` NO-SOURCE) e
+  `gradlew.bat runGameTestServer` passou com 2/2 GameTests no Temurin JDK 17.
+- Criterios ASC-002 atendidos; continuar com ASC-003.
 
 ASC-003
 Titulo: Implementar voo funcional
 Status: PENDING
 Prioridade: ALTA
-Dependencia: ASC-001, ASC-002
+Dependencia: ASC-001, ASC-002 (concluida)
 Criterios:
 - Ativacao e desativacao reais.
 - Movimento controlado e comportamento no ar.

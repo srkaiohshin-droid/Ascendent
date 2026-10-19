@@ -13,10 +13,16 @@ public final class PlayerPowerDataProvider implements ICapabilitySerializable<Co
             CapabilityManager.get(new CapabilityToken<>() {});
 
     private final PlayerPowerData data = new PlayerPowerData();
-    private final LazyOptional<IPlayerPowerData> optional = LazyOptional.of(() -> data);
+    private LazyOptional<IPlayerPowerData> optional = LazyOptional.of(() -> data);
 
     @Override
     public <T> LazyOptional<T> getCapability(Capability<T> capability, Direction side) {
+        // A removed Player's caps are temporarily revived during PlayerEvent.Clone.
+        // The old LazyOptional was invalidated by the attach listener, so create a
+        // fresh view over the same data for that short copy window.
+        if (capability == CAPABILITY && !optional.isPresent()) {
+            optional = LazyOptional.of(() -> data);
+        }
         return CAPABILITY.orEmpty(capability, optional);
     }
 

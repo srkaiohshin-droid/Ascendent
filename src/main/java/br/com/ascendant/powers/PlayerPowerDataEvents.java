@@ -25,11 +25,7 @@ public final class PlayerPowerDataEvents {
     }
 
     @SubscribeEvent
-    public static void copyPlayerDataOnDeath(PlayerEvent.Clone event) {
-        if (!event.isWasDeath()) {
-            return;
-        }
-
+    public static void copyPlayerDataOnClone(PlayerEvent.Clone event) {
         event.getOriginal().reviveCaps();
         try {
             event.getOriginal().getCapability(PlayerPowerDataProvider.CAPABILITY).ifPresent(originalData ->
