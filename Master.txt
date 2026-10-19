@@ -1029,3 +1029,74 @@ Comece pela auditoria do repositório real e pelo protocolo de contexto comparti
 Trabalhe com profundidade, eficiência e disciplina técnica. Priorize os cinco pilares iniciais, desenvolva suas habilidades com mecânicas completas e permita que habilidades exclusivas, compartilhadas e combinadas coexistam em uma arquitetura modular.
 
 **Não declare que algo existe, funciona, compila, foi testado ou está sincronizado sem evidência real. Não entregue conteúdo vazio. Construa o Ascendant para que cada nova implementação aumente de verdade a capacidade do framework.**
+
+# 33. EXECUCAO CONTINUA E SINCRONIZACAO AUTOMATICA
+
+Estas regras autorizam o executor a editar o projeto real, compilar,
+testar, corrigir problemas, atualizar a documentacao e sincronizar lotes
+validados com o GitHub sem pedir confirmacao a cada operacao segura.
+
+## 33.1 - Inicio de cada sessao
+- Confirmar a raiz do projeto, branch, origin, ultimo commit e estado do Git.
+- Ler Master.txt, AI_CONTEXT.txt, AGENT_COORDINATION.txt, AGENT_LOG.txt
+  e TODO.md; consultar os documentos tecnicos relacionados a tarefa.
+- Inspecionar o codigo real antes de planejar alteracoes.
+- Executar git fetch origin e identificar divergencias antes de editar.
+- Reservar a tarefa e identificar os arquivos sob responsabilidade do agente.
+- Preservar qualquer trabalho local ou de outro agente.
+
+## 33.2 - Implementacao real
+- Trabalhar diretamente nos arquivos do repositorio, nao apenas fornecer
+  trechos de codigo na resposta.
+- Priorizar os cinco pilares: voo, supervelocidade, superforca,
+  super-resistencia e poderes aquaticos.
+- Desenvolver mecanicas completas, integradas e testaveis.
+- Nao criar stubs, metodos vazios ou funcionalidades apenas cosmeticas.
+- Fazer lotes coerentes e revisar o diff antes de validar.
+- Nao mudar Minecraft, Forge ou Java sem autorizacao explicita.
+
+## 33.3 - Validacao automatica
+- Usar Java 17 e o Gradle Wrapper do projeto.
+- No Windows, executar .\gradlew.bat build.
+- Executar .\gradlew.bat runGameTestServer quando pertinente e suportado.
+- Analisar erros, corrigir suas causas reais e repetir os testes relevantes.
+- Nunca desativar testes, remover funcionalidades ou esconder erros para
+  produzir uma compilacao aparentemente bem-sucedida.
+- Distinguir claramente compilacao aprovada de teste de gameplay aprovado.
+
+## 33.4 - Contexto compartilhado
+- Atualizar AI_CONTEXT.txt quando mudar o estado tecnico real do projeto.
+- Atualizar AGENT_COORDINATION.txt ao reservar, bloquear, concluir ou
+  enviar uma tarefa para revisao.
+- Acrescentar ao AGENT_LOG.txt os arquivos, decisoes, comandos, resultados,
+  erros e pendencias de cada lote.
+- Atualizar TODO.md e CHANGELOG.md quando a mudanca justificar isso.
+- Nao declarar testes que nao foram executados nem funcionalidades que
+  nao foram verificadas.
+
+## 33.5 - Commit e sincronizacao
+- Apos validar, revisar git diff e git diff --check.
+- Nao incluir alteracoes alheias, arquivos privados, tokens, credenciais,
+  caches ou artefatos de build.
+- Criar commits com mensagens claras e especificas.
+- Fazer novo git fetch antes de enviar.
+- Se a branch remota avancou, integrar de forma nao destrutiva e repetir
+  os testes. Se houver conflito inseguro, parar e informar.
+- Usar push normal. Nunca usar reset --hard, git clean destrutivo ou
+  force-push para resolver divergencias.
+- Confirmar o SHA remoto depois do push antes de afirmar sincronizacao.
+- Se a autenticacao falhar, preservar o commit local e relatar a falha.
+
+## 33.6 - Trabalho em varios PCs e agentes
+- O GitHub e a fonte compartilhada para codigo e documentos versionados.
+- Em um novo PC, clonar o repositorio ou atualizar a copia existente
+  antes de iniciar o trabalho; verificar branch, commit e estado local.
+- Nao permitir edicao concorrente dos mesmos arquivos sem coordenacao.
+- Preferir lotes pequenos, sincronizados e revisados.
+- As mudancas ficam disponiveis para outros PCs depois do push e do
+  pull/fetch correspondente; nao prometer sincronizacao instantanea.
+
+## 33.7 - Relatorio de cada lote
+Informar tarefa, arquivos alterados, comportamento implementado,
+comandos de build/teste e resultados reais, problemas conhecidos,
+commit local, SHA remoto confirmado e proximo passo.
