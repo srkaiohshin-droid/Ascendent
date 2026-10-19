@@ -5,7 +5,7 @@
 - [x] Definir estado persistente, politica de cooldown/permissoes e contrato de sincronizacao.
 - [ ] Implementar cooldown runtime junto da primeira habilidade ativa que o exija.
 - [ ] Implementar sincronizacao de gameplay quando houver consumidor cliente real.
-- [ ] Implementar voo funcional.
+- [ ] Implementar voo funcional. (ASC-003 IN_PROGRESS — checkpoint parcial de 2026-10-19 publicado; build OK e 8/8 GameTests; falta validar sessão real cliente-servidor e regras de colisão/queda/água/desconexão)
 - [ ] Implementar supervelocidade funcional.
 - [ ] Implementar superforca funcional.
 - [ ] Implementar super-resistencia funcional.

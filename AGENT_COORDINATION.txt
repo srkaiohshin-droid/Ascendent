@@ -57,9 +57,15 @@ Criterios:
 
 ASC-003
 Titulo: Implementar voo funcional
-Status: PENDING
+Status: IN_PROGRESS
 Prioridade: ALTA
 Dependencia: ASC-001, ASC-002 (concluida)
+Reserva: Codex; voos, networking, configuracao, entrada cliente, lifecycle,
+  testes Forge, contexto e documentacao. Preservar os demais sistemas.
+Checkpoint 2026-10-19: implementacao parcial commitada (capability de voo,
+  controller, fisica, rede, entrada cliente, configuracao, comandos,
+  GameTests, lang). Build BUILD SUCCESSFUL e 8/8 GameTests aprovados.
+  Sessao real cliente-servidor ainda nao validada; NAO concluir.
 Criterios:
 - Ativacao e desativacao reais.
 - Movimento controlado e comportamento no ar.

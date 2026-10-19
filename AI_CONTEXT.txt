@@ -71,12 +71,31 @@ permissoes e sincronizacao esta definida em docs/ARCHITECTURE.md. O runtime de
 cooldown e pacotes de estado continuam deliberadamente adiados ate uma habilidade
 real os consumir; validar multiplayer quando houver estado de gameplay de rede.
 
+ESTADO ASC-003 — CHECKPOINT PARCIAL EM 2026-10-19
+O sistema de voo esta PARCIALMENTE implementado e NAO esta concluido.
+Implementado ate o momento: capability de estado de voo (FlightState,
+PlayerFlightState, FlightStateProvider), FlightController com
+server-authoritative, FlightPhysics, rede SimpleImpl (FlightNetwork e
+pacotes), entrada cliente (FlightClientInput, FlightClientPackets),
+configuracao comum FlightTuning, eventos FlightEvents, comandos
+/ascendant power grant|revoke|list (AscendantCommands, CommandEvents),
+GameTests de voo (FlightGameTests) e lang en_us/pt_br.
+Arquivos novos: src/main/java/br/com/ascendant/flight/ e .../command/,
+src/main/resources/assets/ascendant/lang/. Ascendant.java registra a rede,
+config, eventos e GameTests.
+Validacao conhecida: `gradlew.bat build` BUILD SUCCESSFUL (jar ascendant
+0.1.0 gerado 2026-10-19 19:21) e `gradlew.bat runGameTestServer` com 8/8
+GameTests aprovados (run/logs/latest.log, 2026-10-19 19:22), com Temurin
+JDK 17.0.20.1.
+Ainda NAO verificado: sessao real cliente-servidor (runClient + servidor),
+revisao final de colisao/queda/agua/desconexao em jogo e validacao
+multiplayer com dois jogadores.
+
 PROXIMO LOTE AUTORIZADO
-ASC-003: implementar voo funcional, com movimento/estado server-authoritative,
-sincronizacao dos campos que o cliente realmente consome, colisao e tratamento
-de interrupcoes conforme AGENT_COORDINATION.txt e Master.txt.
-Forge 1.20.x documenta `AttachCapabilitiesEvent<Entity>`, `PlayerEvent.Clone`,
-`RegisterCapabilitiesEvent` e SimpleImpl como pontos de extensao pertinentes.
+ASC-003 restante: validar o voo em sessao real cliente-servidor, revisar
+regras de colisao, queda, agua e desconexao, corrigir achados e so entao
+avaliar os criterios de conclusao conforme AGENT_COORDINATION.txt e
+Master.txt. Nao marcar ASC-003 como DONE sem essa validacao.
 
 Nenhum dos cinco sistemas de poderes e considerado implementado ate existir
 codigo funcional, integracao e validacao documentada.

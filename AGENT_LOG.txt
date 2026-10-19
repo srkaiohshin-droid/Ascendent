@@ -121,3 +121,39 @@ INTEGRACAO DO AVANCO REMOTO E VALIDACAO FINAL ASC-002
 - README revisado; somente as afirmacoes de estado sobre ciclo de respawn, politicas e GameTests foram atualizadas para refletir ASC-002, preservando o redesenho remoto.
 - Revalidacao apos integracao com Temurin JDK 17.0.20.1: gradlew.bat build terminou BUILD SUCCESSFUL; 	est e NO-SOURCE. gradlew.bat runGameTestServer terminou BUILD SUCCESSFUL e registrou 2/2 GameTests aprovados, incluindo respawn real do servidor. Sem teste com cliente remoto.
 - Arquivos deste lote incluem as alteracoes de ASC-002 em codigo, documentacao e contexto, mais README.md para corrigir o estado agora comprovado. Revisao de diff, git diff --check, commit e push pendentes.
+
+CHECKPOINT ASC-003 - SALVAMENTO DE EMERGENCIA ANTES DE MUDANCA DE PC
+- Data/hora local: 2026-10-19 (America/Sao_Paulo).
+- Agente: opencode (big-pickle).
+- Tarefa: ASC-003 (voo) em andamento; checkpoint de preservacao, sem novas
+  funcionalidades.
+- Git inicial: main sincronizada com origin/main (HEAD ac74f46); fetch
+  executado; alteracoes locais nao commitadas: AGENT_COORDINATION.txt e
+  Ascendant.java modificados; nao rastreados: pacotes command/ e flight/ e
+  assets/ascendant/lang/.
+- Fatos confirmados antes de registrar: build do jar ascendant-0.1.0.jar em
+  19/10/2026 19:21 (build/libs) e run/logs/latest.log do GameTest server
+  registra "All 8 required tests passed" em 19:22. Nenhuma evidencia de
+  sessao real cliente-servidor (runClient/dedicado com jogador remoto).
+- Conteudo preservado: capability FlightState + provider, FlightController,
+  FlightPhysics, FlightNetwork e pacotes, FlightClientInput/ClientPackets,
+  FlightTuning (config comum), FlightEvents, FlightGameTests, comandos
+  AscendantCommands/CommandEvents, lang en_us e pt_br, registro em
+  Ascendant.java e reserva ASC-003 em AGENT_COORDINATION.txt.
+- Documentos atualizados: AI_CONTEXT.txt (estado ASC-003 parcial),
+  AGENT_COORDINATION.txt (checkpoint), AGENT_LOG.txt (este registro),
+  TODO.md e CHANGELOG.md.
+- Nenhuma funcionalidade nova foi implementada; nenhum arquivo foi apagado;
+  nenhum git reset/clean/force-push utilizado.
+- Validacoes executadas nesta sessao: git fetch, status, log e diff;
+  git diff --check; scan de credenciais nos arquivos novos (nenhuma
+  credencial; ocorrencias de "token" sao CapabilityToken do Forge).
+  gradlew nao foi re-executado; usa-se o resultado verificado de 19:21/19:22.
+- Problemas conhecidos: voo nao validado em sessao real cliente-servidor;
+  criterios de colisao/queda/agua/desconexao nao confirmados em jogo;
+  ASC-003 permanece IN_PROGRESS.
+- Proximo passo: em qualquer PC, clonar/atualizar o repositorio, abrir a
+  branch main, executar runClient + servidor dedicado para validar a
+  ativacao do voo em rede real, corrigir achados e entao concluir ASC-003.
+- Commit/sincronizacao: checkpoint commitado e push verificado por
+  git ls-remote (ver relatorio final desta sessao).
