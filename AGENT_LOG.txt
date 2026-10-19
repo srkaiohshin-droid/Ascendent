@@ -1,0 +1,41 @@
+ASCENDANT - REGISTRO DE ALTERACOES
+
+Formato por lote:
+- Data:
+- Agente:
+- Tarefa:
+- Arquivos alterados:
+- Decisoes:
+- Validacoes executadas:
+- Resultado da compilacao:
+- Problemas conhecidos:
+- Pendencias:
+- Commit/sincronizacao (se aplicavel):
+
+REGISTRO INICIAL
+- Data: registrada no momento da execucao do script
+- Tarefa: fundacao inicial e identidade do mod
+- Estado anterior: MDK de exemplo Forge 1.20.1 / 47.3.0
+- Ambiente pretendido: Java 17, Gradle Wrapper 8.8
+- Alteracoes previstas: identidade do mod, classe principal e documentos centrais
+- Validacao: build executado ao final do script; registrar resultado real no terminal
+- GitHub: nao confirmado como conectado
+LOTE DE AUDITORIA E FUNDACAO INICIAL
+- Data: 2026-10-19
+- Agente: Codex
+- Tarefa: ASC-001 concluida; ASC-002 em andamento
+- Arquivos: AI_CONTEXT.txt, AGENT_COORDINATION.txt, AGENT_LOG.txt, TODO.md,
+  CHANGELOG.md, README.md, docs/ARCHITECTURE.md, Ascendant.java, capability/provider/evento,
+  GameTest e data/ascendant/structures/empty.nbt.
+- Decisoes: Forge 1.20.x capability anexada a Player, IDs ResourceLocation,
+  persistencia NBT e copia em morte/respawn. Sem sincronizacao ate haver
+  consumidor de gameplay. A documentacao Forge 1.20.x consultada cobre
+  AttachCapabilitiesEvent, PlayerEvent.Clone, SimpleImpl, lados e GameTests.
+- Validacoes: build inicial falhou usando Java 8u51; builds com Temurin JDK
+  17.0.20.1 passaram. `test` e NO-SOURCE; `runGameTestServer` executou um
+  GameTest, com NBT round-trip, capability acessivel em Player, copia do estado
+  e unlock idempotente; 1 teste passou.
+- Pendencias/riscos: o GameTest ainda nao dispara `PlayerEvent.Clone`; validar
+  esse ciclo de vida, e decidir cooldowns, permissoes e sincronizacao conforme
+  a primeira habilidade. ASC-002 continua aberta.
+- Git: git status falhou porque a pasta nao e repositorio; sem commit/remoto.

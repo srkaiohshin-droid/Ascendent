@@ -1,0 +1,103 @@
+ASCENDANT - FILA DE COORDENACAO DE AGENTES
+
+REGRAS
+1. Antes de implementar, ler AI_CONTEXT.txt, este arquivo e AGENT_LOG.txt.
+2. Inspecionar os arquivos reais e o estado atual do Git, se houver.
+3. Reservar uma tarefa e declarar arquivos que serao modificados.
+4. Evitar que dois agentes alterem simultaneamente os mesmos arquivos.
+5. Nao assumir que escrever neste arquivo notifica outros agentes.
+6. Registrar resultado, testes, arquivos e pendencias ao concluir.
+7. Em conflito, preservar as alteracoes e reconciliar; nao apagar trabalho.
+8. Nao marcar uma tarefa como concluida sem verificar seus criterios.
+
+STATUS PERMITIDOS
+PENDING, IN_PROGRESS, BLOCKED, REVIEW, DONE
+
+TAREFAS INICIAIS
+
+ASC-001
+Titulo: Auditar a fundacao do MDK e os pontos de extensao
+Status: DONE
+Prioridade: CRITICA
+Arquivos: build.gradle, gradle.properties, src/main, mods.toml
+Criterios:
+- Confirmar identidade, ambiente Java e versoes.
+- Confirmar entrada do mod e fluxo de inicializacao.
+- Identificar configuracoes de cliente, servidor e rede.
+- Propor arquitetura modular baseada na API real do Forge 1.20.1.
+- Registrar riscos e comandos de validacao.
+- Resultado: veja docs/ARCHITECTURE.md e AI_CONTEXT.txt (2026-10-19).
+- Build: sucesso em Temurin JDK 17.0.20.1; `test` sem fontes.
+- Git: pasta sem repositorio Git; sem commit/remoto verificavel.
+
+ASC-002
+Titulo: Projetar o nucleo de poderes e estado do jogador
+Status: IN_PROGRESS
+Prioridade: ALTA
+Dependencia: ASC-001
+Criterios:
+- Definir interfaces e contratos sem criar abstrações vazias.
+- Definir persistencia, sincronizacao, cooldowns e permissões.
+- Definir validacao server-authoritative.
+- Propor testes de integracao e limites de desempenho.
+- Lote atual: capability de estado do jogador implementada em
+  src/main/java/br/com/ascendant/powers/ com persistencia/copia em respawn.
+  Teste GameTest de NBT, capability anexada, copia e unlock idempotente passou.
+  Pendente: teste do evento de morte/respawn e decisao de cooldowns/permissoes.
+  Arquivos alterados: Ascendant.java e novos arquivos no pacote powers.
+- Sincronizacao de habilidades sera incluida com o primeiro consumidor de
+  gameplay, evitando protocolo sem dados ou fluxos reais para transportar.
+
+ASC-003
+Titulo: Implementar voo funcional
+Status: PENDING
+Prioridade: ALTA
+Dependencia: ASC-001, ASC-002
+Criterios:
+- Ativacao e desativacao reais.
+- Movimento controlado e comportamento no ar.
+- Estado validado no servidor e sincronizado.
+- Regras de colisao, queda, agua e desconexao definidas.
+- Testes reproduziveis e compilacao aprovada.
+
+ASC-004
+Titulo: Implementar supervelocidade funcional
+Status: PENDING
+Prioridade: ALTA
+Dependencia: ASC-001, ASC-002
+Criterios:
+- Movimento e controle reais, nao apenas particulas.
+- Interacao com colisao, terreno e entidades.
+- Limites seguros, sincronizacao e testes.
+
+ASC-005
+Titulo: Implementar superforca funcional
+Status: PENDING
+Prioridade: ALTA
+Dependencia: ASC-001, ASC-002
+Criterios:
+- Efeitos de gameplay concretos e configuraveis.
+- Dano, interacoes e limites processados com autoridade do servidor.
+- Testes e compilacao aprovados.
+
+ASC-006
+Titulo: Implementar super-resistencia funcional
+Status: PENDING
+Prioridade: ALTA
+Dependencia: ASC-001, ASC-002
+Criterios:
+- Mitigacao de dano especifica e configuravel.
+- Compatibilidade com fontes de dano e regras do Minecraft.
+- Testes e compilacao aprovados.
+
+ASC-007
+Titulo: Projetar e implementar poderes aquaticos
+Status: PENDING
+Prioridade: ALTA
+Dependencia: ASC-001, ASC-002
+Criterios:
+- Beneficios e habilidades aquaticas com efeito real.
+- Regras claras dentro e fora da agua.
+- Sincronizacao, testes e compilacao aprovados.
+
+Nenhuma tarefa esta concluida apenas por existir nesta fila.

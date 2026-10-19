@@ -1,0 +1,71 @@
+ASCENDANT - CONTEXTO CENTRAL DO PROJETO
+
+IDENTIDADE
+Nome: Ascendant - Superhuman Framework
+Minecraft Java: 1.20.1
+Forge: 47.3.0
+Java: 17
+Mod ID: ascendant
+Pacote-base: br.com.ascendant
+Versao inicial: 0.1.0
+Raiz local: C:\Users\srkai\Documents\Ascendant
+
+OBJETIVO
+Construir um framework modular de super-humanos para Minecraft.
+Os poderes devem alterar gameplay de verdade, ser extensíveis, testáveis
+e compatíveis com multiplayer. Efeitos visuais nunca substituem a mecânica.
+
+PRIORIDADES INICIAIS
+1. Voo
+2. Supervelocidade
+3. Superforca
+4. Super-resistencia
+5. Poderes aquaticos
+
+QUALIDADE OBRIGATORIA
+- Nao implementar stubs, TODOs disfarçados de funcionalidades ou metodos vazios.
+- Nao declarar um sistema funcional sem codigo e testes que sustentem isso.
+- Validar compilacao depois de cada lote coerente.
+- Preservar autoridade do servidor para estado, dano, movimento e cooldowns.
+- Validar dados enviados pelo cliente; nunca confiar cegamente em pacotes.
+- Isolar codigo exclusivamente visual para evitar crashes em servidor dedicado.
+- Evitar dependencias circulares e classes monoliticas.
+- Usar registries e eventos Forge apropriados para a versao fixada.
+- Documentar arquivos alterados, comportamento, riscos e testes executados.
+- Preferir implementacoes profundas e completas a muitos poderes superficiais.
+
+RESTRICOES
+- Nao trocar Minecraft, Forge ou Java sem autorizacao explicita.
+- Nao misturar este projeto com Skyheros ou HeroPort.
+- Nao presumir que existe um repositorio GitHub conectado.
+- Nao sobrescrever trabalho alheio sem revisar e preservar alteracoes.
+- Consultar a API real do Forge 1.20.1 antes de usar classes ou metodos.
+- Otimizar tokens e tempo por meio de lotes coerentes, sem sacrificar qualidade.
+
+ESTADO VERIFICADO EM 2026-10-19
+- Projeto Forge MDK para Minecraft 1.20.1 / Forge 47.3.0, mappings oficiais
+  1.20.1, Gradle Wrapper 8.8 e toolchain Java 17.
+- Ascendant e a entrada do mod. A primeira capability de jogador foi
+  implementada para IDs de poderes desbloqueados, com persistencia NBT e copia
+  em morte/respawn. Ainda nao ha definicoes, ativacao, movimento, combate ou
+  sincronizacao de poderes.
+- Nao ha testes JUnit em `src/test`; `gradlew build` termina com sucesso e a
+  tarefa `test` informa NO-SOURCE. Um GameTest Forge em `src/main` valida
+  capability de jogador, NBT, copia de estado e unlock idempotente; passou em
+  `runGameTestServer` com Temurin JDK 17.0.20.1.
+- O terminal aponta por padrao para Java 8u51, antigo demais para ForgeGradle.
+  O projeto deve ser executado com Java 17 conforme sua configuracao.
+- A pasta nao e um repositorio Git (`git status` retorna fatal: not a git
+  repository). Nao ha estado de commit ou remoto verificavel nesta raiz.
+- Identidade do mod e metadados correspondem entre `gradle.properties`,
+  `Ascendant.java` e `mods.toml`.
+
+PROXIMO LOTE AUTORIZADO
+ASC-002 permanece em andamento: testar a copia no evento real de morte/respawn;
+definir cooldowns/permissoes e integrar estado sincronizado somente quando uma
+habilidade real precisar dele. Depois, implementar voo.
+Forge 1.20.x documenta `AttachCapabilitiesEvent<Entity>`, `PlayerEvent.Clone`,
+`RegisterCapabilitiesEvent` e SimpleImpl como pontos de extensao pertinentes.
+
+Nenhum dos cinco sistemas de poderes e considerado implementado ate existir
+codigo funcional, integracao e validacao documentada.
