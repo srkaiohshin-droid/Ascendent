@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">ASCENDANT — Superhuman Framework</title>
+  <desc id="desc">An animated violet and electric-blue energy core surrounded by orbital rings and particles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#080b16"/><stop offset=".55" stop-color="#11152b"/><stop offset="1" stop-color="#20113b"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#43e8ff" stop-opacity="0"/><stop offset=".48" stop-color="#43e8ff"/><stop offset="1" stop-color="#9b6dff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="core">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".16" stop-color="#b8faff"/><stop offset=".42" stop-color="#56cfff"/><stop offset=".72" stop-color="#7657ff" stop-opacity=".7"/><stop offset="1" stop-color="#7657ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#7f91ff" stroke-opacity=".10" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="360" rx="20" fill="url(#bg)"/>
+  <rect width="1200" height="360" rx="20" fill="url(#grid)"/>
+  <g opacity=".55" stroke="url(#beam)" stroke-width="2">
+    <path d="M0 68H1200"><animate attributeName="opacity" values=".12;.65;.12" dur="4s" repeatCount="indefinite"/></path>
+    <path d="M0 292H1200"><animate attributeName="opacity" values=".6;.12;.6" dur="5s" repeatCount="indefinite"/></path>
+  </g>
+  <g transform="translate(900 180)" filter="url(#glow)">
+    <circle r="112" fill="url(#core)" opacity=".55"><animate attributeName="r" values="96;116;96" dur="3.2s" repeatCount="indefinite"/></circle>
+    <circle r="65" fill="none" stroke="#66eaff" stroke-opacity=".8" stroke-width="1.5">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="18s" repeatCount="indefinite"/>
+    </circle>
+    <ellipse rx="120" ry="42" fill="none" stroke="#8e7aff" stroke-width="2" stroke-opacity=".9" transform="rotate(-28)">
+      <animateTransform attributeName="transform" additive="sum" type="rotate" from="0" to="360" dur="14s" repeatCount="indefinite"/>
+    </ellipse>
+    <ellipse rx="95" ry="34" fill="none" stroke="#54eaff" stroke-width="1.5" stroke-opacity=".8" transform="rotate(48)">
+      <animateTransform attributeName="transform" additive="sum" type="rotate" from="360" to="0" dur="11s" repeatCount="indefinite"/>
+    </ellipse>
+    <circle r="43" fill="url(#core)"><animate attributeName="opacity" values=".72;1;.72" dur="2.1s" repeatCount="indefinite"/></circle>
+    <path d="M-24 0H24M0-24V24" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".9"/>
+    <circle r="6" fill="#fff"/>
+  </g>
+  <g fill="#83eaff">
+    <circle cx="756" cy="82" r="2"><animate attributeName="cy" values="82;58;82" dur="3s" repeatCount="indefinite"/></circle>
+    <circle cx="1046" cy="270" r="2.5"><animate attributeName="cx" values="1046;1070;1046" dur="4s" repeatCount="indefinite"/></circle>
+    <circle cx="1090" cy="105" r="1.8"><animate attributeName="cy" values="105;128;105" dur="2.6s" repeatCount="indefinite"/></circle>
+    <circle cx="795" cy="265" r="1.7"><animate attributeName="cx" values="795;770;795" dur="3.5s" repeatCount="indefinite"/></circle>
+  </g>
+  <g font-family="Segoe UI,Arial,sans-serif">
+    <text x="78" y="145" fill="#7deaff" font-size="14" letter-spacing="6">A MODULAR SUPERHUMAN FRAMEWORK</text>
+    <text x="72" y="213" fill="#ffffff" font-size="68" font-weight="800" letter-spacing="3">ASCENDANT</text>
+    <rect x="78" y="237" width="310" height="3" rx="2" fill="url(#beam)">
+      <animate attributeName="width" values="70;310;190;310" dur="5s" repeatCount="indefinite"/>
+    </rect>
+    <text x="78" y="273" fill="#c8d2f2" font-size="19" letter-spacing="1.5">POWER SHOULD CHANGE THE GAME.</text>
+    <text x="78" y="310" fill="#8793ba" font-size="13" letter-spacing="3">MINECRAFT JAVA 1.20.1  •  FORGE 47.3.0</text>
+  </g>
+  <rect x="1" y="1" width="1198" height="358" rx="19" fill="none" stroke="#7e7cff" stroke-opacity=".35"/>
+</svg>
