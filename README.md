@@ -1,7 +1,7 @@
-<!-- ASCENDANT // animated project showcase -->
+<!-- ASCENDANT // apresentação animada do projeto -->
 <div align="center">
 
-<img src="assets/ascendant-reactor.svg" alt="ASCENDANT — animated energy core" width="100%" />
+<img src="assets/ascendant-reactor.svg" alt="ASCENDANT — núcleo de energia animado" width="100%" />
 
 <br/>
 
@@ -11,15 +11,15 @@
 
 <br/><br/>
 
-<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=19&duration=2800&pause=850&color=75E8FF&center=true&vCenter=true&width=780&lines=SUPERHUMAN+POWERS.+REAL+GAMEPLAY.;FLIGHT.+SPEED.+STRENGTH.+DURABILITY.;BUILT+FOR+IMMERSION.+ENGINEERED+FOR+MULTIPLAYER.;ONE+POWER+AT+A+TIME.+NO+SHORTCUTS." alt="Animated Ascendant tagline" />
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=19&duration=2800&pause=850&color=75E8FF&center=true&vCenter=true&width=780&lines=PODERES+SOBRE-HUMANOS.+GAMEPLAY+REAL.;VOO.+VELOCIDADE.+FORCA.+RESISTENCIA.;IMERSAO+E+MULTIJOGADOR+EM+PRIMEIRO+LUGAR.;UM+PODER+POR+VEZ.+SEM+ATALHOS." alt="Frases animadas do Ascendant" />
 
 <br/>
 
-<a href="#-the-vision">THE VISION</a> ◈
-<a href="#-power-protocol">POWER PROTOCOL</a> ◈
-<a href="#-development-status">STATUS</a> ◈
-<a href="#-build--test">BUILD</a> ◈
-<a href="#-architecture">ARCHITECTURE</a>
+<a href="#-a-visao">A VISÃO</a> ◈
+<a href="#-protocolo-de-poderes">PODERES</a> ◈
+<a href="#-estado-do-desenvolvimento">STATUS</a> ◈
+<a href="#-compilar-e-testar">COMPILAR</a> ◈
+<a href="#-arquitetura">ARQUITETURA</a>
 
 </div>
 
@@ -27,89 +27,95 @@
 
 <div align="center">
 
-## ◉ SYSTEM ONLINE
+## ◉ SISTEMA INICIALIZADO
 
-**Ascendant** is a modular superhuman framework for Minecraft Java Edition.
+**Ascendant** é uma estrutura modular de poderes sobre-humanos para Minecraft Java Edition.
 
-Not a collection of flashy buttons. A foundation for powers that change how you move, fight, explore, and interact with the world.
+Não é apenas uma coleção de botões e efeitos visuais. É a base para poderes que transformam a maneira de se movimentar, lutar, explorar e interagir com o mundo.
 
 </div>
 
-## ✦ The vision
+## ✦ A visão
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-### ⚡ Powers with weight
-Acceleration, momentum, control, impact, limitations, and consequences. A power should feel different to use—not just look different.
+### ⚡ Poderes com peso
+
+Aceleração, impulso, controle, impacto, limitações e consequências. Cada poder deve ter uma identidade mecânica própria, não apenas uma aparência diferente.
 
 </td>
 <td width="50%" valign="top">
 
-### ◈ A world that reacts
-Movement, terrain, water, collisions, damage, and player state are part of the mechanic.
+### ◈ Um mundo que reage
+
+Terreno, água, colisões, dano e estado do jogador fazem parte da habilidade. O ambiente não deve ser ignorado pela mecânica.
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### ⛨ Multiplayer by design
-The server validates meaningful actions and owns authoritative gameplay outcomes. Client input is a request, never proof.
+### ⛨ Multijogador desde a base
+
+O servidor valida ações importantes e determina os resultados do jogo. A entrada do cliente é uma solicitação, não uma prova de que a ação é permitida.
 
 </td>
 <td width="50%" valign="top">
 
-### ⌘ Built to evolve
-Modular systems, explicit state, controlled networking, dedicated-server safety, and tests that verify behavior.
+### ⌘ Feito para evoluir
+
+Sistemas modulares, estados explícitos, rede controlada, compatibilidade com servidor dedicado e testes que verificam o comportamento.
 
 </td>
 </tr>
 </table>
 
-## ◈ Power protocol
+## ◈ Protocolo de poderes
 
 <div align="center">
 
-| CORE SYSTEM | DESIGN TARGET | STATUS |
+| SISTEMA CENTRAL | OBJETIVO DE DESIGN | ESTADO |
 |:--|:--|:--:|
-| **01 · Flight** | Takeoff, steering, acceleration, hovering, braking, landing, collision and fall rules | **IN PROGRESS** |
-| **02 · Super speed** | Acceleration, momentum, precision control and safe terrain interaction | **PLANNED** |
-| **03 · Super strength** | Server-validated combat and meaningful world interactions | **PLANNED** |
-| **04 · Super durability** | Configurable mitigation across damage sources | **PLANNED** |
-| **05 · Aquatic powers** | Distinct movement and abilities in and around water | **PLANNED** |
+| **01 · Voo** | Decolagem, direção, aceleração, pairar, frenagem, pouso, colisões e regras de queda | **EM DESENVOLVIMENTO** |
+| **02 · Supervelocidade** | Aceleração, impulso, controle preciso e interação segura com o terreno | **PLANEJADO** |
+| **03 · Superforça** | Combate validado pelo servidor e interações relevantes com o mundo | **PLANEJADO** |
+| **04 · Super-resistência** | Mitigação configurável e consistente entre fontes de dano | **PLANEJADO** |
+| **05 · Poderes aquáticos** | Movimento e habilidades próprios dentro e ao redor da água | **PLANEJADO** |
 
 </div>
 
 <details>
-<summary><strong>▸ What does “complete” mean?</strong></summary>
+<summary><strong>▸ O que significa considerar um poder concluído?</strong></summary>
 
-A power is not complete just because the project compiles or a particle effect appears. It needs real gameplay behavior, correct server/client integration, lifecycle rules, relevant tests, and documented limitations. Status reflects development progress—not a promise that every feature is ready for players.
+Um poder não está pronto apenas porque o projeto compila ou porque uma partícula aparece na tela. Ele precisa de comportamento real de jogo, integração correta entre cliente e servidor, regras para transições de estado, testes relevantes e limitações documentadas.
+
+Os estados apresentados refletem o progresso do desenvolvimento — não uma promessa de que todas as funcionalidades já estejam prontas para jogadores.
 </details>
 
-## ⌁ Development status
+## ⌁ Estado do desenvolvimento
 
 <div align="center">
 
-| CHECKPOINT | RESULT |
+| MARCO | RESULTADO |
 |:--|:--:|
-| Forge project foundation | ✓ |
-| Player power-state capability and NBT persistence | ✓ |
-| Flight controller, physics and input integration | In progress |
-| Automated flight/GameTest validation | ✓ 8/8 at the recorded checkpoint |
-| Remote-client multiplayer validation | Pending |
-| Remaining core powers | Pending |
+| Estrutura inicial do projeto Forge | ✓ |
+| Capability de estado dos poderes e persistência NBT | ✓ |
+| Controlador de voo, física e integração de controles | Em andamento |
+| Validação automatizada de voo/GameTests | ✓ 8/8 no marco registrado |
+| Validação com cliente remoto em multijogador | Pendente |
+| Demais poderes centrais | Pendente |
 
 </div>
 
-> **Current focus:** finish and validate flight before expanding the framework with more powers. Automated tests are useful evidence, but they do not replace a real client/server multiplayer session.
+> **Prioridade atual:** concluir e validar o voo antes de ampliar a estrutura com novos poderes. Testes automatizados são evidências importantes, mas não substituem uma sessão real com cliente e servidor.
 
-## ⌘ Technology stack
+## ⌘ Tecnologias
 
 <div align="center">
 
-<img src="https://skillicons.dev/icons?i=java,gradle,git&theme=dark" alt="Java, Gradle and Git" />
+<img src="https://skillicons.dev/icons?i=java,gradle,git&theme=dark" alt="Java, Gradle e Git" />
 
 <br/>
 
@@ -120,63 +126,63 @@ A power is not complete just because the project compiles or a particle effect a
 
 </div>
 
-| Setting | Value |
+| Configuração | Valor |
 |---|---|
 | Minecraft | Java Edition 1.20.1 |
 | Forge | 47.3.0 |
 | Java | 17 |
-| Mod ID | ascendant |
-| Base package | br.com.ascendant |
-| Project version | 0.1.0 |
+| ID do mod | \`ascendant\` |
+| Pacote-base | \`br.com.ascendant\` |
+| Versão do projeto | \`0.1.0\` |
 
-## ⌘ Build & test
+## ⌘ Compilar e testar
 
-Requirements: JDK 17, Git, and the repository's Gradle Wrapper.
+**Requisitos:** JDK 17, Git e o Gradle Wrapper incluído no repositório.
 
 \`\`\`powershell
 git clone https://github.com/srkaiohshin-droid/Ascendent.git
 cd Ascendent
-.\\gradlew.bat build
-.\\gradlew.bat runGameTestServer
+.\gradlew.bat build
+.\gradlew.bat runGameTestServer
 \`\`\`
 
-On Linux/macOS, use \`./gradlew build\` and \`./gradlew runGameTestServer\`.
+No Linux/macOS, use \`./gradlew build\` e \`./gradlew runGameTestServer\`.
 
-Look for the built mod in \`build/libs/\`. Run commands with JDK 17 selected. A successful build alone does not prove a gameplay feature works correctly.
+O mod compilado deve ficar em \`build/libs/\`. Execute os comandos com o JDK 17 selecionado. Uma compilação bem-sucedida, isoladamente, não comprova que uma habilidade funcione corretamente durante o jogo.
 
-## ⌬ Architecture
+## ⌬ Arquitetura
 
 \`\`\`mermaid
 flowchart TD
-    A["Forge events & player input"] --> B["Player power state"]
-    B --> C["Power controllers & physics"]
-    C --> D["Server-authoritative gameplay"]
-    D <--> E["Network synchronization"]
-    E <--> F["Client presentation"]
-    F --> G["Animation · Audio · VFX"]
-    D --> H["GameTests & validation"]
+    A["Eventos Forge e controles do jogador"] --> B["Estado dos poderes"]
+    B --> C["Controladores e física"]
+    C --> D["Gameplay autoritativo no servidor"]
+    D <--> E["Sincronização pela rede"]
+    E <--> F["Apresentação no cliente"]
+    F --> G["Animação · Áudio · Efeitos visuais"]
+    D --> H["GameTests e validação"]
 \`\`\`
 
-**Engineering rules**
+**Princípios de engenharia**
 
-- **Server authority:** the server validates requests and decides gameplay outcomes.
-- **Clear ownership:** controllers, persistent state, networking, and visual effects have separate responsibilities.
-- **Lifecycle safety:** death, respawn, dimension changes, water, disconnects, and transitions must be handled deliberately.
-- **Dedicated-server safety:** client-only rendering code must not break a server launch.
-- **Evidence over claims:** document what was implemented, tested, and remains unverified.
+- **Autoridade do servidor:** o servidor valida solicitações e decide os resultados do jogo.
+- **Responsabilidades separadas:** controladores, estado persistente, rede e efeitos visuais têm funções distintas.
+- **Ciclo de vida seguro:** morte, renascimento, troca de dimensão, água, desconexão e outras transições precisam ser tratadas explicitamente.
+- **Compatibilidade com servidor dedicado:** código exclusivo de renderização do cliente não pode impedir a inicialização do servidor.
+- **Evidências acima de promessas:** documentar o que foi implementado, o que foi testado e o que ainda não foi verificado.
 
-## ⌁ Project files
+## ⌁ Arquivos e documentação
 
-| Document | Purpose |
+| Documento | Finalidade |
 |---|---|
-| [Master.txt](Master.txt) | Central vision, requirements, and priorities |
-| [AI_CONTEXT.txt](AI_CONTEXT.txt) | Technical context and constraints for coding agents |
-| [AGENT_COORDINATION.txt](AGENT_COORDINATION.txt) | Task queue, checkpoints, and acceptance criteria |
-| [AGENT_LOG.txt](AGENT_LOG.txt) | Work history and validation notes |
-| [Architecture](docs/ARCHITECTURE.md) | Structure and extension points |
-| [Power development](docs/POWER_DEVELOPMENT.md) | Standards for implementing abilities |
-| [Networking](docs/NETWORKING.md) | Communication and server validation |
-| [Testing](docs/TESTING.md) | Build and test workflow |
+| [Master.txt](Master.txt) | Visão central, requisitos e prioridades |
+| [AI_CONTEXT.txt](AI_CONTEXT.txt) | Contexto técnico e restrições para agentes de programação |
+| [AGENT_COORDINATION.txt](AGENT_COORDINATION.txt) | Fila de tarefas, marcos e critérios de aceitação |
+| [AGENT_LOG.txt](AGENT_LOG.txt) | Histórico de trabalho e registros de validação |
+| [Arquitetura](docs/ARCHITECTURE.md) | Estrutura do projeto e pontos de extensão |
+| [Desenvolvimento de poderes](docs/POWER_DEVELOPMENT.md) | Padrões para implementar habilidades |
+| [Rede](docs/NETWORKING.md) | Comunicação e validação pelo servidor |
+| [Testes](docs/TESTING.md) | Fluxo de compilação e testes |
 
 ---
 
@@ -184,10 +190,10 @@ flowchart TD
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:20113b,50:243b63,100:080b16&height=130&section=footer" width="100%" alt="" />
 
-<h3>ASCENDANT // POWER IS A SYSTEM.</h3>
+<h3>ASCENDANT // PODER É UM SISTEMA.</h3>
 
-<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&size=13&duration=3200&pause=1200&color=8B7CFF&center=true&vCenter=true&width=600&lines=BUILD+WITH+PURPOSE.;VALIDATE+EVERY+ABILITY.;THE+NEXT+EVOLUTION+IS+IN+PROGRESS." alt="Animated footer tagline" />
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&size=13&duration=3200&pause=1200&color=8B7CFF&center=true&vCenter=true&width=600&lines=CONSTRUA+COM+PROPOSITO.;VALIDE+CADA+HABILIDADE.;A+PROXIMA+EVOLUCAO+ESTA+EM+ANDAMENTO." alt="Frases animadas no rodapé" />
 
-<sub>Independent Minecraft mod project · Work in progress</sub>
+<sub>Projeto independente para Minecraft · Em desenvolvimento</sub>
 
 </div>
