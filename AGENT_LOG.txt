@@ -157,3 +157,124 @@ CHECKPOINT ASC-003 - SALVAMENTO DE EMERGENCIA ANTES DE MUDANCA DE PC
   ativacao do voo em rede real, corrigir achados e entao concluir ASC-003.
 - Commit/sincronizacao: checkpoint commitado e push verificado por
   git ls-remote (ver relatorio final desta sessao).
+
+CONCLUSAO DE AUDITORIA E CORRECOES ESTRUTURAIS DO VOO (ASC-003)
+- Data/hora local: 2026-10-19 22:25:00 -03:00 (America/Sao_Paulo).
+- Agente: Antigravity.
+- Tarefa: ASC-003 (voo funcional) - correcoes estruturais e expansao de testes.
+- Arquivos alterados:
+  - `src/main/java/br/com/ascendant/command/AscendantCommands.java`
+  - `src/main/java/br/com/ascendant/flight/FlightState.java`
+  - `src/main/java/br/com/ascendant/flight/PlayerFlightState.java`
+  - `src/main/java/br/com/ascendant/flight/FlightController.java`
+  - `src/main/java/br/com/ascendant/flight/FlightEvents.java`
+  - `src/main/java/br/com/ascendant/flight/FlightClientInput.java`
+  - `src/main/java/br/com/ascendant/flight/FlightGameTests.java`
+  - `AI_CONTEXT.txt`
+  - `AGENT_COORDINATION.txt`
+  - `AGENT_LOG.txt`
+  - `TODO.md`
+  - `CHANGELOG.md`
+- Problemas concretos identificados e corrigidos:
+  1. `AscendantCommands`: `StringArgumentType.word()` quebrava a sintaxe ao encontrar ":" em `ascendant:flight`. Substituido por `ResourceLocationArgument.id()`, garantindo compatibilidade com o parser de comandos vanilla/Forge.
+  2. Predição cliente e sincronização de movimento: `FlightClientInput` nunca atualizava o `FlightState` local com a mascara de entrada do teclado; com isso, `tickClient` computava a fisica com input 0 (hover/desaceleracao) enquanto o servidor acelerava, gerando jitter violento. Corrigido para sincronizar a mascara antes de `tickClient`.
+  3. Dano de queda e reset de `fallDistance`: `noGravity` desativava a gravidade mas nao limpava `fallDistance`. Jogadores caindo ou descendo sofriam dano fatal instantaneo ao pousar ou deativar o voo. Adicionado `resetFallDistance()` na ativacao, tick a tick, deativacao/pouso e cancelamento em `LivingFallEvent`.
+  4. Interacao com fluidos (lava): adicionada verificacao de `isInLava()` em `canActivate` e `canMaintainFlight`, impedindo ativacao e interrompendo voo imediatamente ao submergir em lava.
+  5. Amortecimento de velocidade residual: transicao segura para a fisica normal no solo (zerando vertical e amortecendo horizontal) e no ar (limitando horizontal e queda brusca).
+  6. Ciclo de respawn: adicionado hook para `PlayerEvent.PlayerRespawnEvent` em `FlightEvents`, corrigindo a suposicao errada de que `PlayerLoggedInEvent` roda no respawn em Forge 1.20.1.
+- Validacoes executadas:
+  - `gradlew.bat compileJava`: BUILD SUCCESSFUL.
+  - `gradlew.bat build`: BUILD SUCCESSFUL (jar gerado).
+  - `gradlew.bat runGameTestServer`: 14/14 GameTests aprovados (12 testes de voo e 2 de poderes).
+  - `git diff --check`: aprovado sem erros de espacos ou quebras de linha.
+- Estado: ASC-003 colocado em status REVIEW, cumprindo todos os requisitos tecnicos e de testes automatizados. Validacao interativa com GUI (`runClient`) pendente de inspecao humana/sessao com jogador.
+
+CORRECAO DE MODIFICADOR @SubscribeEvent EM FLIGHTCLIENTINPUT
+- Data/hora local: 2026-10-19 22:28:00 -03:00 (America/Sao_Paulo).
+- Agente: Antigravity.
+- Arquivo alterado: `src/main/java/br/com/ascendant/flight/FlightClientInput.java`.
+- Causa do crash: `registerKeyMappings` estava declarado como `private static void`. No Forge, qualquer metodo anotado com `@SubscribeEvent` deve ser `public`, caso contrario o `EventAccessTransformer` do Forge lanca `java.lang.RuntimeException: Illegal private member with @SubscribeEvent annotation` durante o carregamento do mod no cliente.
+- Correcao: alterado para `public static void registerKeyMappings(RegisterKeyMappingsEvent event)`.
+- Validacao: `gradlew.bat build` concluido com BUILD SUCCESSFUL em 12s; `runGameTestServer` com 14/14 GameTests aprovados.
+
+REFINAMENTO PROFUNDO DO VOO 3D INSPIRADO NO FISK'S SUPERHEROES (ASC-003.1)
+- Data/hora local: 2026-10-19 22:43:00 -03:00 (America/Sao_Paulo).
+- Agente: Antigravity.
+- Tarefa: ASC-003.1 - Refinamento do voo com movimentação 3D guiada pela câmera, convergência aerodinâmica, inércia, boost e banking.
+- Auditoria da referência Fisk:
+  - Analisados `ModifierControlledFlight.java`, `ModifierFlight.java`, `ModifierPropelledFlight.java`, `FlightMouseManager.java`, `ModelHelper.java` e `CTRenderPlayer.java` em `C:\Users\srkai\Documents\Load mods mcp\FiskHeroes-analysis`.
+  - Mapeado o modelo de propulsão 3D (`getLookVec`), inércia de planeio, interpolação de curvas convergentes (`lerp` em direção ao vetor de visão com preservação de magnitude), cálculo de roll/banking baseado no produto vetorial entre movimento e visão (`cross` / `acos(dot)`) e pose inclinada do modelo via rotação.
+- Arquivos alterados:
+  - `src/main/java/br/com/ascendant/flight/FlightPhysics.java`
+  - `src/main/java/br/com/ascendant/flight/FlightController.java`
+  - `src/main/java/br/com/ascendant/flight/FlightTuning.java`
+  - `src/main/java/br/com/ascendant/flight/FlightRenderEvents.java` (novo)
+  - `src/main/java/br/com/ascendant/flight/FlightGameTests.java`
+  - `AI_CONTEXT.txt`
+  - `AGENT_COORDINATION.txt`
+  - `AGENT_LOG.txt`
+  - `TODO.md`
+  - `CHANGELOG.md`
+- Implementações:
+  1. `FlightPhysics`: vetor de visão 3D completo (`yaw` e `pitch`). Olhar para cima e avançar sobe; olhar para baixo mergulha.
+  2. Convergência aerodinâmica: curvas suaves sem paradas ou giros secos.
+  3. Planeio inercial com arrasto configurável (`drag = 0.94`) e estabilização de hover.
+  4. Modo Boost / Sprint com velocidade máxima de até 1.25 blocos/tick.
+  5. `FlightRenderEvents`: inclinação corporal (pitch tilt) no `RenderPlayerEvent.Pre` e banking dinâmico nas curvas via `mulPose`, com camera roll sutil em `ViewportEvent.ComputeCameraAngles`.
+- Validações executadas:
+  - `gradlew.bat compileJava`: BUILD SUCCESSFUL.
+  - `gradlew.bat build`: BUILD SUCCESSFUL (jar gerado).
+  - `gradlew.bat runGameTestServer`: 18/18 GameTests aprovados (16 testes de voo e 2 de poderes).
+- Estado: ASC-003.1 em status REVIEW, pronto para validação visual em `runClient`.
+
+ANIMACAO CORPORAL DE VOO HEROICO (ASC-003.2)
+- Data/hora local: 2026-10-19 23:47:00 -03:00 (America/Sao_Paulo).
+- Tarefa: implementar a pose de voo heroico (Superman) no modelo vanilla, com estados, transicoes e
+  orientacao corporal sem tocar na fisica, controles, rede ou estados ja implementados.
+- Referencia Fisk analisada (somente leitura, sem copiar assets/codigo):
+  - `assets/fiskheroes/models/animations/flight/boost/superman.fsk` e `superman_elbow.fsk`:
+    tronco proximo da horizontal, braco direito projetado a frente (~165 graus), cabeca erguida
+    (~10 graus), pernas com leve defasagem e deslocamento lateral.
+  - `default_arms_forward.anim.json`, `boost/default.fsk`, `hover/default.fsk` e `idle/default.fsk`:
+    linguagem visual de braços a frente, hover quase ereto e pequenas variacoes naturais.
+  - Formato `.fsk` e rig proprietarios; a implementacao e original para o `HumanoidModel` 1.20.1.
+- Arquivos criados:
+  - `src/main/java/br/com/ascendant/flight/FlightAnimationState.java`
+  - `src/main/java/br/com/ascendant/flight/FlightPose.java`
+  - `src/main/java/br/com/ascendant/flight/FlightPoseLibrary.java`
+  - `src/main/java/br/com/ascendant/flight/FlightPoseSample.java`
+  - `src/main/java/br/com/ascendant/flight/client/FlightAnimationController.java`
+  - `src/main/java/br/com/ascendant/flight/client/FlightPoseRenderer.java`
+  - `src/main/java/br/com/ascendant/mixin/HumanoidModelMixin.java`
+  - `src/main/java/br/com/ascendant/mixin/PlayerRendererMixin.java`
+  - `src/main/resources/ascendant.mixins.json`
+- Arquivos modificados:
+  - `FlightRenderEvents.java` (removida a inclinacao dupla em `RenderPlayerEvent.Pre`; mantido apenas
+    o camera roll em `ViewportEvent.ComputeCameraAngles`).
+  - `FlightGameTests.java` (+9 testes de pose/estado, total 27).
+  - `build.gradle` (MixinGradle 0.7.38, refmap e annotation processor).
+  - `AI_CONTEXT.txt`, `AGENT_COORDINATION.txt`, `AGENT_LOG.txt`, `TODO.md`, `CHANGELOG.md`.
+- Implementacao:
+  1. Mixin em `HumanoidModel.setupAnim` (TAIL) para membros/cabeca; Mixin em
+     `PlayerRenderer.setupRotations` (TAIL) para inclinar o modelo todo dentro do push/pop do renderer.
+  2. Pose interpolada por `partialTick` com rampa de peso, sem acumulo por frame; EXIT devolve a
+     vanilla em 8 ticks e limpa o rig.
+  3. Estados HOVER, TAKEOFF, HEROIC_FLIGHT, CRUISE, CLIMB, DIVE, TURNING, BRAKING, EXIT; uma unica
+     biblioteca de pose e composicao por parametros.
+  4. Cabeca com contra-rotacao absoluta e pequena extensao de pescoco, para a face acompanhar o voo
+     em vez de apontar para o chao.
+  5. `FlightAnimationController` estima velocidade de observadores pela variacao de posicao, mantendo
+     o voo remoto animado sem novo protocolo.
+- Validacao:
+  - `gradlew.bat build`: BUILD SUCCESSFUL; refmap e `MixinConfigs` presentes no jar.
+  - `gradlew.bat runGameTestServer`: 27/27 GameTests aprovados.
+  - `git diff --check`: sem erros.
+  - `runClient`: Mixins aplicados (`HumanoidModelMixin` e `PlayerRendererMixin`); em sessao com voo
+    ativo, corpo horizontal, bracos a frente, cabeca/face para frente, frenagem com bracos abertos e
+    saida suave de volta a vanilla foram observados.
+- Pendencias e riscos:
+  - A ultima rodada de captura da silhueta simplificada foi prejudicada pela perda de foco da janela
+    do cliente durante a automacao de teclado; a homologacao visual final dessa combinacao exata de
+    valores ainda precisa ser feita em sessao grafica normal.
+  - O `net/` e material de referencia pre-existente, nao modificado e nao incluido no build.
+- Sem commit e sem push nesta sessao, conforme instrucao direta do usuario.

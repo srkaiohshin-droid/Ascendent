@@ -5,7 +5,9 @@
 - [x] Definir estado persistente, politica de cooldown/permissoes e contrato de sincronizacao.
 - [ ] Implementar cooldown runtime junto da primeira habilidade ativa que o exija.
 - [ ] Implementar sincronizacao de gameplay quando houver consumidor cliente real.
-- [ ] Implementar voo funcional. (ASC-003 IN_PROGRESS — checkpoint parcial de 2026-10-19 publicado; build OK e 8/8 GameTests; falta validar sessão real cliente-servidor e regras de colisão/queda/água/desconexão)
+- [ ] Implementar voo funcional. (ASC-003 REVIEW — correções de parser de comandos, predição de entrada do cliente, fallDistance, lava, transição de física residual e respawn implementadas)
+- [ ] Refinamento profundo do voo 3D e visual inspirado no Fisk (ASC-003.1 REVIEW — vetor 3D look pitch/yaw, convergência aerodinâmica, inércia de planeio, boost/sprint, inclinação corporal e banking visual implementados; 18/18 GameTests aprovados; pendente validação tátil em cliente GUI)
+- [ ] Homologar a animação corporal de voo heroico (ASC-003.2 REVIEW — mixins client-only, pose horizontal com braços à frente, cabeça contra-rotacionada, nove estados interpolados e 27/27 GameTests aprovados; pendente captura visual final da silhueta simplificada)
 - [ ] Implementar supervelocidade funcional.
 - [ ] Implementar superforca funcional.
 - [ ] Implementar super-resistencia funcional.

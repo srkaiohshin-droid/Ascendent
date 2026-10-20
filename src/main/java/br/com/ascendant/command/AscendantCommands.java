@@ -5,11 +5,11 @@ import br.com.ascendant.flight.FlightController;
 import br.com.ascendant.powers.IPlayerPowerData;
 import br.com.ascendant.powers.PlayerPowerDataProvider;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,7 +21,7 @@ import java.util.Collection;
  * /ascendant power revoke <player> <power_id>
  * /ascendant power list <player>
  *
- * Requires OP level 2. Powers are identified by ResourceLocation strings,
+ * Requires OP level 2. Powers are identified by ResourceLocations,
  * e.g. "ascendant:flight". The command runs on the server; no client authority.
  */
 public final class AscendantCommands {
@@ -36,16 +36,16 @@ public final class AscendantCommands {
                 .then(Commands.literal("power")
                     .then(Commands.literal("grant")
                         .then(Commands.argument("targets", EntityArgument.players())
-                            .then(Commands.argument("power", StringArgumentType.word())
+                            .then(Commands.argument("power", ResourceLocationArgument.id())
                                 .executes(ctx -> grantPower(ctx,
                                     EntityArgument.getPlayers(ctx, "targets"),
-                                    StringArgumentType.getString(ctx, "power"))))))
+                                    ResourceLocationArgument.getId(ctx, "power"))))))
                     .then(Commands.literal("revoke")
                         .then(Commands.argument("targets", EntityArgument.players())
-                            .then(Commands.argument("power", StringArgumentType.word())
+                            .then(Commands.argument("power", ResourceLocationArgument.id())
                                 .executes(ctx -> revokePower(ctx,
                                     EntityArgument.getPlayers(ctx, "targets"),
-                                    StringArgumentType.getString(ctx, "power"))))))
+                                    ResourceLocationArgument.getId(ctx, "power"))))))
                     .then(Commands.literal("list")
                         .then(Commands.argument("target", EntityArgument.player())
                             .executes(ctx -> listPowers(ctx,
@@ -54,13 +54,7 @@ public final class AscendantCommands {
     }
 
     private static int grantPower(CommandContext<CommandSourceStack> ctx,
-                                   Collection<ServerPlayer> targets, String powerString) {
-        ResourceLocation powerId = ResourceLocation.tryParse(powerString);
-        if (powerId == null) {
-            ctx.getSource().sendFailure(Component.literal(
-                "Invalid power id: '" + powerString + "'. Use namespace:path format (e.g. ascendant:flight)."));
-            return 0;
-        }
+                                   Collection<ServerPlayer> targets, ResourceLocation powerId) {
         int count = 0;
         for (ServerPlayer player : targets) {
             IPlayerPowerData data = player.getCapability(PlayerPowerDataProvider.CAPABILITY).orElse(null);
@@ -85,13 +79,7 @@ public final class AscendantCommands {
     }
 
     private static int revokePower(CommandContext<CommandSourceStack> ctx,
-                                    Collection<ServerPlayer> targets, String powerString) {
-        ResourceLocation powerId = ResourceLocation.tryParse(powerString);
-        if (powerId == null) {
-            ctx.getSource().sendFailure(Component.literal(
-                "Invalid power id: '" + powerString + "'. Use namespace:path format."));
-            return 0;
-        }
+                                    Collection<ServerPlayer> targets, ResourceLocation powerId) {
         int count = 0;
         for (ServerPlayer player : targets) {
             IPlayerPowerData data = player.getCapability(PlayerPowerDataProvider.CAPABILITY).orElse(null);

@@ -31,6 +31,11 @@ final class PlayerFlightState implements FlightState {
     }
 
     @Override
+    public void setInputMask(int inputMask) {
+        this.inputMask = inputMask & VALID_INPUT_MASK;
+    }
+
+    @Override
     public boolean acceptInput(int inputMask, long gameTick) {
         if ((inputMask & ~VALID_INPUT_MASK) != 0 || gameTick == lastInputGameTick) {
             return false;

@@ -20,6 +20,8 @@ public interface FlightState {
 
     int getInputMask();
 
+    void setInputMask(int inputMask);
+
     /** Accepts only a bounded input mask and at most one packet per server tick. */
     boolean acceptInput(int inputMask, long gameTick);
 

@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "br.com.ascendant.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "ascendant.refmap.json",
+  "client": [
+    "HumanoidModelMixin",
+    "PlayerRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

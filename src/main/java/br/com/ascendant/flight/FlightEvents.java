@@ -7,6 +7,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.living.LivingFallEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -35,22 +36,30 @@ public final class FlightEvents {
 
     /**
      * On clone (death respawn or End return): clear flight from the original.
-     * The new entity starts with a clean state. After the player re-enters the
-     * world, onLogin or StartTracking will sync state to the client.
+     * The new entity starts with a clean state.
      */
     @SubscribeEvent
     public static void onClone(PlayerEvent.Clone event) {
-        // Only clear the original; new player flight state starts inactive by default.
         FlightController.deactivateForLifecycle(event.getOriginal());
     }
 
     /**
-     * Send flight state on player login and after respawn.
-     * In Forge 1.20.1, PlayerLoggedInEvent fires both on initial join and after
-     * server respawn (the respawned player goes through placeNewPlayer again).
+     * Send flight state on initial player login to the server.
      */
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            FlightController.syncToClient(player);
+        }
+    }
+
+    /**
+     * Send flight state when the player respawns (after death or End return).
+     * In Forge 1.20.1, PlayerLoggedInEvent only fires on connection join;
+     * PlayerRespawnEvent handles world re-entry after death/End.
+     */
+    @SubscribeEvent
+    public static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             FlightController.syncToClient(player);
         }
@@ -73,6 +82,17 @@ public final class FlightEvents {
     public static void onStartTracking(PlayerEvent.StartTracking event) {
         if (event.getTarget() instanceof ServerPlayer target && event.getEntity() instanceof ServerPlayer recipient) {
             FlightNetwork.syncTrackedPlayer(recipient, target);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLivingFall(LivingFallEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            FlightState state = FlightController.getState(player);
+            if (state != null && state.isActive()) {
+                event.setCanceled(true);
+                event.setDistance(0.0F);
+            }
         }
     }
 }

@@ -45,57 +45,44 @@ RESTRICOES
 
 ESTADO VERIFICADO EM 2026-10-19
 - Projeto Forge MDK para Minecraft 1.20.1 / Forge 47.3.0, mappings oficiais
-  1.20.1, Gradle Wrapper 8.8 e toolchain Java 17.
-- Ascendant e a entrada do mod. A primeira capability de jogador foi
-  implementada para IDs de poderes desbloqueados, com persistencia NBT e copia
-  em morte/respawn. Ainda nao ha definicoes, ativacao, movimento, combate ou
-  sincronizacao de poderes.
-- Nao ha testes JUnit em `src/test`; `gradlew build` termina com sucesso e a
-  tarefa `test` informa NO-SOURCE. Dois GameTests Forge em `src/main` cobrem
-  round-trip NBT, unlock idempotente e o ciclo de `PlayerList.respawn` nos
-  ramos de morte e retorno do End. O respawn usa o servidor real e um transporte
-  Netty embutido; nao e um teste multiplayer com cliente remoto. Ambos passaram
-  em `runGameTestServer` com Temurin JDK 17.0.20.1.
-- O terminal aponta por padrao para Java 8u51, antigo demais para ForgeGradle.
-  O projeto deve ser executado com Java 17 conforme sua configuracao.
-- A pasta e um repositorio Git na branch `main`, com `origin` configurado para
-  `https://github.com/srkaiohshin-droid/Ascendent.git`. O estado de sincronizacao
-  deve ser confirmado com fetch/status no inicio de cada sessao.
-- Identidade do mod e metadados correspondem entre `gradle.properties`,
-  `Ascendant.java` e `mods.toml`.
+  1.20.1, Gradle Wrapper 8.8 e toolchain Java 17 (Temurin 17.0.20.1).
+- Capability de dados de poderes desbloqueados (IPlayerPowerData) persistida em NBT
+  com preservacao em morte e retorno do End.
+- Sistema de voo com refinamento tridimensional inspirado no Fisk's Superheroes:
+  1. Trajetoria 3D orientada pela visao: pitch e yaw governam o deslocamento tridimensional.
+     Olhar para cima e avancar sobe suavemente; olhar para baixo mergulha com ganho gravitacional natural.
+  2. Convergencia aerodinamica de curvas: a velocidade converge gradualmente para a mira mantendo momento,
+     eliminando o comportamento de foguete espacial e propiciando curvas cinematograficas.
+  3. Desaceleracao inercial e glide: soltar o comando de avanco resulta em planeio suave com arrasto
+     aerodinamico (drag = 0.94) ate estabilizacao no hover, sem paradas secas.
+  4. Modo Boost / Sprint: correr durante o voo ativa a velocidade de propulsao maxima (1.25 blocos/tick).
+  5. Frenagem ativa (tecla X) e ajustes verticais (Espaco/Shift) integrados sem conflito com o vetor 3D.
+  6. Inclinacao corporal (pitch tilt) e rolagem/banking (roll) na renderizacao do jogador (FlightRenderEvents),
+     com sutil camera roll durante curvas em alta velocidade, totalmente desacoplado da fisica de colisao.
+- 18/18 GameTests aprovados em `gradlew.bat runGameTestServer` (16 testes de voo e 2 de poderes).
+- `gradlew.bat build` concluido com sucesso.
 
-ESTADO ASC-002
-Capability persistente, copia server-side nos dois ramos reais de clone e
-GameTests do ciclo de respawn estao concluidos. A politica de cooldowns,
-permissoes e sincronizacao esta definida em docs/ARCHITECTURE.md. O runtime de
-cooldown e pacotes de estado continuam deliberadamente adiados ate uma habilidade
-real os consumir; validar multiplayer quando houver estado de gameplay de rede.
-
-ESTADO ASC-003 — CHECKPOINT PARCIAL EM 2026-10-19
-O sistema de voo esta PARCIALMENTE implementado e NAO esta concluido.
-Implementado ate o momento: capability de estado de voo (FlightState,
-PlayerFlightState, FlightStateProvider), FlightController com
-server-authoritative, FlightPhysics, rede SimpleImpl (FlightNetwork e
-pacotes), entrada cliente (FlightClientInput, FlightClientPackets),
-configuracao comum FlightTuning, eventos FlightEvents, comandos
-/ascendant power grant|revoke|list (AscendantCommands, CommandEvents),
-GameTests de voo (FlightGameTests) e lang en_us/pt_br.
-Arquivos novos: src/main/java/br/com/ascendant/flight/ e .../command/,
-src/main/resources/assets/ascendant/lang/. Ascendant.java registra a rede,
-config, eventos e GameTests.
-Validacao conhecida: `gradlew.bat build` BUILD SUCCESSFUL (jar ascendant
-0.1.0 gerado 2026-10-19 19:21) e `gradlew.bat runGameTestServer` com 8/8
-GameTests aprovados (run/logs/latest.log, 2026-10-19 19:22), com Temurin
-JDK 17.0.20.1.
-Ainda NAO verificado: sessao real cliente-servidor (runClient + servidor),
-revisao final de colisao/queda/agua/desconexao em jogo e validacao
-multiplayer com dois jogadores.
+ESTADO ASC-003.1 — EM REVISAO / AGUARDANDO SESSAO REAL (2026-10-19)
+Fisica 3D, controles, inercia, boost, banking, comandos e testes automatizados estao implementados e validados.
+Pendente inspecao em sessao grafica interativa (runClient) para homologacao.
 
 PROXIMO LOTE AUTORIZADO
-ASC-003 restante: validar o voo em sessao real cliente-servidor, revisar
-regras de colisao, queda, agua e desconexao, corrigir achados e so entao
-avaliar os criterios de conclusao conforme AGENT_COORDINATION.txt e
-Master.txt. Nao marcar ASC-003 como DONE sem essa validacao.
+Executar validacao interativa em jogo (runClient), homologar o voo para DONE e iniciar ASC-004 (supervelocidade).
 
-Nenhum dos cinco sistemas de poderes e considerado implementado ate existir
-codigo funcional, integracao e validacao documentada.
+ESTADO ASC-003.2 — ANIMACAO CORPORAL DE VOO HEROICO (2026-10-19)
+- Camada visual implementada com dois Mixins client-only, sem alterar fisica, controles ou rede:
+  - `HumanoidModelMixin` (TAIL de `HumanoidModel.setupAnim`) aplica membros e cabeca.
+  - `PlayerRendererMixin` (TAIL de `PlayerRenderer.setupRotations`) inclina o modelo inteiro.
+- Pose comum e testavel: `FlightAnimationState`, `FlightPose`, `FlightPoseLibrary` e `FlightPoseSample`.
+- `FlightAnimationController` (cliente): maquina de estados por tick com interpolacao por partialTick,
+  rampa de peso na entrada/saida, limpeza por jogador e estimativa de velocidade para observadores.
+- `FlightPoseRenderer` (cliente): aplica a transformacao no PoseStack e as rotacoes absolutas das partes.
+- Estados: HOVER, TAKEOFF, HEROIC_FLIGHT, CRUISE, CLIMB, DIVE, TURNING, BRAKING e EXIT.
+- Cabeca contra-rotacionada para olhar na direcao do voo; corpo em ~78 graus com leve head-up.
+- `gradlew.bat build` e `runGameTestServer`: 27/27 GameTests aprovados; `git diff --check` limpo.
+- Validacao grafica real: Mixins aplicados no `runClient`; com voo ativo o corpo ficou horizontal,
+  a cabeca foi contra-rotacionada e a face voltou-se para frente; frenagem e saida suaves observadas.
+- Pendente: homologacao visual final da silhueta simplificada (a ultima captura foi prejudicada
+  pela perda de foco da janela do cliente, nao por erro de compilacao ou de testes).
+- Sem commit/push nesta sessao, conforme instrucao direta do usuario. O diretorio `net/` e material
+  de referencia pre-existente e nao foi modificado.

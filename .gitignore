@@ -23,3 +23,6 @@ run
 
 # Files from Forge MDK
 forge*changelog.txt
+
+# Local-only Minecraft reference sources are not distributable project files
+/net/

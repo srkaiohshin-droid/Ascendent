@@ -30,7 +30,7 @@ public final class FlightClientInput {
     }
 
     @SubscribeEvent
-    private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
+    public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(TOGGLE_FLIGHT);
         event.register(BRAKE);
         MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onClientTick);
@@ -53,6 +53,9 @@ public final class FlightClientInput {
             if (!requestPending && minecraft.screen == null) {
                 FlightState state = FlightController.getState(player);
                 boolean desired = state == null || !state.isActive();
+                if (desired && (!player.isAlive() || player.isInWater() || player.isInLava())) {
+                    continue;
+                }
                 requestPending = true;
                 FlightNetwork.requestActive(desired);
             }
@@ -65,6 +68,8 @@ public final class FlightClientInput {
         }
 
         int input = minecraft.screen == null ? readInput(minecraft) : 0;
+        state.setInputMask(input);
+
         long tick = player.tickCount;
         if (input != lastSentInput || tick - lastSentTick >= 10L) {
             FlightNetwork.sendInput(input);
@@ -87,7 +92,12 @@ public final class FlightClientInput {
 
     private static void onPlayerTick(TickEvent.PlayerTickEvent event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (event.phase == TickEvent.Phase.START && event.player == minecraft.player) {
+        if (event.phase == TickEvent.Phase.START && event.player == minecraft.player && minecraft.player != null) {
+            FlightState state = FlightController.getState(event.player);
+            if (state != null && state.isActive()) {
+                int input = minecraft.screen == null ? readInput(minecraft) : 0;
+                state.setInputMask(input);
+            }
             FlightController.tickClient(event.player);
         }
     }
@@ -100,6 +110,9 @@ public final class FlightClientInput {
             FlightState state = FlightController.getState(minecraft.player);
             if (state != null) {
                 state.setActive(active);
+                if (!active) {
+                    state.clearInput();
+                }
             }
         }
     }

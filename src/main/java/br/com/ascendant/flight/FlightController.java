@@ -10,6 +10,7 @@ import net.minecraft.world.phys.Vec3;
 public final class FlightController {
     public static final ResourceLocation FLIGHT_POWER = new ResourceLocation("ascendant", "flight");
     private static final long INPUT_TIMEOUT_TICKS = 20L;
+    private static final double SAFE_TRANSITION_MAX_HORIZONTAL = 0.28D;
 
     private FlightController() {
     }
@@ -34,6 +35,7 @@ public final class FlightController {
             state.setActive(true);
             state.setHasLeftGround(!player.onGround());
             player.setNoGravity(true);
+            player.resetFallDistance();
             FlightNetwork.syncState(player);
         }
         return true;
@@ -42,7 +44,7 @@ public final class FlightController {
     public static boolean canActivate(Player player) {
         if (!FlightTuning.ENABLED.get() || !player.isAlive() || player.isSpectator()
                 || player.isPassenger() || player.isSleeping() || player.isInWater()
-                || player.getAbilities().mayfly || player.level().isClientSide) {
+                || player.isInLava() || player.getAbilities().mayfly || player.level().isClientSide) {
             return false;
         }
         return player.getCapability(PlayerPowerDataProvider.CAPABILITY)
@@ -78,6 +80,8 @@ public final class FlightController {
         if (!player.isNoGravity()) {
             player.setNoGravity(true);
         }
+        player.resetFallDistance();
+
         if (state.getLastInputGameTick() == Long.MIN_VALUE
                 || player.level().getGameTime() - state.getLastInputGameTick() > INPUT_TIMEOUT_TICKS) {
             state.clearInput();
@@ -86,6 +90,7 @@ public final class FlightController {
             state.setHasLeftGround(true);
         } else if (state.hasLeftGround()
                 && (state.getInputMask() & FlightState.ASCEND) == 0
+                && player.getXRot() >= -10.0F
                 && Math.abs(player.getDeltaMovement().y) <= FlightTuning.LANDING_SPEED.get()) {
             deactivate(player, state);
             FlightNetwork.syncState(serverPlayer);
@@ -99,6 +104,7 @@ public final class FlightController {
         FlightState state = getState(player);
         if (state != null && state.isActive() && player.isLocalPlayer()) {
             player.setNoGravity(true);
+            player.resetFallDistance();
             player.setDeltaMovement(nextVelocity(player, state.getInputMask()));
         }
     }
@@ -131,23 +137,53 @@ public final class FlightController {
         return player.getCapability(FlightStateProvider.CAPABILITY).orElse(null);
     }
 
-    private static boolean canMaintainFlight(Player player) {
+    public static boolean canMaintainFlight(Player player) {
         return player.isAlive() && !player.isSpectator() && !player.isPassenger()
-                && !player.isSleeping() && !player.isInWater() && !player.getAbilities().mayfly
+                && !player.isSleeping() && !player.isInWater() && !player.isInLava()
+                && !player.getAbilities().mayfly
                 && player.getCapability(PlayerPowerDataProvider.CAPABILITY)
                 .map(data -> data.hasPower(FLIGHT_POWER)).orElse(false);
     }
 
     private static Vec3 nextVelocity(Player player, int inputMask) {
-        return FlightPhysics.nextVelocity(player.getDeltaMovement(), player.getYRot(), inputMask,
-                FlightTuning.MAX_HORIZONTAL_SPEED.get(), FlightTuning.MAX_VERTICAL_SPEED.get(),
-                FlightTuning.HORIZONTAL_ACCELERATION.get(), FlightTuning.VERTICAL_ACCELERATION.get(),
-                FlightTuning.BRAKING.get(), FlightTuning.HOVER_STABILITY.get());
+        return FlightPhysics.nextVelocity(
+                player.getDeltaMovement(),
+                player.getYRot(),
+                player.getXRot(),
+                inputMask,
+                player.isSprinting(),
+                FlightTuning.MAX_CRUISE_SPEED.get(),
+                FlightTuning.MAX_BOOST_SPEED.get(),
+                FlightTuning.ACCELERATION.get(),
+                FlightTuning.BOOST_ACCELERATION.get(),
+                FlightTuning.STEERING_FACTOR.get(),
+                FlightTuning.DRAG.get(),
+                FlightTuning.BRAKING.get(),
+                FlightTuning.HOVER_STABILITY.get()
+        );
     }
 
     private static void deactivate(Player player, FlightState state) {
         boolean restoreNoGravity = state.hadNoGravity();
         state.clear();
         player.setNoGravity(restoreNoGravity);
+        player.resetFallDistance();
+
+        // Safe residual velocity transition: prevent unexpected fling or sliding
+        Vec3 current = player.getDeltaMovement();
+        if (player.onGround()) {
+            player.setDeltaMovement(current.multiply(0.2D, 0.0D, 0.2D));
+        } else {
+            double hSpeed = Math.sqrt(current.x * current.x + current.z * current.z);
+            double newX = current.x;
+            double newZ = current.z;
+            if (hSpeed > SAFE_TRANSITION_MAX_HORIZONTAL) {
+                double scale = SAFE_TRANSITION_MAX_HORIZONTAL / hSpeed;
+                newX *= scale;
+                newZ *= scale;
+            }
+            double newY = Math.max(current.y, -0.2D);
+            player.setDeltaMovement(new Vec3(newX, newY, newZ));
+        }
     }
 }

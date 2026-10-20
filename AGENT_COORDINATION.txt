@@ -57,27 +57,64 @@ Criterios:
 
 ASC-003
 Titulo: Implementar voo funcional
-Status: IN_PROGRESS
+Status: REVIEW
 Prioridade: ALTA
 Dependencia: ASC-001, ASC-002 (concluida)
-Reserva: Codex; voos, networking, configuracao, entrada cliente, lifecycle,
-  testes Forge, contexto e documentacao. Preservar os demais sistemas.
-Checkpoint 2026-10-19: implementacao parcial commitada (capability de voo,
-  controller, fisica, rede, entrada cliente, configuracao, comandos,
-  GameTests, lang). Build BUILD SUCCESSFUL e 8/8 GameTests aprovados.
-  Sessao real cliente-servidor ainda nao validada; NAO concluir.
+Reserva: Antigravity; correções de comandos, predição de entrada do cliente, amortecimento
+  de velocidade residual, protecao de dano de queda, bloqueio de fluidos (água e lava),
+  sincronizacao de respawn, testes automatizados e documentacao.
 Criterios:
-- Ativacao e desativacao reais.
-- Movimento controlado e comportamento no ar.
-- Estado validado no servidor e sincronizado.
-- Regras de colisao, queda, agua e desconexao definidas.
-- Testes reproduziveis e compilacao aprovada.
+- [x] Ativacao e desativacao reais com validacao server-authoritative.
+- [x] Movimento controlado, aceleracao, desaceleracao, frenagem e pairar estavel.
+- [x] Estado validado no servidor e sincronizado com clientes locais e observadores.
+- [x] Regras de colisao, queda, agua, lava e desconexao definidas e testadas.
+- [x] Testes reproduziveis e compilacao aprovada.
+- [ ] Validacao tatil em sessao real cliente-servidor (pendente de execucao interativa em GUI).
+
+ASC-003.1
+Titulo: Refinamento profundo do voo direcional 3D e visual (inspirado no Fisk's Superheroes)
+Status: REVIEW
+Prioridade: ALTA
+Dependencia: ASC-003
+Reserva: Antigravity; FlightPhysics, FlightController, FlightClientInput, FlightRenderEvents, FlightTuning, FlightState, testes automatizados e documentacao.
+Criterios:
+- [x] Voo direcional tridimensional completo: direcao da camera (pitch e yaw) governa a trajetoria com aceleracao vetorial suave.
+- [x] Inercia real, conservacao de velocidade e curvas convergentes graduais (sem teletransporte ou snappings abruptos).
+- [x] Subida, mergulho e curvas suaves sem singularidades em angulos extremos (+-90 graus).
+- [x] Integracao de propulsao 3D com teclas de microajuste vertical (Space/Shift) e frenagem (X).
+- [x] Suporte a voo acelerado (boost / sprint).
+- [x] Inclinacao corporal (pitch tilt) e banking visual (roll) durante curvas e voo em velocidade cruzeiro/sprint.
+- [x] Limites globais tridimensionais de velocidade e seguranca de colisoes.
+- [x] Testes automatizados e compilacao aprovada (18/18 GameTests aprovados).
+- [ ] Validacao tatil em sessao real cliente-servidor (pendente de execucao interativa em GUI).
+
+ASC-003.2
+Titulo: Implementar a animacao corporal de voo heroico (pose Superman)
+Status: REVIEW
+Prioridade: ALTA
+Dependencia: ASC-003, ASC-003.1
+Reserva: FlightAnimationState, FlightPose, FlightPoseLibrary, FlightPoseSample,
+  FlightAnimationController, FlightPoseRenderer, FlightRenderEvents, mixins client-only,
+  build.gradle, ascendant.mixins.json, testes de pose e documentacao.
+Criterios:
+- [x] Corpo inteiro inclinado para a horizontal na renderizacao, sem alterar posicao, hitbox,
+  yaw, pitch, colisao ou camera da entidade.
+- [x] Bracos estendidos a frente com pequena assimetria; pernas atras com variacoes naturais;
+  cabeca contra-rotacionada para a direcao do voo.
+- [x] Nove estados com uma unica biblioteca de pose: HOVER, TAKEOFF, HEROIC_FLIGHT, CRUISE,
+  CLIMB, DIVE, TURNING, BRAKING, EXIT.
+- [x] Interpolacao por partialTick, rampa de peso, limites de juntas e retorno a pose vanilla.
+- [x] Mixins client-only aplicados em `setupAnim` e `setupRotations`; servidor dedicado preservado.
+- [x] Compilacao, refmap de Mixin e 27/27 GameTests aprovados.
+- [ ] Homologacao visual final da silhueta simplificada em sessao grafica (captura final pendente
+  por perda de foco da janela do cliente; a pose horizontal e a cabeca para frente foram observadas
+  em sessao grafica anterior).
 
 ASC-004
 Titulo: Implementar supervelocidade funcional
 Status: PENDING
 Prioridade: ALTA
-Dependencia: ASC-001, ASC-002
+Dependencia: ASC-001, ASC-002, ASC-003
 Criterios:
 - Movimento e controle reais, nao apenas particulas.
 - Interacao com colisao, terreno e entidades.
