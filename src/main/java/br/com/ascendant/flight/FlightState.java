@@ -29,6 +29,10 @@ public interface FlightState {
 
     void clearInput();
 
+    long getLastToggleGameTick();
+
+    void setLastToggleGameTick(long gameTick);
+
     boolean hasLeftGround();
 
     void setHasLeftGround(boolean hasLeftGround);

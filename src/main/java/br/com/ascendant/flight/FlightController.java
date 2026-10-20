@@ -10,6 +10,7 @@ import net.minecraft.world.phys.Vec3;
 public final class FlightController {
     public static final ResourceLocation FLIGHT_POWER = new ResourceLocation("ascendant", "flight");
     private static final long INPUT_TIMEOUT_TICKS = 20L;
+    private static final long TOGGLE_RATE_LIMIT_TICKS = 2L;
     private static final double SAFE_TRANSITION_MAX_HORIZONTAL = 0.28D;
 
     private FlightController() {
@@ -20,17 +21,36 @@ public final class FlightController {
         if (state == null) {
             return false;
         }
-        if (!requestedActive) {
-            deactivate(player, state);
-            FlightNetwork.syncState(player);
-            return true;
-        }
-        if (!canActivate(player)) {
-            deactivate(player, state);
-            FlightNetwork.syncState(player);
+
+        long currentTick = player.level().getGameTime();
+        if (state.getLastToggleGameTick() != Long.MIN_VALUE
+                && currentTick - state.getLastToggleGameTick() < TOGGLE_RATE_LIMIT_TICKS) {
             return false;
         }
+
+        if (!requestedActive) {
+            if (state.isActive()) {
+                state.setLastToggleGameTick(currentTick);
+                deactivate(player, state);
+                FlightNetwork.syncState(player);
+                return true;
+            }
+            return false;
+        }
+
+        if (!canActivate(player)) {
+            if (state.isActive()) {
+                state.setLastToggleGameTick(currentTick);
+                deactivate(player, state);
+                FlightNetwork.syncState(player);
+            } else {
+                FlightNetwork.syncToClient(player);
+            }
+            return false;
+        }
+
         if (!state.isActive()) {
+            state.setLastToggleGameTick(currentTick);
             state.setHadNoGravity(player.isNoGravity());
             state.setActive(true);
             state.setHasLeftGround(!player.onGround());
@@ -86,23 +106,55 @@ public final class FlightController {
                 || player.level().getGameTime() - state.getLastInputGameTick() > INPUT_TIMEOUT_TICKS) {
             state.clearInput();
         }
+
+        int inputMask = state.getInputMask();
         if (!player.onGround()) {
             state.setHasLeftGround(true);
-        } else if (state.hasLeftGround()
-                && (state.getInputMask() & FlightState.ASCEND) == 0
-                && player.getXRot() >= -10.0F
-                && Math.abs(player.getDeltaMovement().y) <= FlightTuning.LANDING_SPEED.get()) {
+        } else if (shouldLand(player, state, inputMask)) {
             deactivate(player, state);
             FlightNetwork.syncState(serverPlayer);
             return;
         }
 
-        player.setDeltaMovement(nextVelocity(player, state.getInputMask()));
+        player.setDeltaMovement(nextVelocity(player, inputMask));
+    }
+
+    public static boolean shouldLand(Player player, FlightState state, int inputMask) {
+        if (!player.onGround() || !state.hasLeftGround()) {
+            return false;
+        }
+        if ((inputMask & FlightState.ASCEND) != 0) {
+            return false;
+        }
+        if (Math.abs(player.getDeltaMovement().y) > FlightTuning.LANDING_SPEED.get()) {
+            return false;
+        }
+
+        // Touchdown condition: deliberate descent, brake, neutral glide, steep downward pitch, or slow taxiing
+        if ((inputMask & (FlightState.DESCEND | FlightState.BRAKE)) != 0) {
+            return true;
+        }
+        if (inputMask == 0) {
+            return true;
+        }
+        if (player.getXRot() > 25.0F) {
+            return true;
+        }
+
+        Vec3 delta = player.getDeltaMovement();
+        double hSpeedSq = delta.x * delta.x + delta.z * delta.z;
+        double cruiseSpeed = FlightTuning.MAX_CRUISE_SPEED.get();
+        return hSpeedSq <= (cruiseSpeed * 0.4D) * (cruiseSpeed * 0.4D);
     }
 
     public static void tickClient(Player player) {
         FlightState state = getState(player);
         if (state != null && state.isActive() && player.isLocalPlayer()) {
+            if (!player.isAlive() || player.isInWater() || player.isInLava()
+                    || player.isPassenger() || player.isSleeping()) {
+                player.setNoGravity(false);
+                return;
+            }
             player.setNoGravity(true);
             player.resetFallDistance();
             player.setDeltaMovement(nextVelocity(player, state.getInputMask()));
@@ -130,7 +182,7 @@ public final class FlightController {
      * Used after lifecycle events (login, respawn) to ensure client consistency.
      */
     public static void syncToClient(ServerPlayer player) {
-        FlightNetwork.syncState(player);
+        FlightNetwork.syncToClient(player);
     }
 
     public static FlightState getState(Player player) {
@@ -138,9 +190,9 @@ public final class FlightController {
     }
 
     public static boolean canMaintainFlight(Player player) {
-        return player.isAlive() && !player.isSpectator() && !player.isPassenger()
-                && !player.isSleeping() && !player.isInWater() && !player.isInLava()
-                && !player.getAbilities().mayfly
+        return FlightTuning.ENABLED.get() && player.isAlive() && !player.isSpectator()
+                && !player.isPassenger() && !player.isSleeping() && !player.isInWater()
+                && !player.isInLava() && !player.getAbilities().mayfly
                 && player.getCapability(PlayerPowerDataProvider.CAPABILITY)
                 .map(data -> data.hasPower(FLIGHT_POWER)).orElse(false);
     }

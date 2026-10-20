@@ -86,3 +86,23 @@ ESTADO ASC-003.2 — ANIMACAO CORPORAL DE VOO HEROICO (2026-10-19)
   pela perda de foco da janela do cliente, nao por erro de compilacao ou de testes).
 - Sem commit/push nesta sessao, conforme instrucao direta do usuario. O diretorio `net/` e material
   de referencia pre-existente e nao foi modificado.
+
+
+ESTADO ASC-003 BACKEND — HARDENING, SEGURANCA E CONCLUSAO DO BACKEND (2026-10-20)
+- Hardening e segurança server-authoritative concluídos pelo Agente 1 (Backend):
+  1. Rate limiting e anti-spam: adicionado controle de frequência em `requestActive` (`TOGGLE_RATE_LIMIT_TICKS = 2L`),
+     eliminando exploração por macros ou pacotes forjados em lote.
+  2. Eliminação de broadcast redundante: desativações quando o jogador já está inativo não disparam mais pacotes para
+     todos os observadores; criado `FlightNetwork.syncToClient` para notificações unicast.
+  3. Proteção contra NullPointerException em conexões nulas (`connection == null`) em ambientes de teste e lifecycle.
+  4. Consistência de autorização: `canMaintainFlight` agora respeita a configuração global `FlightTuning.ENABLED`.
+  5. Aterrissagem natural e preservação de voo em relevo irregular: `shouldLand` diferencia pouso intencional
+     (descida ativa, frenagem, planeio neutro lento ou mergulho vertical) de sobrevoo rasante em alta velocidade,
+     impedindo cancelamentos acidentais ao sobrevoar colinas ou desníveis.
+  6. Tratamento de morte e corpos flutuantes: adicionado listener para `LivingDeathEvent` que desativa o voo e
+     restaura a gravidade imediatamente, impedindo que o jogador permaneça suspenso após a morte.
+  7. Proteção contra encerramentos abruptos: `onLogin` e `onRespawn` limpam resquícios de `noGravity` se o voo estiver inativo.
+  8. Proteção de predição do cliente: `tickClient` suspende imediatamente a gravidade nula se o jogador entrar em água,
+     lava, veículo ou dormir, evitando rubberbanding e dessincronização durante o ping.
+- 31/31 GameTests aprovados em `gradlew.bat runGameTestServer` (19 testes de voo, 9 de pose e 3 de poderes/capability).
+- `gradlew.bat build` concluído com sucesso.

@@ -60,3 +60,15 @@
 - GameTests expandidos de 18 para 27; `gradlew.bat build` e `runGameTestServer` aprovados.
 - Validação gráfica em `runClient`: Mixins aplicados, corpo horizontal e face voltada para frente
   observados; homologação visual final da silhueta simplificada permanece pendente.
+
+
+## 0.1.0 — Hardening e Conclusão do Backend de Voo (ASC-003 Backend, 2026-10-20)
+- Rate limiting anti-spam de rede: o servidor agora restringe solicitações de ativação/desativação a no máximo 1 a cada 2 ticks por jogador, prevenindo ataques por flooding de pacotes e macros.
+- Otimização de tráfego de rede: solicitações redundantes de desativação não geram mais broadcast para observadores; adicionado `syncToClient` para sincronizações unicast eficientes.
+- Resiliência de rede e segurança contra NPE: verificação defensiva de conexões nulas (`connection == null`) em `FlightNetwork`.
+- Consistência de autorização com a configuração: `canMaintainFlight` agora respeita a configuração global `FlightTuning.ENABLED`.
+- Aprimoramento da detecção de solo e sobrevoo de terreno irregular: o voo não é mais cancelado acidentalmente ao raspar o solo em alta velocidade de cruzeiro/boost; o pouso (`shouldLand`) requer desaceleração, planeio neutro, frenagem ou mergulho íngreme direcionado.
+- Tratamento de morte e queda de corpos (`LivingDeathEvent`): cancelamento imediato de voo e restauração de gravidade ao morrer, impedindo que corpos fiquem flutuando no ar.
+- Recuperação de crash em login/respawn: restauração de gravidade normal caso o jogador tenha permanecido com `noGravity` após encerramento inesperado do servidor.
+- Predição segura no cliente: suspensão imediata da gravidade nula local ao entrar em água, lava, veículos ou dormir.
+- Expansão da suíte de testes: adicionados 3 novos GameTests para validação de rate limiting, desativação por configuração e pouso inteligente em terreno (total de 31 GameTests aprovados).

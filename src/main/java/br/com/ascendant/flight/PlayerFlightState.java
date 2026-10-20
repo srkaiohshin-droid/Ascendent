@@ -4,6 +4,7 @@ final class PlayerFlightState implements FlightState {
     private boolean active;
     private int inputMask;
     private long lastInputGameTick = Long.MIN_VALUE;
+    private long lastToggleGameTick = Long.MIN_VALUE;
     private boolean hasLeftGround;
     private boolean hadNoGravity;
 
@@ -56,6 +57,16 @@ final class PlayerFlightState implements FlightState {
     }
 
     @Override
+    public long getLastToggleGameTick() {
+        return lastToggleGameTick;
+    }
+
+    @Override
+    public void setLastToggleGameTick(long gameTick) {
+        this.lastToggleGameTick = gameTick;
+    }
+
+    @Override
     public boolean hasLeftGround() {
         return hasLeftGround;
     }
@@ -80,6 +91,7 @@ final class PlayerFlightState implements FlightState {
         active = false;
         inputMask = 0;
         lastInputGameTick = Long.MIN_VALUE;
+        lastToggleGameTick = Long.MIN_VALUE;
         hasLeftGround = false;
         hadNoGravity = false;
     }

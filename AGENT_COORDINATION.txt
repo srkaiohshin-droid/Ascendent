@@ -62,13 +62,14 @@ Prioridade: ALTA
 Dependencia: ASC-001, ASC-002 (concluida)
 Reserva: Antigravity; correções de comandos, predição de entrada do cliente, amortecimento
   de velocidade residual, protecao de dano de queda, bloqueio de fluidos (água e lava),
-  sincronizacao de respawn, testes automatizados e documentacao.
+  sincronizacao de respawn, rate limiting anti-spam, protecao contra nulo em rede, pouso
+  natural em terreno irregular, tratamento de morte (LivingDeathEvent) e testes automatizados.
 Criterios:
-- [x] Ativacao e desativacao reais com validacao server-authoritative.
+- [x] Ativacao e desativacao reais com validacao server-authoritative e rate limiting (2 ticks).
 - [x] Movimento controlado, aceleracao, desaceleracao, frenagem e pairar estavel.
-- [x] Estado validado no servidor e sincronizado com clientes locais e observadores.
-- [x] Regras de colisao, queda, agua, lava e desconexao definidas e testadas.
-- [x] Testes reproduziveis e compilacao aprovada.
+- [x] Estado validado no servidor e sincronizado com clientes locais e observadores via unicast/broadcast.
+- [x] Regras de colisao, queda, agua, lava, morte e desconexao definidas e testadas.
+- [x] Testes reproduziveis e compilacao aprovada (31/31 GameTests aprovados).
 - [ ] Validacao tatil em sessao real cliente-servidor (pendente de execucao interativa em GUI).
 
 ASC-003.1

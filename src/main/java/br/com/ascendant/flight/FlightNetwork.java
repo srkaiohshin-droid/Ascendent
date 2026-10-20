@@ -45,13 +45,29 @@ public final class FlightNetwork {
     }
 
     static void syncState(ServerPlayer player) {
+        if (player == null || player.connection == null) {
+            return;
+        }
         FlightState state = FlightController.getState(player);
         boolean active = state != null && state.isActive();
         CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player),
                 new FlightStateUpdate(player.getId(), active, player.isNoGravity()));
     }
 
+    static void syncToClient(ServerPlayer player) {
+        if (player == null || player.connection == null) {
+            return;
+        }
+        FlightState state = FlightController.getState(player);
+        boolean active = state != null && state.isActive();
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                new FlightStateUpdate(player.getId(), active, player.isNoGravity()));
+    }
+
     static void syncTrackedPlayer(ServerPlayer recipient, ServerPlayer target) {
+        if (recipient == null || recipient.connection == null) {
+            return;
+        }
         FlightState state = FlightController.getState(target);
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> recipient),
                 new FlightStateUpdate(target.getId(), state != null && state.isActive(), target.isNoGravity()));

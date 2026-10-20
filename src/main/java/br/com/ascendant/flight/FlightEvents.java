@@ -2,11 +2,12 @@ package br.com.ascendant.flight;
 
 import br.com.ascendant.Ascendant;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -35,6 +36,17 @@ public final class FlightEvents {
     }
 
     /**
+     * When player dies, immediately cancel flight and restore gravity so corpses do not float.
+     */
+    @SubscribeEvent
+    public static void onLivingDeath(LivingDeathEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            FlightController.deactivateForLifecycle(player);
+            FlightNetwork.syncState(player);
+        }
+    }
+
+    /**
      * On clone (death respawn or End return): clear flight from the original.
      * The new entity starts with a clean state.
      */
@@ -45,10 +57,17 @@ public final class FlightEvents {
 
     /**
      * Send flight state on initial player login to the server.
+     * Cleans up stale noGravity if a dirty server crash occurred during previous flight.
      */
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            FlightState state = FlightController.getState(player);
+            if (state == null || !state.isActive()) {
+                if (player.isNoGravity() && !player.isSpectator() && !player.isCreative()) {
+                    player.setNoGravity(false);
+                }
+            }
             FlightController.syncToClient(player);
         }
     }
@@ -61,6 +80,12 @@ public final class FlightEvents {
     @SubscribeEvent
     public static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            FlightState state = FlightController.getState(player);
+            if (state == null || !state.isActive()) {
+                if (player.isNoGravity() && !player.isSpectator() && !player.isCreative()) {
+                    player.setNoGravity(false);
+                }
+            }
             FlightController.syncToClient(player);
         }
     }

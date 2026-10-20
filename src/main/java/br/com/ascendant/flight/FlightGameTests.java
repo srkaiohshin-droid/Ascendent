@@ -474,4 +474,127 @@ public final class FlightGameTests {
                 "Exit must target vanilla leg rotations");
         helper.succeed();
     }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void landingConditionsDistinguishTouchdownFromTerrainSkimming(GameTestHelper helper) {
+        Player player = helper.makeMockPlayer();
+        PlayerFlightState state = new PlayerFlightState();
+        state.setActive(true);
+        state.setHasLeftGround(true);
+        player.setOnGround(true);
+
+        // Cruising forward at high speed over rolling terrain should NOT land prematurely
+        player.setDeltaMovement(new Vec3(0.0D, 0.0D, 0.60D));
+        player.setXRot(0.0F);
+        helper.assertTrue(!FlightController.shouldLand(player, state, FlightState.FORWARD),
+                "Cruising forward over uneven terrain at speed must not cancel flight");
+
+        // Climbing with ascend key held must not land
+        helper.assertTrue(!FlightController.shouldLand(player, state, FlightState.ASCEND),
+                "Holding ascend while touching ground must not cancel flight");
+
+        // Intentional landing case 1: Holding descend key
+        helper.assertTrue(FlightController.shouldLand(player, state, FlightState.DESCEND),
+                "Holding descend on ground must trigger touchdown");
+
+        // Intentional landing case 2: Holding air brake
+        helper.assertTrue(FlightController.shouldLand(player, state, FlightState.BRAKE),
+                "Holding brake on ground must trigger touchdown");
+
+        // Intentional landing case 3: Neutral glide (no input held)
+        helper.assertTrue(FlightController.shouldLand(player, state, 0),
+                "Neutral drift with no input on ground must trigger touchdown");
+
+        // Intentional landing case 4: Steep downward pitch
+        player.setXRot(30.0F);
+        helper.assertTrue(FlightController.shouldLand(player, state, FlightState.FORWARD),
+                "Steep downward dive into ground must trigger touchdown");
+
+        // Intentional landing case 5: Low horizontal speed (slow taxiing)
+        player.setXRot(0.0F);
+        player.setDeltaMovement(new Vec3(0.0D, 0.0D, 0.10D));
+        helper.assertTrue(FlightController.shouldLand(player, state, FlightState.FORWARD),
+                "Slow forward approach to ground must trigger touchdown");
+
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void toggleSpamRateLimitingRejectsRapidPackets(GameTestHelper helper) {
+        ServerPlayer player = new ServerPlayer(helper.getLevel().getServer(), helper.getLevel(),
+                new GameProfile(UUID.randomUUID(), "rate_limit_test")) {
+            @Override
+            public boolean isSpectator() {
+                return false;
+            }
+
+            @Override
+            public boolean isCreative() {
+                return false;
+            }
+        };
+        IPlayerPowerData powers = player.getCapability(PlayerPowerDataProvider.CAPABILITY)
+                .orElseThrow(() -> new AssertionError("Player power capability is unavailable"));
+        powers.unlockPower(FlightController.FLIGHT_POWER);
+
+        FlightState state = FlightController.getState(player);
+        helper.assertTrue(state != null, "Player must have flight state capability");
+
+        // First activation request on current tick should succeed
+        boolean first = FlightController.requestActive(player, true);
+        helper.assertTrue(first, "Initial flight activation request must succeed");
+        helper.assertTrue(state.isActive(), "Flight state must be active");
+
+        // Rapid duplicate/toggle request in the exact same tick must be dropped by rate limiter
+        boolean rapid = FlightController.requestActive(player, false);
+        helper.assertTrue(!rapid, "Rapid toggle request within rate-limit window must be rejected");
+        helper.assertTrue(state.isActive(), "State must remain active because rapid request was rejected");
+
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void configDisabledShutsDownFlightMaintenance(GameTestHelper helper) {
+        Player player = helper.makeMockPlayer();
+        IPlayerPowerData powers = player.getCapability(PlayerPowerDataProvider.CAPABILITY)
+                .orElseThrow(() -> new AssertionError("Player power capability is unavailable"));
+        powers.unlockPower(FlightController.FLIGHT_POWER);
+
+        helper.assertTrue(FlightController.canMaintainFlight(player),
+                "Flight maintenance should be permitted when power is unlocked and config enabled");
+
+        // Temporarily disable flight in config
+        FlightTuning.ENABLED.set(false);
+        try {
+            helper.assertTrue(!FlightController.canMaintainFlight(player),
+                    "canMaintainFlight must return false when flight is disabled in configuration");
+            helper.assertTrue(!FlightController.canActivate(player),
+                    "canActivate must return false when flight is disabled in configuration");
+        } finally {
+            FlightTuning.ENABLED.set(true);
+        }
+
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void livingDeathDeactivatesFlightAndRestoresGravity(GameTestHelper helper) {
+        Player player = helper.makeMockPlayer();
+        IPlayerPowerData powers = player.getCapability(PlayerPowerDataProvider.CAPABILITY)
+                .orElseThrow(() -> new AssertionError("Player power capability is unavailable"));
+        powers.unlockPower(FlightController.FLIGHT_POWER);
+
+        FlightState state = FlightController.getState(player);
+        helper.assertTrue(state != null, "Player must have flight state");
+        state.setActive(true);
+        state.setHadNoGravity(false);
+        player.setNoGravity(true);
+
+        // Simulate lifecycle deactivation on death
+        FlightController.deactivateForLifecycle(player);
+
+        helper.assertTrue(!state.isActive(), "Flight state must be inactive upon death");
+        helper.assertTrue(!player.isNoGravity(), "Gravity must be restored upon death so corpse falls");
+        helper.succeed();
+    }
 }
