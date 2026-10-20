@@ -1,242 +1,193 @@
-<!--
-  ASCENDANT — Superhuman Framework
-  README focado em identidade visual, estado real do projeto e onboarding.
--->
-
+<!-- ASCENDANT // animated project showcase -->
 <div align="center">
 
-  <img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:101827,45:243b63,100:6d5dfc&height=220&section=header&text=ASCENDANT&fontSize=58&fontColor=ffffff&fontAlignY=38&desc=SUPERHUMAN%20FRAMEWORK&descSize=18&descAlignY=58&animation=fadeIn" alt="Ascendant — Superhuman Framework" />
+<img src="assets/ascendant-reactor.svg" alt="ASCENDANT — animated energy core" width="100%" />
 
-  <p>
-    <strong>Um framework modular de super-humanos para Minecraft.</strong><br/>
-    Poderes construídos para mudar o gameplay — não apenas a aparência.
-  </p>
+<br/>
 
-  <p>
-    <img src="https://img.shields.io/badge/Minecraft-1.20.1-3C8527?style=for-the-badge&logo=minecraft&logoColor=white" alt="Minecraft 1.20.1" />
-    <img src="https://img.shields.io/badge/Forge-47.3.0-orange?style=for-the-badge" alt="Forge 47.3.0" />
-    <img src="https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 17" />
-    <img src="https://img.shields.io/badge/Versão-0.1.0-6d5dfc?style=for-the-badge" alt="Versão 0.1.0" />
-  </p>
+<img src="https://img.shields.io/badge/MINECRAFT-1.20.1-43B581?style=for-the-badge&labelColor=0B1020" alt="Minecraft 1.20.1" />
+<img src="https://img.shields.io/badge/FORGE-47.3.0-EA7A35?style=for-the-badge&labelColor=0B1020" alt="Forge 47.3.0" />
+<img src="https://img.shields.io/badge/JAVA-17-65C7F7?style=for-the-badge&labelColor=0B1020" alt="Java 17" />
 
-  <p>
-    <a href="#-visão-geral">Visão geral</a> •
-    <a href="#-estado-atual">Estado atual</a> •
-    <a href="#-roadmap-de-poderes">Roadmap</a> •
-    <a href="#-compilar-e-testar">Compilar e testar</a> •
-    <a href="#-arquitetura">Arquitetura</a>
-  </p>
+<br/><br/>
+
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=19&duration=2800&pause=850&color=75E8FF&center=true&vCenter=true&width=780&lines=SUPERHUMAN+POWERS.+REAL+GAMEPLAY.;FLIGHT.+SPEED.+STRENGTH.+DURABILITY.;BUILT+FOR+IMMERSION.+ENGINEERED+FOR+MULTIPLAYER.;ONE+POWER+AT+A+TIME.+NO+SHORTCUTS." alt="Animated Ascendant tagline" />
+
+<br/>
+
+<a href="#-the-vision">THE VISION</a> ◈
+<a href="#-power-protocol">POWER PROTOCOL</a> ◈
+<a href="#-development-status">STATUS</a> ◈
+<a href="#-build--test">BUILD</a> ◈
+<a href="#-architecture">ARCHITECTURE</a>
 
 </div>
 
 ---
 
-## ✦ Visão geral
-
-**Ascendant** é um projeto em desenvolvimento para criar uma base sólida, extensível e preparada para multiplayer para poderes super-humanos no Minecraft Java 1.20.1.
-
-A proposta é priorizar **poucos poderes com profundidade real** em vez de muitos poderes superficiais. Cada habilidade deve ter comportamento próprio, regras claras, integração com o mundo e validação técnica.
-
-<table>
-  <tr>
-    <td width="50%">
-      <h3>⚡ Gameplay de verdade</h3>
-      Habilidades devem alterar movimento, interações ou combate. Partículas e animações complementam a mecânica; não substituem sua implementação.
-    </td>
-    <td width="50%">
-      <h3>🧩 Arquitetura modular</h3>
-      Separação entre estado do jogador, lógica dos poderes, integração com Forge, rede e apresentação visual.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <h3>🛡️ Multiplayer em primeiro plano</h3>
-      O servidor deve validar mudanças de estado, movimento, dano, permissões e cooldowns. Dados enviados pelo cliente não são confiáveis por padrão.
-    </td>
-    <td width="50%">
-      <h3>🧪 Qualidade verificável</h3>
-      Compilação, GameTests e documentação de limitações fazem parte do desenvolvimento — não são etapas opcionais.
-    </td>
-  </tr>
-</table>
-
-## 🚧 Estado atual
-
-> [!IMPORTANT]
-> **Ascendant está em estágio inicial.** A base de estado do jogador existe, mas os cinco sistemas de poderes abaixo ainda não são considerados implementados.
-
-### O que já existe
-
-- [x] Projeto configurado para Minecraft 1.20.1, Forge 47.3.0 e Java 17.
-- [x] Capability de jogador para armazenar IDs de poderes desbloqueados.
-- [x] Persistência do estado em NBT.
-- [x] Lógica de cópia do estado nos caminhos tratados por `PlayerEvent.Clone`.
-- [x] GameTests para capability, serialização NBT, desbloqueio idempotente e respawn real do servidor após morte e retorno do End.
-- [x] Build e GameTest executados com sucesso no ambiente JDK 17 utilizado na validação.
-
-### O que ainda falta
-
-- [x] Testar o ciclo de morte e respawn pelo servidor, incluindo retorno do End; multiplayer com cliente remoto ainda não foi testado.
-- [x] Definir políticas de permissão e cooldown; integrar cooldown runtime quando uma habilidade ativa precisar dele.
-- [ ] Implementar a primeira habilidade de gameplay: **voo**.
-- [ ] Adicionar sincronização de rede quando houver estado real que precise ser compartilhado.
-- [ ] Desenvolver e validar os demais poderes.
-
-<details>
-  <summary><strong>📌 Como interpretar o status</strong></summary>
-
-  Uma capability de estado não significa que um poder já funciona. O projeto só considera uma habilidade concluída quando sua mecânica, integração com o jogo, comportamento multiplayer e testes relevantes estiverem implementados e validados. A compilação bem-sucedida, isoladamente, não comprova o funcionamento de gameplay.
-</details>
-
-## 🦸 Roadmap de poderes
-
-A ordem inicial prioriza a implementação profunda de cinco pilares.
-
-| Prioridade | Sistema | Status | Objetivo |
-|:--:|---|:--:|---|
-| 01 | **Voo** | 🔄 Próximo | Ativação e desativação reais, controle aéreo, colisões e regras de queda. |
-| 02 | **Supervelocidade** | ⏳ Planejado | Movimento acelerado com limites, interação com terreno e controle seguro. |
-| 03 | **Superforça** | ⏳ Planejado | Interações e efeitos concretos sobre combate e mundo, validados pelo servidor. |
-| 04 | **Super-resistência** | ⏳ Planejado | Mitigação de dano configurável e compatível com diferentes fontes de dano. |
-| 05 | **Poderes aquáticos** | ⏳ Planejado | Habilidades próprias para ambientes aquáticos, com regras dentro e fora da água. |
-
-<sub>Os indicadores descrevem a fila de desenvolvimento, não funcionalidades disponíveis para jogadores.</sub>
-
-## 🛠️ Tecnologias
-
 <div align="center">
-  <img src="https://img.shields.io/badge/Minecraft_Java-1.20.1-3C8527?style=flat-square&logo=minecraft&logoColor=white" alt="Minecraft Java 1.20.1" />
-  <img src="https://img.shields.io/badge/Minecraft_Forge-47.3.0-orange?style=flat-square" alt="Minecraft Forge 47.3.0" />
-  <img src="https://img.shields.io/badge/Java-17-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 17" />
-  <img src="https://img.shields.io/badge/Gradle-Wrapper-02303A?style=flat-square&logo=gradle&logoColor=white" alt="Gradle Wrapper" />
+
+## ◉ SYSTEM ONLINE
+
+**Ascendant** is a modular superhuman framework for Minecraft Java Edition.
+
+Not a collection of flashy buttons. A foundation for powers that change how you move, fight, explore, and interact with the world.
+
 </div>
 
-| Configuração | Valor |
+## ✦ The vision
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### ⚡ Powers with weight
+Acceleration, momentum, control, impact, limitations, and consequences. A power should feel different to use—not just look different.
+
+</td>
+<td width="50%" valign="top">
+
+### ◈ A world that reacts
+Movement, terrain, water, collisions, damage, and player state are part of the mechanic.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### ⛨ Multiplayer by design
+The server validates meaningful actions and owns authoritative gameplay outcomes. Client input is a request, never proof.
+
+</td>
+<td width="50%" valign="top">
+
+### ⌘ Built to evolve
+Modular systems, explicit state, controlled networking, dedicated-server safety, and tests that verify behavior.
+
+</td>
+</tr>
+</table>
+
+## ◈ Power protocol
+
+<div align="center">
+
+| CORE SYSTEM | DESIGN TARGET | STATUS |
+|:--|:--|:--:|
+| **01 · Flight** | Takeoff, steering, acceleration, hovering, braking, landing, collision and fall rules | **IN PROGRESS** |
+| **02 · Super speed** | Acceleration, momentum, precision control and safe terrain interaction | **PLANNED** |
+| **03 · Super strength** | Server-validated combat and meaningful world interactions | **PLANNED** |
+| **04 · Super durability** | Configurable mitigation across damage sources | **PLANNED** |
+| **05 · Aquatic powers** | Distinct movement and abilities in and around water | **PLANNED** |
+
+</div>
+
+<details>
+<summary><strong>▸ What does “complete” mean?</strong></summary>
+
+A power is not complete just because the project compiles or a particle effect appears. It needs real gameplay behavior, correct server/client integration, lifecycle rules, relevant tests, and documented limitations. Status reflects development progress—not a promise that every feature is ready for players.
+</details>
+
+## ⌁ Development status
+
+<div align="center">
+
+| CHECKPOINT | RESULT |
+|:--|:--:|
+| Forge project foundation | ✓ |
+| Player power-state capability and NBT persistence | ✓ |
+| Flight controller, physics and input integration | In progress |
+| Automated flight/GameTest validation | ✓ 8/8 at the recorded checkpoint |
+| Remote-client multiplayer validation | Pending |
+| Remaining core powers | Pending |
+
+</div>
+
+> **Current focus:** finish and validate flight before expanding the framework with more powers. Automated tests are useful evidence, but they do not replace a real client/server multiplayer session.
+
+## ⌘ Technology stack
+
+<div align="center">
+
+<img src="https://skillicons.dev/icons?i=java,gradle,git&theme=dark" alt="Java, Gradle and Git" />
+
+<br/>
+
+<img src="https://img.shields.io/badge/Minecraft_Java-1.20.1-43B581?style=flat-square&logo=minecraft&logoColor=white" alt="Minecraft Java 1.20.1" />
+<img src="https://img.shields.io/badge/Forge-47.3.0-EA7A35?style=flat-square" alt="Forge 47.3.0" />
+<img src="https://img.shields.io/badge/JDK-17-65C7F7?style=flat-square&logo=openjdk&logoColor=white" alt="JDK 17" />
+<img src="https://img.shields.io/badge/Build-Gradle_Wrapper-7C83FD?style=flat-square&logo=gradle&logoColor=white" alt="Gradle Wrapper" />
+
+</div>
+
+| Setting | Value |
 |---|---|
 | Minecraft | Java Edition 1.20.1 |
 | Forge | 47.3.0 |
 | Java | 17 |
-| Mod ID | `ascendant` |
-| Pacote-base | `br.com.ascendant` |
-| Versão inicial | `0.1.0` |
+| Mod ID | ascendant |
+| Base package | br.com.ascendant |
+| Project version | 0.1.0 |
 
-## 🚀 Compilar e testar
+## ⌘ Build & test
 
-### Pré-requisitos
+Requirements: JDK 17, Git, and the repository's Gradle Wrapper.
 
-- Windows, Linux ou macOS com ambiente compatível com o projeto.
-- **JDK 17** instalado e selecionado no ambiente.
-- Git, caso queira clonar o repositório.
-
-### 1. Clonar o projeto
-
-```bash
+\`\`\`powershell
 git clone https://github.com/srkaiohshin-droid/Ascendent.git
 cd Ascendent
-```
+.\\gradlew.bat build
+.\\gradlew.bat runGameTestServer
+\`\`\`
 
-### 2. Selecionar o Java 17 no Windows
+On Linux/macOS, use \`./gradlew build\` and \`./gradlew runGameTestServer\`.
 
-O Gradle deve ser executado com JDK 17. Se o terminal estiver apontando para uma versão antiga do Java, configure `JAVA_HOME` e priorize o diretório `bin` dessa instalação no `PATH`.
+Look for the built mod in \`build/libs/\`. Run commands with JDK 17 selected. A successful build alone does not prove a gameplay feature works correctly.
 
-Exemplo no PowerShell — ajuste o caminho para a instalação real do seu JDK:
+## ⌬ Architecture
 
-```powershell
-$env:JAVA_HOME = "C:\\Program Files\\Eclipse Adoptium\\jdk-17"
-$env:PATH = "$env:JAVA_HOME\\bin;$env:PATH"
-java -version
-```
-
-Confirme que a saída indica Java 17 antes de continuar.
-
-### 3. Compilar
-
-No Windows:
-
-```powershell
-.\gradlew.bat build
-```
-
-No Linux/macOS:
-
-```bash
-./gradlew build
-```
-
-O artefato compilado deve ser procurado em `build/libs/`.
-
-### 4. Executar os GameTests
-
-No Windows:
-
-```powershell
-.\gradlew.bat runGameTestServer
-```
-
-No Linux/macOS:
-
-```bash
-./gradlew runGameTestServer
-```
-
-> [!NOTE]
-> Os GameTests cobrem persistência do estado e o ciclo real de respawn do servidor após morte e retorno do End. Não foi executado teste multiplayer com cliente remoto. A tarefa JUnit `test` pode informar `NO-SOURCE` porque não há testes JUnit em `src/test`; isso não substitui os GameTests do Forge.
-
-## 🧱 Arquitetura
-
-A arquitetura evolui junto com as necessidades reais de cada mecânica, evitando abstrações vazias e sistemas criados sem um consumidor concreto.
-
-```mermaid
+\`\`\`mermaid
 flowchart TD
-    A["Entrada do mod · Forge"] --> B["Estado do jogador"]
-    B --> C["Lógica dos poderes"]
-    C --> D["Integração com o gameplay"]
-    C --> E["Validação no servidor"]
-    E <--> F["Rede e sincronização"]
-    F <--> G["Cliente"]
-    G --> H["Animações · Áudio · Efeitos"]
-    D --> I["GameTests e validação"]
-    E --> I
-```
+    A["Forge events & player input"] --> B["Player power state"]
+    B --> C["Power controllers & physics"]
+    C --> D["Server-authoritative gameplay"]
+    D <--> E["Network synchronization"]
+    E <--> F["Client presentation"]
+    F --> G["Animation · Audio · VFX"]
+    D --> H["GameTests & validation"]
+\`\`\`
 
-**Princípios técnicos**
+**Engineering rules**
 
-- **Autoridade do servidor:** o cliente envia intenções; o servidor valida e decide os resultados.
-- **Separação de responsabilidades:** regras de poderes, persistência, integração Forge, rede e renderização não devem virar uma classe monolítica.
-- **Estado explícito:** dados permanentes e temporários devem ter políticas claras para morte, respawn, troca de dimensão e desconexão.
-- **Cliente e servidor dedicados:** código exclusivamente visual não deve quebrar o carregamento do servidor.
-- **Implementação comprovável:** não declarar uma mecânica funcional sem código, integração e validação compatíveis com a afirmação.
+- **Server authority:** the server validates requests and decides gameplay outcomes.
+- **Clear ownership:** controllers, persistent state, networking, and visual effects have separate responsibilities.
+- **Lifecycle safety:** death, respawn, dimension changes, water, disconnects, and transitions must be handled deliberately.
+- **Dedicated-server safety:** client-only rendering code must not break a server launch.
+- **Evidence over claims:** document what was implemented, tested, and remains unverified.
 
-## 📚 Documentação do projeto
+## ⌁ Project files
 
-| Documento | Conteúdo |
+| Document | Purpose |
 |---|---|
-| [`AI_CONTEXT.txt`](AI_CONTEXT.txt) | Identidade, prioridades, restrições e contexto técnico central. |
-| [`AGENT_COORDINATION.txt`](AGENT_COORDINATION.txt) | Fila de tarefas, responsáveis e critérios de conclusão. |
-| [`AGENT_LOG.txt`](AGENT_LOG.txt) | Histórico de lotes, alterações e validações. |
-| [Arquitetura](docs/ARCHITECTURE.md) | Organização técnica e pontos de extensão do Forge. |
-| [Desenvolvimento de poderes](docs/POWER_DEVELOPMENT.md) | Critérios para projetar e concluir cada habilidade. |
-| [Rede](docs/NETWORKING.md) | Diretrizes de comunicação e validação multiplayer. |
-| [Testes](docs/TESTING.md) | Processo de compilação e validação. |
-
-## 🤝 Desenvolvimento
-
-Contribuições, revisões de arquitetura e sugestões técnicas são bem-vindas. Antes de implementar uma tarefa, consulte o contexto central e a fila de coordenação para preservar as decisões do projeto e evitar alterações conflitantes.
-
-1. Entenda o estado real da funcionalidade antes de modificá-la.
-2. Prefira lotes coerentes e modulares.
-3. Compile e execute os testes relevantes após as mudanças.
-4. Registre o que foi alterado, o que foi validado e quais limitações continuam abertas.
+| [Master.txt](Master.txt) | Central vision, requirements, and priorities |
+| [AI_CONTEXT.txt](AI_CONTEXT.txt) | Technical context and constraints for coding agents |
+| [AGENT_COORDINATION.txt](AGENT_COORDINATION.txt) | Task queue, checkpoints, and acceptance criteria |
+| [AGENT_LOG.txt](AGENT_LOG.txt) | Work history and validation notes |
+| [Architecture](docs/ARCHITECTURE.md) | Structure and extension points |
+| [Power development](docs/POWER_DEVELOPMENT.md) | Standards for implementing abilities |
+| [Networking](docs/NETWORKING.md) | Communication and server validation |
+| [Testing](docs/TESTING.md) | Build and test workflow |
 
 ---
 
 <div align="center">
 
-  <strong>ASCENDANT</strong><br/>
-  <sub>Build powers with purpose. Validate every ability.</sub>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:20113b,50:243b63,100:080b16&height=130&section=footer" width="100%" alt="" />
 
-  <br/>
+<h3>ASCENDANT // POWER IS A SYSTEM.</h3>
 
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:6d5dfc,55:243b63,100:101827&height=100&section=footer" alt="" />
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&size=13&duration=3200&pause=1200&color=8B7CFF&center=true&vCenter=true&width=600&lines=BUILD+WITH+PURPOSE.;VALIDATE+EVERY+ABILITY.;THE+NEXT+EVOLUTION+IS+IN+PROGRESS." alt="Animated footer tagline" />
+
+<sub>Independent Minecraft mod project · Work in progress</sub>
 
 </div>
