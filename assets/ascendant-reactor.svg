@@ -46,12 +46,12 @@
     <circle cx="795" cy="265" r="1.7"><animate attributeName="cx" values="795;770;795" dur="3.5s" repeatCount="indefinite"/></circle>
   </g>
   <g font-family="Segoe UI,Arial,sans-serif">
-    <text x="78" y="145" fill="#7deaff" font-size="14" letter-spacing="6">A MODULAR SUPERHUMAN FRAMEWORK</text>
+    <text x="78" y="145" fill="#7deaff" font-size="14" letter-spacing="6">ESTRUTURA MODULAR DE SUPER-HUMANOS</text>
     <text x="72" y="213" fill="#ffffff" font-size="68" font-weight="800" letter-spacing="3">ASCENDANT</text>
     <rect x="78" y="237" width="310" height="3" rx="2" fill="url(#beam)">
       <animate attributeName="width" values="70;310;190;310" dur="5s" repeatCount="indefinite"/>
     </rect>
-    <text x="78" y="273" fill="#c8d2f2" font-size="19" letter-spacing="1.5">POWER SHOULD CHANGE THE GAME.</text>
+    <text x="78" y="273" fill="#c8d2f2" font-size="19" letter-spacing="1.5">PODERES QUE MUDAM O JOGO.</text>
     <text x="78" y="310" fill="#8793ba" font-size="13" letter-spacing="3">MINECRAFT JAVA 1.20.1  •  FORGE 47.3.0</text>
   </g>
   <rect x="1" y="1" width="1198" height="358" rx="19" fill="none" stroke="#7e7cff" stroke-opacity=".35"/>
