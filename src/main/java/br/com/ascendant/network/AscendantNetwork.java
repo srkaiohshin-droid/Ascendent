@@ -41,9 +41,12 @@ public final class AscendantNetwork {
         CHANNEL.registerMessage(id++, TogglePowerPacket.class,
                 TogglePowerPacket::encode, TogglePowerPacket::decode,
                 TogglePowerPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
-        CHANNEL.registerMessage(id, EquipSuitPacket.class,
+        CHANNEL.registerMessage(id++, EquipSuitPacket.class,
                 EquipSuitPacket::encode, EquipSuitPacket::decode,
                 EquipSuitPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        CHANNEL.registerMessage(id, ActivatePowerPacket.class,
+                ActivatePowerPacket::encode, ActivatePowerPacket::decode,
+                ActivatePowerPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registered = true;
     }
 
@@ -57,6 +60,31 @@ public final class AscendantNetwork {
 
     public static void sendEquipSuit(ResourceLocation suitId, boolean equip) {
         CHANNEL.sendToServer(new EquipSuitPacket(suitId, equip));
+    }
+
+    public static void sendActivatePower(ResourceLocation powerId) {
+        CHANNEL.sendToServer(new ActivatePowerPacket(powerId));
+    }
+
+    public record ActivatePowerPacket(ResourceLocation powerId) {
+        public static void encode(ActivatePowerPacket msg, FriendlyByteBuf buf) {
+            buf.writeResourceLocation(msg.powerId());
+        }
+
+        public static ActivatePowerPacket decode(FriendlyByteBuf buf) {
+            return new ActivatePowerPacket(buf.readResourceLocation());
+        }
+
+        public static void handle(ActivatePowerPacket msg, Supplier<NetworkEvent.Context> ctxSupplier) {
+            NetworkEvent.Context ctx = ctxSupplier.get();
+            ctx.enqueueWork(() -> {
+                ServerPlayer player = ctx.getSender();
+                if (player != null) {
+                    PowerRuntimeEngine.activatePower(player, msg.powerId());
+                }
+            });
+            ctx.setPacketHandled(true);
+        }
     }
 
     public record ActivateAbilityPacket(ResourceLocation abilityId) {

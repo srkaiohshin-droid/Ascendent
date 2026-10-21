@@ -14,10 +14,12 @@
 - [x] Implementar poderes aquaticos funcionais (ASC-007 — aquatic_respiration, tidal_wave, water_dash, atlantean_sovereignty, hydro_torpedo).
 - [x] Cobrir capability NBT e respawn server-side com GameTest.
 - [x] Implementar arquitetura modular de poderes, habilidades e componentes reutilizáveis.
-- [x] Cadastrar catálogo completo de 500 poderes e 500 habilidades (106 poderes e 103 habilidades funcionais).
+- [x] Cadastrar catálogo completo de 500 poderes e 500 habilidades (113 poderes e 111 habilidades funcionais; 387/389 templates).
 - [x] Implementar Catálogo de Trajes inspirado no Armoured Workshop (SuitRegistry, SuitManager, 6 trajes integrados).
 - [x] Implementar Gerenciador de Pacotes inspirado no Fisk's Heroes (PackManager, PackSecurity, LocalPackCatalogProvider).
 - [x] Criar ferramentas de validação e automação de conteúdo (ContentValidator, CatalogExporter).
-- [x] Validar com 32/32 GameTests automatizados e build aprovado.
+- [x] Validar com 35/35 GameTests automatizados e build aprovado.
+- [x] Lote B1: conectar invisibilidade, levitação sustentada, vórtice sustentado, invocação de lobos e faseamento; limpar estado runtime ao perder a última fonte do traje. `compileJava`, GameTests e `build` aprovados.
+- [ ] Interface do catálogo de poderes/trajes, keybinds e menu radial reutilizando registries e networking existentes.
 - [ ] Validar gameplay multiplayer com dois jogadores quando houver mecanica de rede interativa.
 - [x] Configurar e confirmar o remoto Git origin autorizado.

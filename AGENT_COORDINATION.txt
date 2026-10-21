@@ -157,11 +157,26 @@ Prioridade: ALTA
 Dependencia: ASC-001 ate ASC-007
 Criterios:
 - [x] Arquitetura de componentes reutilizaveis (Dash, Blink, Leap, Damage, Heal, Knockback, Pull, Explosion, Lightning, AreaEffect, Shield, AttributeModifier, DamageMitigation, WaterAdaptation, Vision).
-- [x] Registro e catalogo de 500 poderes em 40 categorias (106 funcionais, 394 templates).
-- [x] Registro e catalogo de 500 habilidades em 14 categorias (103 funcionais, 397 templates).
+- [x] Registro e catalogo de 500 poderes em 40 categorias (113 funcionais, 387 templates).
+- [x] Registro e catalogo de 500 habilidades em 14 categorias (111 funcionais, 389 templates).
 - [x] Catalogo de Trajes inspirado no Armoured Workshop com 6 trajes integrados.
 - [x] Gerenciador de Pacotes inspirado no Fisk's Heroes com seguranca estrita (PackSecurity anti-traversal e bloqueio executavel).
 - [x] Ferramentas de validacao e exportacao automatizadas (ContentValidator, CatalogExporter).
-- [x] 32/32 GameTests aprovados e build bem-sucedido.
+- [x] 35/35 GameTests aprovados e build bem-sucedido.
+
+LOTE B1
+Titulo: Conectar cinco componentes funcionais e limpar ciclo de vida de trajes
+Status: DONE
+Arquivos: componentes Invisibility, Levitation, VortexAction, SummonEntity e Phase;
+  ComponentRegistry, PowerCatalogData, PowerRuntimeEngine, SuitManager,
+  AscendantNetwork, AscendantCommands e FrameworkGameTests.
+Resultado: 500 poderes preservados; contagens verificadas em runtime: 113 poderes
+  funcionais/387 templates e 111 habilidades funcionais/389 templates. Levitação
+  e vórtice permanecem SUSTAINED; o restante dos cinco mapeamentos é ACTIVE.
+  Poderes ACTIVE agora têm ativação server-side pelo runtime, pacote e comando.
+Validação: 35/35 GameTests e `build` aprovados; ver detalhes em
+  `docs/DEVELOPMENT_STATUS.md` e `AGENT_LOG.txt`.
+Próxima tarefa: interface de catálogo, keybinds e menu radial, usando registries
+  e networking existentes; não criar UI paralela.
 
 Nenhuma tarefa esta concluida apenas por existir nesta fila.

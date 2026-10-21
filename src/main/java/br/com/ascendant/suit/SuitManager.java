@@ -1,5 +1,6 @@
 package br.com.ascendant.suit;
 
+import br.com.ascendant.power.runtime.PowerRuntimeEngine;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -22,12 +23,34 @@ public final class SuitManager {
         if (suit == null) {
             return false;
         }
+        ResourceLocation previousId = EQUIPPED_SUITS.get(player.getUUID());
+        if (suitId.equals(previousId)) {
+            return true;
+        }
+        SuitDefinition previous = previousId == null ? null : SuitRegistry.get(previousId);
         EQUIPPED_SUITS.put(player.getUUID(), suitId);
+        if (previous != null) {
+            for (ResourceLocation powerId : previous.getGrantedPowers()) {
+                if (!suit.getGrantedPowers().contains(powerId)) {
+                    PowerRuntimeEngine.deactivatePowerIfInaccessible(player, powerId);
+                }
+            }
+        }
         return true;
     }
 
     public static boolean unequipSuit(ServerPlayer player) {
-        return EQUIPPED_SUITS.remove(player.getUUID()) != null;
+        ResourceLocation removedId = EQUIPPED_SUITS.remove(player.getUUID());
+        if (removedId == null) {
+            return false;
+        }
+        SuitDefinition removed = SuitRegistry.get(removedId);
+        if (removed != null) {
+            for (ResourceLocation powerId : removed.getGrantedPowers()) {
+                PowerRuntimeEngine.deactivatePowerIfInaccessible(player, powerId);
+            }
+        }
+        return true;
     }
 
     public static ResourceLocation getEquippedSuitId(ServerPlayer player) {

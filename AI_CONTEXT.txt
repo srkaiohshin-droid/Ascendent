@@ -21,7 +21,7 @@ PRIORIDADES INICIAIS
 3. Superforca (Implementada com componentes modulares)
 4. Super-resistencia (Implementada com mitigação e componentes de dano)
 5. Poderes aquaticos (Implementados com adaptação aquática e impulso)
-6. Catálogo de 500 poderes e 500 habilidades (106 poderes funcionais, 103 habilidades funcionais)
+6. Catálogo de 500 poderes e 500 habilidades (113 poderes funcionais, 111 habilidades funcionais)
 7. Catálogo de Trajes (Armoured Workshop)
 8. Gerenciador de Pacotes e Segurança (Fisk's Heroes)
 
@@ -37,20 +37,26 @@ QUALIDADE OBRIGATORIA
 - Documentar arquivos alterados, comportamento, riscos e testes executados.
 - Preferir implementacoes profundas e completas a muitos poderes superficiais.
 
-ESTADO VERIFICADO EM 2026-10-20 (MODULAR SUPERPOWER FRAMEWORK)
+ESTADO VERIFICADO EM 2026-10-21 (MODULAR SUPERPOWER FRAMEWORK)
 - Arquitetura de componentes reutilizáveis (IPowerComponent, ComponentContext, ComponentRegistry):
   Dash, Blink, Leap, DamageAction, HealAction, KnockbackAction, PullAction, ExplosionAction,
   LightningAction, AreaEffectAction, ShieldAction, AttributeModifier, DamageMitigation,
-  WaterAdaptation, NightVision, ThermalVision, FlightAction e Template.
+  WaterAdaptation, NightVision, ThermalVision, FlightAction, Invisibility, Levitation,
+  VortexAction, SummonEntity, Phase e Template.
 - Catálogo de 500 poderes cadastrados em 40 categorias oficiais:
-  106 poderes com executores mecânicos funcionais e 394 poderes em template para expansões subsequentes.
+  113 poderes com executores mecânicos funcionais e 387 poderes em template para expansões subsequentes.
 - Catálogo de 500 habilidades cadastradas em 14 categorias funcionais:
-  103 habilidades funcionais e 397 em template.
+  111 habilidades funcionais e 389 em template.
 - Catálogo de Trajes (SuitRegistry, SuitManager, BuiltinSuitData) com 6 trajes integrados
   (Classic Ascendant, Speedster Mk-I, Titan Exosuit, Atlantean Regalia, Solar Aegis, Shadow Infiltrator).
 - Gerenciador de Pacotes (PackManager, PackSecurity, LocalPackCatalogProvider) com extração
   atômica, proteção contra Zip-Slip e bloqueio rigoroso de arquivos executáveis.
 - Ferramenta de validação e exportação (ContentValidator, CatalogExporter).
 - PowerRuntimeEngine (cooldowns, toggles de estado, hooks de dano, mitigação, queda e ticks).
-- 32/32 GameTests aprovados em `gradlew.bat runGameTestServer` (16 voo, 2 capability, 9 poses, 5 framework).
+- 35/35 GameTests aprovados em `gradlew.bat runGameTestServer` (16 voo, 2 capability, 9 poses, 8 framework).
 - `gradlew.bat build` concluído com sucesso.
+- Lote B1: cinco componentes ligados a poderes server-side; ACTIVE powers têm caminho de ativação
+  no runtime, pacote e comando. Limpeza de toggles, efeitos e modificadores ao perder a última
+  fonte de traje testada. Ver `docs/DEVELOPMENT_STATUS.md` e o registro B1 em `AGENT_LOG.txt`.
+- Próxima tarefa: interface de catálogo, keybinds e menu radial usando os registries e networking
+  existentes; não implementar UI paralela.

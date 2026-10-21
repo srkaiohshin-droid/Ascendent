@@ -2,8 +2,8 @@
 
 > **Target Platform:** Minecraft Java 1.20.1 | Forge 47.3.0 | Java 17 (Temurin 17.0.20.1)  
 > **Package Base:** `br.com.ascendant`  
-> **Status Date:** 2026-10-20  
-> **Build Status:** BUILD SUCCESSFUL (Gradle 8.8, 32/32 GameTests Passing)
+> **Status Date:** 2026-10-21
+> **Build Status:** BUILD SUCCESSFUL (Gradle 8.8, 35/35 GameTests Passing)
 
 ---
 
@@ -34,6 +34,11 @@ flowchart TD
         Water[WaterAdaptationComponent]
         Vision[Thermal / NightVision]
         FlightComp[FlightActionComponent]
+        Invis[InvisibilityComponent]
+        Levitation[LevitationComponent]
+        Vortex[VortexActionComponent]
+        Summon[SummonEntityComponent]
+        Phase[PhaseComponent]
         Templ[TemplateComponent]
     end
 
@@ -71,11 +76,11 @@ Todos os poderes e habilidades foram auditados pelo `ContentValidator` automatiz
 | Métrica | Quantidade | Observações |
 | :--- | :--- | :--- |
 | **Total de Poderes Cadastrados** | **500** | Distribuídos entre as 40 categorias oficiais |
-| **Poderes Funcionais (Executores Reais)** | **106** | Apoiados por componentes com lógica física, atributos, combate e mobilidade reais |
-| **Poderes em Template / Expansão Futura** | **394** | Marcados honestamente com `functional = false` e parâmetros mecânicos detalhados |
+| **Poderes Funcionais (Executores Reais)** | **113** | Apoiados por componentes com lógica física, atributos, combate e mobilidade reais |
+| **Poderes em Template / Expansão Futura** | **387** | Marcados honestamente com `functional = false` e parâmetros mecânicos detalhados |
 | **Total de Habilidades Cadastradas** | **500** | Distribuídas entre as 14 categorias de habilidades |
-| **Habilidades Funcionais (Executores Reais)** | **103** | Apoiadas por componentes operacionais testados e validados |
-| **Habilidades em Template / Expansão Futura** | **397** | Marcadas honestamente com `functional = false` |
+| **Habilidades Funcionais (Executores Reais)** | **111** | Apoiadas por componentes operacionais testados e validados |
+| **Habilidades em Template / Expansão Futura** | **389** | Marcadas honestamente com `functional = false` |
 | **Trajes Cadastrados (Armoured Workshop)** | **6** | Classic Ascendant, Speedster Mk-I, Titan Exosuit, Atlantean Regalia, Solar Aegis, Shadow Infiltrator |
 | **Erros de Validação / Referências Órfãs** | **0** | Validação automatizada aprovada sem exceções |
 
@@ -89,7 +94,7 @@ Os poderes estão distribuídos rigorosamente em 40 categorias (13 nas primeiras
 2. **Supervelocidade e movimento cinético:** `ascendant:kinetic_sprint` (modificador de atributo `generic.movement_speed`), `ascendant:mach_dash`, `ascendant:hyper_leap`, `ascendant:kinetic_dampener`.
 3. **Superforça e manipulação física:** `ascendant:titan_strength` (modificador de `generic.attack_damage`), `ascendant:seismic_slam`, `ascendant:colossal_leap`, `ascendant:shockwave_knockback`.
 4. **Resistência, invulnerabilidade e regeneração:** `ascendant:diamond_skin` (modificador de `generic.armor`), `ascendant:kinetic_mitigation` (mitigação percentual em `LivingHurtEvent`), `ascendant:fire_immunity`, `ascendant:nanite_regeneration`.
-5. **Teletransporte e portais:** `ascendant:blink_step` (teletransporte instantâneo via raycast com aterrissagem segura), `ascendant:spatial_leap`, `ascendant:phase_dash`.
+5. **Teletransporte e portais:** `ascendant:blink_step` (teletransporte instantâneo via raycast com aterrissagem segura), `ascendant:spatial_leap`, `ascendant:void_step` (faseamento com destino carregado e livre de colisão), `ascendant:phase_dash`.
 6. **Energia e rajadas:** `ascendant:energy_blast`, `ascendant:energy_burst`, `ascendant:kinetic_pulse`.
 7. **Fogo e plasma:** `ascendant:pyroclastic_burst`, `ascendant:fireball_shot`, `ascendant:inferno_resistance`.
 8. **Gelo e criocinese:** `ascendant:cryo_blast` (aplicação de freeze ticks e lentidão em área), `ascendant:frost_bite_touch`, `ascendant:subzero_burst`.
@@ -101,18 +106,18 @@ Os poderes estão distribuídos rigorosamente em 40 categorias (13 nas primeiras
 14. **Som e ressonância:** `ascendant:sonic_screech`, `ascendant:acoustic_shockwave`, `ascendant:sonic_boost_leap`.
 15. **Luz:** `ascendant:solar_healing`, `ascendant:photonic_dash`.
 16. **Sombras:** `ascendant:shadow_teleport`, `ascendant:shadow_strike`.
-17. **Telecinese:** `ascendant:kinetic_pull`, `ascendant:kinetic_push`, `ascendant:psychic_slam`.
+17. **Telecinese:** `ascendant:kinetic_pull`, `ascendant:kinetic_push`, `ascendant:psychic_slam`, `ascendant:telekinetic_levitate` (levitação sustentada de alvo visível e não aliado).
 18. **Gravidade:** `ascendant:gravity_leap`, `ascendant:gravitational_slam`, `ascendant:weightlessness_cushion`.
 19. **Escudos e barreiras:** `ascendant:kinetic_barrier` (corações de absorção adicionais e resistência), `ascendant:energy_aegis`, `ascendant:reactive_deflection`.
 20. **Cura e suporte:** `ascendant:healing_touch`, `ascendant:regeneration_aura`, `ascendant:restorative_surge`.
 21. **Sentidos aprimorados:** `ascendant:sonar_pulse`, `ascendant:reflex_boost`.
-22. **Visão especial:** `ascendant:night_vision_eyes`, `ascendant:thermal_scan` (efeito glowing em entidades próximas), `ascendant:infrared_toggle`.
+22. **Visão especial:** `ascendant:night_vision_eyes`, `ascendant:thermal_scan` (efeito glowing em entidades próximas), `ascendant:infrared_toggle`, `ascendant:refractive_invisibility` (efeito vanilla de invisibilidade temporário).
 23. **Camuflagem e furtividade:** `ascendant:chameleon_dash`, `ascendant:stealth_strike`.
 24. **Metamorfose:** `ascendant:beast_leap`, `ascendant:feral_swipe`.
 25. **Clones e duplicatas:** `ascendant:clone_dash_decoy`, `ascendant:decoy_burst`.
-26. **Invocação:** `ascendant:lightning_elemental_strike`, `ascendant:healing_wisp`.
+26. **Invocação:** `ascendant:lightning_elemental_strike`, `ascendant:healing_wisp`, `ascendant:spectral_wolf_pack` (três lobos vanilla domados).
 27. **Armadilhas e minas:** `ascendant:kinetic_mine`, `ascendant:frost_trap_burst`.
-28. **Controle de multidões:** `ascendant:staggering_wave`, `ascendant:cryo_lockdown`, `ascendant:sonic_repulsion`.
+28. **Controle de multidões:** `ascendant:staggering_wave`, `ascendant:cryo_lockdown`, `ascendant:sonic_repulsion`, `ascendant:vortex_maelstrom` (atração sustentada server-side).
 29. **Manipulação tecnológica:** `ascendant:cybernetic_speed`, `ascendant:nanite_heal_injection`.
 30. **Habilidades cósmicas:** `ascendant:stellar_dash`, `ascendant:supernova_blast`.
 31. **Poderes psíquicos:** `ascendant:mind_blast`, `ascendant:psychic_push`.
@@ -156,13 +161,24 @@ O módulo `br.com.ascendant.pack` implementa:
 ## 6. Resultado dos Testes e Build
 
 - **Gradle Build:** `BUILD SUCCESSFUL` (compilação limpa sem erros).
-- **GameTests (`runGameTestServer`):** **32/32 testes aprovados** (27 testes preexistentes do voo, mixins e capability preservados com 100% de sucesso + 5 novos testes de integridade do framework).
+- **GameTests (`runGameTestServer`):** **35/35 testes obrigatórios aprovados**; servidor iniciou, executou os 35 testes e encerrou normalmente.
+- **Poderes funcionais antes/depois do lote B1:** 108 → 113 (o estado anterior tinha 500 registros; a contagem de habilidades funcionais não foi alterada pelo B1: 111).
+- **Catálogo após B1:** 500 poderes (113 funcionais, 387 templates); 500 habilidades (111 funcionais, 389 templates).
+- **Poderes conectados:** `refractive_invisibility` (ACTIVE), `telekinetic_levitate` (SUSTAINED), `vortex_maelstrom` (SUSTAINED), `spectral_wolf_pack` (ACTIVE) e `void_step` (ACTIVE). Levitação levita uma entidade visível não aliada; vórtice atrai entidades próximas não aliadas; invocação cria três lobos vanilla domados e associados ao jogador; faseamento move o jogador para destino carregado e sem colisão.
+- **Ativação de poderes ACTIVE:** adicionado caminho server-authoritative no runtime, pacote de rede e comando administrativo `/ascendant power use <targets> <power_id>`. Não há ainda interface/keybind/menu radial para essa ativação.
+- **Ciclo de trajes:** ao trocar/desequipar traje, ou revogar poder, estado toggle/cooldown e callbacks são limpos quando o jogador perde a última fonte de acesso. A cobertura verifica limpeza de night vision e modificador de movimento, ausência de duplicação ao re-equipar e preservação quando o poder continua intrínseco.
+- **Limite da verificação de expiração:** o teste confirma duração configurada finita para invisibilidade (5 ticks no fixture); o efeito não é esperado a expirar naturalmente no ServerPlayer criado pelo fixture do GameTest.
+- **Arquivos principais do B1:** cinco componentes novos, `ComponentRegistry`, `PowerCatalogData`, `PowerRuntimeEngine`, `SuitManager`, `AscendantNetwork`, `AscendantCommands` e `FrameworkGameTests`.
+- **GameTests cobertos pelo lote:** integridade/contagens, registro e round-trip dos cinco componentes, execução server-side, duração finita, limpeza de efeitos/modificadores no desequipar, preservação de posse alternativa e ausência de duplicação de modificadores.
 - **Testes novos cobertos:**
-  1. `catalogIntegrityAndCountValidation`: valida contagem de 500 poderes, 500 habilidades e integridade total de referências.
+  1. `catalogIntegrityAndCountValidation`: valida contagem de 500 poderes/500 habilidades, contagens funcionais/templates e integridade de referências.
   2. `coreComponentsExecution`: valida impulsão do DashComponent, cura do HealActionComponent e absorção do ShieldActionComponent.
   3. `abilityActivationAndCooldownEnforcement`: valida verificação de permissão, execução da habilidade e bloqueio por cooldown.
   4. `suitEquipGrantsAssociatedPowers`: valida concessão de poderes pelo traje e remoção ao desequipar.
   5. `packSecurityPathTraversalAndExecutableRejection`: valida bloqueio de Zip-Slip e arquivos `.class` executáveis.
+  6. `newComponentsAreRegisteredAndExecuteOnServer`: valida mapeamento, round-trip e execução dos cinco novos componentes.
+  7. `temporaryInvisibilityUsesFiniteDuration`: confirma aplicação de duração finita configurada.
+  8. `suitRemovalCleansToggleButPreservesIntrinsicPower`: verifica limpeza de toggle/efeito/modificador, ausência de duplicação e preservação da fonte intrínseca.
 
 ---
 
@@ -173,4 +189,5 @@ O módulo `br.com.ascendant.pack` implementa:
    - Se for introduzir uma nova mecânica, crie um novo componente em `br.com.ascendant.power.component` implementando `IPowerComponent` e registre sua fábrica em `ComponentRegistry`.
 2. **Executar validação de catálogo e compilação:**
    - Execute `.\gradlew.bat compileJava` para verificar a compilação.
-   - Execute `.\gradlew.bat runGameTestServer` para rodar os 32 GameTests automatizados.
+   - Execute `.\gradlew.bat runGameTestServer` para rodar os 35 GameTests automatizados.
+3. **Próxima implementação:** construir UI de catálogo, keybinds e menu radial sobre os registries e o networking atuais; não duplicar essas camadas.

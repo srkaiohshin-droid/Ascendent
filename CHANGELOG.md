@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0 — Componentes funcionais e ciclo de vida B1
+- Conectados `refractive_invisibility`, `telekinetic_levitate`, `vortex_maelstrom`,
+  `spectral_wolf_pack` e `void_step` a executores reais e serializáveis.
+- Invisibility aplica efeito vanilla com duração finita; levitação e vórtice são
+  sustentados por toggle; invocação usa lobos vanilla domados; faseamento desloca
+  o jogador apenas até destino carregado, dentro do world border e sem colisão.
+- Adicionado caminho server-side para ativar poderes `ACTIVE` pelo runtime,
+  pacote de rede e `/ascendant power use`; levitação e vórtice mantêm SUSTAINED.
+- Troca/remoção de traje e revogação limpam toggle, cooldown e callbacks quando
+  a última fonte de acesso desaparece, preservando o poder quando outra fonte o concede.
+- GameTests cobrem registro/round-trip, execução, duração finita, limpeza de efeito
+  e atributo, posse alternativa e contagens do catálogo: 500 poderes (113 funcionais,
+  387 templates) e 500 habilidades (111 funcionais, 389 templates).
+- Validação final: `compileJava`, `runGameTestServer` (35/35) e `build` aprovados.
+- Interface, keybinds e menu radial continuam pendentes para lote posterior.
+
 ## 0.1.0 — Fundacao inicial
 - Identidade Ascendant configurada.
 - Classe principal dedicada criada.

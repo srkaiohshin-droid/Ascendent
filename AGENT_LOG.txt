@@ -347,3 +347,34 @@ LOTE MODULAR SUPERPOWER FRAMEWORK — 500 PODERES, 500 HABILIDADES, TRAJES E PAC
   - `gradlew.bat compileJava`: BUILD SUCCESSFUL.
   - `gradlew.bat build`: BUILD SUCCESSFUL (jar reobfuscado com mixins e recursos).
   - `gradlew.bat runGameTestServer`: 32/32 GameTests aprovados (27 voo/poses/capability + 5 framework).
+
+LOTE B1 — COMPONENTES FUNCIONAIS E CICLO DE VIDA DE TRAJES
+- Data/hora local: 2026-10-21 20:11 -03:00.
+- Tarefa: conectar cinco componentes funcionais ao catálogo, habilitar execução
+  server-side para poderes ACTIVE e limpar estado runtime quando a última fonte
+  de acesso concedida por traje for removida.
+- Implementação: Invisibility, Levitation, VortexAction, SummonEntity e Phase
+  registrados em `ComponentRegistry`; conectados, respectivamente, a
+  `refractive_invisibility`, `telekinetic_levitate`, `vortex_maelstrom`,
+  `spectral_wolf_pack` e `void_step`. Levitação e vórtice permanecem SUSTAINED;
+  os outros três mapeamentos são ACTIVE. Invocação usa `EntityType.WOLF` vanilla
+  e associa o dono via UUID. Ativações executadas no servidor.
+- Runtime/trajes: poderes ACTIVE ativáveis pelo runtime, pacote serverbound e
+  `/ascendant power use`. Ao trocar/desequipar traje ou revogar poder, toggle,
+  cooldown e callbacks são limpos apenas quando o jogador perde a última fonte;
+  acesso intrínseco remanescente preserva o estado.
+- Cobertura/contagens: GameTests verificam registro e round-trip dos cinco
+  componentes, execução, duração finita, limpeza de efeito/modificador,
+  re-equipamento sem duplicação e preservação de poder intrínseco. Catálogo:
+  500 poderes (113 funcionais, 387 templates) e 500 habilidades (111 funcionais,
+  389 templates).
+- Validação no Temurin JDK 17.0.20.1 / Gradle 8.8:
+  `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
+  `.\gradlew.bat runGameTestServer --no-daemon` — 35/35 GameTests passaram e o
+  servidor encerrou normalmente;
+  `.\gradlew.bat build --no-daemon` — BUILD SUCCESSFUL; `test` NO-SOURCE.
+- Limite: a prova de invisibilidade confirma o valor de duração finita (5 ticks);
+  expiração natural não é observável no ServerPlayer usado pelo fixture GameTest.
+- Próxima tarefa: interface de catálogo, keybinds e menu radial sobre registries
+  e networking existentes; não iniciada neste lote.
+- Commit/push: não realizados conforme solicitação explícita do usuário.

@@ -2,6 +2,7 @@ package br.com.ascendant.power.runtime;
 
 import br.com.ascendant.power.AbilityDefinition;
 import br.com.ascendant.power.AbilityRegistry;
+import br.com.ascendant.core.PowerType;
 import br.com.ascendant.power.PowerDefinition;
 import br.com.ascendant.power.PowerRegistry;
 import br.com.ascendant.power.component.ComponentContext;
@@ -81,19 +82,76 @@ public final class PowerRuntimeEngine {
             return false;
         }
         PowerDefinition power = PowerRegistry.get(powerId);
-        if (power == null) {
+        if (power == null || !power.isFunctional()
+                || (power.getType() != PowerType.TOGGLE && power.getType() != PowerType.SUSTAINED)) {
             return false;
         }
 
         Set<ResourceLocation> toggles = ACTIVE_TOGGLES.computeIfAbsent(player.getUUID(), k -> ConcurrentHashMap.newKeySet());
+        boolean changed;
         if (enable) {
-            toggles.add(powerId);
+            changed = toggles.add(powerId);
         } else {
-            toggles.remove(powerId);
+            changed = toggles.remove(powerId);
         }
 
-        for (IPowerComponent comp : power.getComponents()) {
-            comp.onToggle(player, enable);
+        if (changed) {
+            for (IPowerComponent comp : power.getComponents()) {
+                comp.onToggle(player, enable);
+            }
+            if (toggles.isEmpty()) {
+                ACTIVE_TOGGLES.remove(player.getUUID(), toggles);
+            }
+        }
+        return true;
+    }
+
+    public static boolean activatePower(ServerPlayer player, ResourceLocation powerId) {
+        PowerDefinition power = PowerRegistry.get(powerId);
+        if (power == null || !power.isFunctional() || power.getType() != PowerType.ACTIVE
+                || !hasPowerAccess(player, powerId) || isOnCooldown(player, powerId)) {
+            return false;
+        }
+
+        ComponentContext context = ComponentContext.of(player, powerId);
+        boolean executed = false;
+        for (IPowerComponent component : power.getComponents()) {
+            if (component.isFunctional() && component.execute(context)) {
+                executed = true;
+            }
+        }
+        if (executed && power.getCooldownTicks() > 0) {
+            setCooldown(player, powerId, power.getCooldownTicks());
+        }
+        return executed;
+    }
+
+    /**
+     * Removes a power's transient runtime state after its final ownership source is lost.
+     * This deliberately bypasses togglePower's access check, which must reject client activation.
+     */
+    public static boolean deactivatePowerIfInaccessible(ServerPlayer player, ResourceLocation powerId) {
+        if (hasPowerAccess(player, powerId)) {
+            return false;
+        }
+
+        Map<ResourceLocation, Long> playerCooldowns = COOLDOWNS.get(player.getUUID());
+        if (playerCooldowns != null) {
+            playerCooldowns.remove(powerId);
+        }
+        Set<ResourceLocation> toggles = ACTIVE_TOGGLES.get(player.getUUID());
+        if (toggles != null) {
+            toggles.remove(powerId);
+            if (toggles.isEmpty()) {
+                ACTIVE_TOGGLES.remove(player.getUUID(), toggles);
+            }
+        }
+
+        PowerDefinition power = PowerRegistry.get(powerId);
+        if (power != null) {
+            for (IPowerComponent component : power.getComponents()) {
+                component.onToggle(player, false);
+            }
         }
         return true;
     }
