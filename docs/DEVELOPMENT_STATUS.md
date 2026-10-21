@@ -161,15 +161,21 @@ O módulo `br.com.ascendant.pack` implementa:
 ## 6. Resultado dos Testes e Build
 
 - **Gradle Build:** `BUILD SUCCESSFUL` (compilação limpa sem erros).
-- **GameTests (`runGameTestServer`):** **35/35 testes obrigatórios aprovados**; servidor iniciou, executou os 35 testes e encerrou normalmente.
+- **GameTests (`runGameTestServer`):** **36/36 testes obrigatórios aprovados** na validação B2; servidor iniciou, executou os testes e encerrou normalmente.
 - **Poderes funcionais antes/depois do lote B1:** 108 → 113 (o estado anterior tinha 500 registros; a contagem de habilidades funcionais não foi alterada pelo B1: 111).
 - **Catálogo após B1:** 500 poderes (113 funcionais, 387 templates); 500 habilidades (111 funcionais, 389 templates).
 - **Poderes conectados:** `refractive_invisibility` (ACTIVE), `telekinetic_levitate` (SUSTAINED), `vortex_maelstrom` (SUSTAINED), `spectral_wolf_pack` (ACTIVE) e `void_step` (ACTIVE). Levitação levita uma entidade visível não aliada; vórtice atrai entidades próximas não aliadas; invocação cria três lobos vanilla domados e associados ao jogador; faseamento move o jogador para destino carregado e sem colisão.
-- **Ativação de poderes ACTIVE:** adicionado caminho server-authoritative no runtime, pacote de rede e comando administrativo `/ascendant power use <targets> <power_id>`. Não há ainda interface/keybind/menu radial para essa ativação.
+- **Ativação de poderes ACTIVE:** caminho server-authoritative no runtime, pacote de rede, comando administrativo `/ascendant power use <targets> <power_id>` e ações da nova interface.
 - **Ciclo de trajes:** ao trocar/desequipar traje, ou revogar poder, estado toggle/cooldown e callbacks são limpos quando o jogador perde a última fonte de acesso. A cobertura verifica limpeza de night vision e modificador de movimento, ausência de duplicação ao re-equipar e preservação quando o poder continua intrínseco.
 - **Limite da verificação de expiração:** o teste confirma duração configurada finita para invisibilidade (5 ticks no fixture); o efeito não é esperado a expirar naturalmente no ServerPlayer criado pelo fixture do GameTest.
 - **Arquivos principais do B1:** cinco componentes novos, `ComponentRegistry`, `PowerCatalogData`, `PowerRuntimeEngine`, `SuitManager`, `AscendantNetwork`, `AscendantCommands` e `FrameworkGameTests`.
 - **GameTests cobertos pelo lote:** integridade/contagens, registro e round-trip dos cinco componentes, execução server-side, duração finita, limpeza de efeitos/modificadores no desequipar, preservação de posse alternativa e ausência de duplicação de modificadores.
+- **Interface B2:** telas client-only para navegar os 500 poderes, 500 habilidades e trajes registrados; pesquisa, filtro de categoria, detalhes e diferenciação entre funcional/template. A interface usa ações e registries atuais, sem duplicar o runtime.
+- **Keybinds B2:** F6 abre/fecha o catálogo, G abre/fecha o radial, V ativa seleção manual, B alterna somente poderes toggle/sustained e PageUp/PageDown navegam seleção/páginas. Todos são configuráveis nas opções de controles do Minecraft.
+- **Menu radial B2:** até oito ações por página, seleção direcional via mouse, confirmação por clique/Enter, cancelamento por botão direito/Escape e troca de páginas; abrir/cancelar não dispara ações.
+- **Ações disponíveis:** somente poderes funcionais `ACTIVE`, `TOGGLE`/`SUSTAINED` e habilidades funcionais de gatilho manual são acionáveis; templates e entradas de acionamento automático continuam visíveis, mas indisponíveis. Equipar/desequipar usa os pacotes existentes e o servidor permanece autoritativo.
+- **GameTest B2:** `catalogFilteringAndActionClassification` cobre busca, categoria, classificação dos tipos acionáveis e geometria do radial. A suíte passou com **36/36**; não foram adicionados testes de tela gráfica.
+- **Limite de validação B2:** `runClient` não foi executado; renderização, layout, foco de busca e captura real de keybinds ainda precisam de inspeção em cliente interativo.
 - **Testes novos cobertos:**
   1. `catalogIntegrityAndCountValidation`: valida contagem de 500 poderes/500 habilidades, contagens funcionais/templates e integridade de referências.
   2. `coreComponentsExecution`: valida impulsão do DashComponent, cura do HealActionComponent e absorção do ShieldActionComponent.
@@ -190,4 +196,4 @@ O módulo `br.com.ascendant.pack` implementa:
 2. **Executar validação de catálogo e compilação:**
    - Execute `.\gradlew.bat compileJava` para verificar a compilação.
    - Execute `.\gradlew.bat runGameTestServer` para rodar os 35 GameTests automatizados.
-3. **Próxima implementação:** construir UI de catálogo, keybinds e menu radial sobre os registries e o networking atuais; não duplicar essas camadas.
+3. **Próxima implementação:** validar a UI B2 em `runClient` e corrigir eventuais problemas visuais/entrada; não duplicar registries ou networking.

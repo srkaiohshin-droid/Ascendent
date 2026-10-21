@@ -1,5 +1,6 @@
 package br.com.ascendant.test;
 
+import br.com.ascendant.catalog.CatalogInteraction;
 import br.com.ascendant.flight.FlightController;
 import br.com.ascendant.pack.PackSecurity;
 import br.com.ascendant.power.AbilityRegistry;
@@ -70,6 +71,48 @@ public final class FrameworkGameTests {
                 "AbilityRegistry must retain exactly 111 functional abilities, found: " + AbilityRegistry.getFunctionalCount());
         helper.assertTrue(AbilityRegistry.size() - AbilityRegistry.getFunctionalCount() == 389,
                 "AbilityRegistry must retain 389 honest templates");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void catalogFilteringAndActionClassification(GameTestHelper helper) {
+        PowerDefinition active = PowerRegistry.get(new ResourceLocation("ascendant", "refractive_invisibility"));
+        PowerDefinition sustained = PowerRegistry.get(new ResourceLocation("ascendant", "telekinetic_levitate"));
+        PowerDefinition passive = PowerRegistry.get(new ResourceLocation("ascendant", "kinetic_sprint"));
+        PowerDefinition template = PowerRegistry.get(new ResourceLocation("ascendant", "orbital_ascent"));
+        var activeAbility = AbilityRegistry.get(new ResourceLocation("ascendant", "thunder_punch"));
+        var passiveAbility = AbilityRegistry.get(new ResourceLocation("ascendant", "night_vision_passive"));
+
+        helper.assertTrue(CatalogInteraction.matches("REFRACTIVE camouflage",
+                        active.getId().toString(), active.getNameKey(), active.getCategory().name()),
+                "Catalog search must match case-insensitive identifier and category terms");
+        helper.assertTrue(CatalogInteraction.matches("levitate", sustained.getId().toString(),
+                        "Telekinetic Levitate", sustained.getCategory().name()),
+                "Catalog search must match display names");
+        helper.assertTrue(!CatalogInteraction.matches("missing", active.getId().toString(),
+                        active.getNameKey(), active.getCategory().name()),
+                "Catalog search must reject unmatched queries");
+        helper.assertTrue(CatalogInteraction.matchesCategory("TELEKINESIS", "telekinesis")
+                        && CatalogInteraction.matchesCategory("all", "telekinesis")
+                        && !CatalogInteraction.matchesCategory("WATER", "telekinesis"),
+                "Category filtering must be case-insensitive and support all categories");
+        helper.assertTrue(CatalogInteraction.forPower(active).type() == CatalogInteraction.ActionType.ACTIVATE_POWER,
+                "Functional ACTIVE powers map to the power activation path");
+        helper.assertTrue(CatalogInteraction.forPower(sustained).type() == CatalogInteraction.ActionType.TOGGLE_POWER,
+                "Functional SUSTAINED powers map to a server-resolved toggle request");
+        helper.assertTrue(CatalogInteraction.forPower(passive).type() == CatalogInteraction.ActionType.NONE,
+                "Passive powers must not be manually activated from a catalog");
+        helper.assertTrue(CatalogInteraction.forPower(template).type() == CatalogInteraction.ActionType.NONE,
+                "Template powers must be visibly non-actionable");
+        helper.assertTrue(CatalogInteraction.forAbility(activeAbility).type()
+                        == CatalogInteraction.ActionType.ACTIVATE_ABILITY
+                        && CatalogInteraction.forAbility(passiveAbility).type() == CatalogInteraction.ActionType.NONE,
+                "Only functional key-triggered abilities map to manual activation");
+        helper.assertTrue(CatalogInteraction.radialSector(0.0D, -100.0D, 8, 12.0D) == 0
+                        && CatalogInteraction.radialSector(100.0D, 0.0D, 8, 12.0D) == 2
+                        && CatalogInteraction.radialSector(0.0D, 0.0D, 8, 12.0D) == -1
+                        && CatalogInteraction.radialSector(100.0D, 0.0D, 9, 12.0D) == -1,
+                "Radial selection must map clockwise sectors and reject the dead zone and invalid counts");
         helper.succeed();
     }
 

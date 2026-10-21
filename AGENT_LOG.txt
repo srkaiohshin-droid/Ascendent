@@ -378,3 +378,31 @@ LOTE B1 — COMPONENTES FUNCIONAIS E CICLO DE VIDA DE TRAJES
 - Próxima tarefa: interface de catálogo, keybinds e menu radial sobre registries
   e networking existentes; não iniciada neste lote.
 - Commit/push: não realizados conforme solicitação explícita do usuário.
+
+LOTE B2 — INTERFACE DE CATÁLOGO, KEYBINDS E MENU RADIAL
+- Tarefa: adicionar navegação client-side e acionamento de poderes, habilidades e trajes,
+  usando registries e networking existentes, sem reimplementar o runtime.
+- Arquivos criados: `src/main/java/br/com/ascendant/catalog/CatalogInteraction.java`,
+  `src/main/java/br/com/ascendant/ui/client/PowerCatalogScreen.java`,
+  `src/main/java/br/com/ascendant/ui/client/RadialMenuScreen.java` e
+  `src/main/java/br/com/ascendant/ui/client/AscendantClientControls.java`.
+- Arquivos modificados: `src/main/java/br/com/ascendant/network/AscendantNetwork.java`
+  (toggle solicitado ao servidor e desequipar), `src/main/java/br/com/ascendant/test/FrameworkGameTests.java`,
+  `src/main/resources/assets/ascendant/lang/en_us.json`,
+  `src/main/resources/assets/ascendant/lang/pt_br.json`, `AI_CONTEXT.txt`,
+  `AGENT_COORDINATION.txt`, `TODO.md`, `CHANGELOG.md` e `docs/DEVELOPMENT_STATUS.md`.
+- Implementação: catálogo para powers/abilities/suits com pesquisa, filtro, detalhes, estado
+  funcional/template e ação contextual; radial com oito opções por página, seleção direcional,
+  confirmação/cancelamento; controles configuráveis F6/G/V/B/PageUp/PageDown.
+  `CatalogInteraction` compartilha a classificação de ações sem dependências client-only.
+  Pedidos de ativação/toggle/equip permanecem no canal de rede e são validados no servidor.
+- Teste adicionado: busca, filtragem por categoria, acionabilidade de powers/abilities e setores
+  do radial; a execução foi por servidor GameTest, não por teste de UI renderizada.
+- Validação com Temurin JDK 17.0.20.1 / Gradle 8.8:
+  `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
+  `.\gradlew.bat runGameTestServer --no-daemon` — 36/36 testes obrigatórios aprovados,
+  servidor iniciado, encerrado normalmente e Gradle BUILD SUCCESSFUL;
+  `.\gradlew.bat build --no-daemon` — BUILD SUCCESSFUL, `test` NO-SOURCE.
+- Limite: `runClient` e validação gráfica/entrada interativa não foram executados.
+- Próxima ação: inspecionar a UI em cliente real e corrigir eventuais problemas de layout/foco.
+- Git: alterações ainda não commitadas nem enviadas durante esta atualização.

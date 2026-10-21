@@ -179,4 +179,19 @@ Validação: 35/35 GameTests e `build` aprovados; ver detalhes em
 Próxima tarefa: interface de catálogo, keybinds e menu radial, usando registries
   e networking existentes; não criar UI paralela.
 
+LOTE B2
+Titulo: Interface client-side de catálogo, keybinds configuráveis e menu radial
+Status: REVIEW
+Arquivos: `CatalogInteraction`, telas `PowerCatalogScreen` e `RadialMenuScreen`,
+  `AscendantClientControls`, `AscendantNetwork`, `FrameworkGameTests`,
+  traduções en_us/pt_br e documentação de status/contexto.
+Resultado: navegação de poderes, habilidades e trajes dos registries; busca,
+  filtro, detalhes e distinção de funcional/template. Keybinds F6/G/V/B/PageUp/PageDown.
+  Radial com oito opções por página, seleção por mouse, confirmação e cancelamento.
+  A rede existente permanece autoridade final para ativação e equipamento.
+Validação: `compileJava`, `runGameTestServer` (36/36) e `build` aprovados.
+  `runClient` e inspeção gráfica ainda não realizados.
+Próxima tarefa: validar renderização, foco e keybinds em cliente interativo; corrigir
+  achados antes de ampliar UI.
+
 Nenhuma tarefa esta concluida apenas por existir nesta fila.

@@ -44,9 +44,12 @@ public final class AscendantNetwork {
         CHANNEL.registerMessage(id++, EquipSuitPacket.class,
                 EquipSuitPacket::encode, EquipSuitPacket::decode,
                 EquipSuitPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
-        CHANNEL.registerMessage(id, ActivatePowerPacket.class,
+        CHANNEL.registerMessage(id++, ActivatePowerPacket.class,
                 ActivatePowerPacket::encode, ActivatePowerPacket::decode,
                 ActivatePowerPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        CHANNEL.registerMessage(id, TogglePowerRequestPacket.class,
+                TogglePowerRequestPacket::encode, TogglePowerRequestPacket::decode,
+                TogglePowerRequestPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registered = true;
     }
 
@@ -58,8 +61,16 @@ public final class AscendantNetwork {
         CHANNEL.sendToServer(new TogglePowerPacket(powerId, enable));
     }
 
+    public static void sendTogglePowerRequest(ResourceLocation powerId) {
+        CHANNEL.sendToServer(new TogglePowerRequestPacket(powerId));
+    }
+
     public static void sendEquipSuit(ResourceLocation suitId, boolean equip) {
         CHANNEL.sendToServer(new EquipSuitPacket(suitId, equip));
+    }
+
+    public static void sendUnequipSuit() {
+        CHANNEL.sendToServer(new EquipSuitPacket(new ResourceLocation(Ascendant.MOD_ID, "catalog_unequip"), false));
     }
 
     public static void sendActivatePower(ResourceLocation powerId) {
@@ -124,6 +135,28 @@ public final class AscendantNetwork {
                 ServerPlayer player = ctx.getSender();
                 if (player != null) {
                     PowerRuntimeEngine.togglePower(player, msg.powerId(), msg.enable());
+                }
+            });
+            ctx.setPacketHandled(true);
+        }
+    }
+
+    public record TogglePowerRequestPacket(ResourceLocation powerId) {
+        public static void encode(TogglePowerRequestPacket msg, FriendlyByteBuf buf) {
+            buf.writeResourceLocation(msg.powerId());
+        }
+
+        public static TogglePowerRequestPacket decode(FriendlyByteBuf buf) {
+            return new TogglePowerRequestPacket(buf.readResourceLocation());
+        }
+
+        public static void handle(TogglePowerRequestPacket msg, Supplier<NetworkEvent.Context> ctxSupplier) {
+            NetworkEvent.Context ctx = ctxSupplier.get();
+            ctx.enqueueWork(() -> {
+                ServerPlayer player = ctx.getSender();
+                if (player != null) {
+                    PowerRuntimeEngine.togglePower(player, msg.powerId(),
+                            !PowerRuntimeEngine.isPowerToggled(player, msg.powerId()));
                 }
             });
             ctx.setPacketHandled(true);

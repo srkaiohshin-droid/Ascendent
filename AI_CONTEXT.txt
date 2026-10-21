@@ -53,10 +53,15 @@ ESTADO VERIFICADO EM 2026-10-21 (MODULAR SUPERPOWER FRAMEWORK)
   atômica, proteção contra Zip-Slip e bloqueio rigoroso de arquivos executáveis.
 - Ferramenta de validação e exportação (ContentValidator, CatalogExporter).
 - PowerRuntimeEngine (cooldowns, toggles de estado, hooks de dano, mitigação, queda e ticks).
-- 35/35 GameTests aprovados em `gradlew.bat runGameTestServer` (16 voo, 2 capability, 9 poses, 8 framework).
+- 36/36 GameTests aprovados em `gradlew.bat runGameTestServer` no lote B2; o resultado B1 foi 35/35.
 - `gradlew.bat build` concluído com sucesso.
 - Lote B1: cinco componentes ligados a poderes server-side; ACTIVE powers têm caminho de ativação
   no runtime, pacote e comando. Limpeza de toggles, efeitos e modificadores ao perder a última
   fonte de traje testada. Ver `docs/DEVELOPMENT_STATUS.md` e o registro B1 em `AGENT_LOG.txt`.
-- Próxima tarefa: interface de catálogo, keybinds e menu radial usando os registries e networking
-  existentes; não implementar UI paralela.
+- Lote B2: telas de catálogo e radial client-only, keybinds configuráveis, classificação de ações
+  compartilhada sem dependências client-only e solicitações usando o networking existente.
+  Catálogo inclui entradas funcionais e templates; radial inclui apenas poderes/abilities com
+  ativação manual. `compileJava`, `runGameTestServer` (36/36) e `build` passaram. Teste gráfico
+  interativo em `runClient` permanece pendente.
+- Próxima tarefa: validar a UI em cliente real e corrigir achados de layout/entrada antes de
+  ampliar o catálogo ou adicionar novas interfaces.

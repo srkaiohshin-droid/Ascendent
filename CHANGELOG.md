@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0 — Interface de catálogo e menu radial B2
+- Adicionadas telas client-only para navegar poderes, habilidades e trajes, com busca por nome/ID/categoria,
+  filtro de categoria, detalhes e indicação explícita de entradas funcionais ou templates.
+- Ações de poderes, habilidades e trajes enviadas pelo canal de rede existente; a validação e execução
+  permanecem server-authoritative. Poderes alternáveis são decididos pelo estado no servidor.
+- Adicionados keybinds configuráveis para abrir o catálogo (F6), abrir o radial (G), ativar (V),
+  alternar (B) e navegar/folhear (PageUp/PageDown).
+- Menu radial apresenta até oito opções por página, seleção por direção do mouse, confirmação,
+  cancelamento e navegação sem executar ações ao abrir ou cancelar.
+- `CatalogInteraction` fornece filtragem/classificação compartilhada; GameTest cobre busca, filtros,
+  acionabilidade e setores do radial.
+- Validação: `compileJava`, `runGameTestServer` (36/36) e `build` aprovados. Validação visual em
+  `runClient` permanece pendente.
+
 ## 0.1.0 — Componentes funcionais e ciclo de vida B1
 - Conectados `refractive_invisibility`, `telekinetic_levitate`, `vortex_maelstrom`,
   `spectral_wolf_pack` e `void_step` a executores reais e serializáveis.
@@ -14,7 +28,8 @@
   e atributo, posse alternativa e contagens do catálogo: 500 poderes (113 funcionais,
   387 templates) e 500 habilidades (111 funcionais, 389 templates).
 - Validação final: `compileJava`, `runGameTestServer` (35/35) e `build` aprovados.
-- Interface, keybinds e menu radial continuam pendentes para lote posterior.
+- A interface client-side, keybinds e menu radial foram adicionados no lote B2; validação gráfica
+  interativa ainda está pendente.
 
 ## 0.1.0 — Fundacao inicial
 - Identidade Ascendant configurada.
