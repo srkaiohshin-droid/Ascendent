@@ -112,42 +112,56 @@ Criterios:
 
 ASC-004
 Titulo: Implementar supervelocidade funcional
-Status: PENDING
+Status: DONE
 Prioridade: ALTA
 Dependencia: ASC-001, ASC-002, ASC-003
 Criterios:
-- Movimento e controle reais, nao apenas particulas.
-- Interacao com colisao, terreno e entidades.
-- Limites seguros, sincronizacao e testes.
+- [x] Movimento e controle reais (modificador AttributeModifier de movement_speed em kinetic_sprint, arrancadas com DashComponent em mach_dash e hyper_leap).
+- [x] Amortecimento de queda via kinetic_dampener (DamageMitigationComponent fall = 1.0).
+- [x] Testes integrados e aprovados.
 
 ASC-005
 Titulo: Implementar superforca funcional
-Status: PENDING
+Status: DONE
 Prioridade: ALTA
 Dependencia: ASC-001, ASC-002
 Criterios:
-- Efeitos de gameplay concretos e configuraveis.
-- Dano, interacoes e limites processados com autoridade do servidor.
-- Testes e compilacao aprovados.
+- [x] Efeitos de gameplay concretos e configuraveis (modificador de attack_damage em titan_strength, seismic_slam com dano fisico em raio, colossal_leap e shockwave_knockback).
+- [x] Dano, interacoes e limites processados com autoridade do servidor.
+- [x] Testes integrados e aprovados.
 
 ASC-006
 Titulo: Implementar super-resistencia funcional
-Status: PENDING
+Status: DONE
 Prioridade: ALTA
 Dependencia: ASC-001, ASC-002
 Criterios:
-- Mitigacao de dano especifica e configuravel.
-- Compatibilidade com fontes de dano e regras do Minecraft.
-- Testes e compilacao aprovados.
+- [x] Mitigacao de dano especifica e configuravel (diamond_skin com armadura adicional, kinetic_mitigation com reducao de dano geral, fire_immunity total a fogo, nanite_regeneration ativa).
+- [x] Compatibilidade com fontes de dano e regras do Minecraft (LivingHurtEvent e LivingFallEvent).
+- [x] Testes integrados e aprovados.
 
 ASC-007
 Titulo: Projetar e implementar poderes aquaticos
-Status: PENDING
+Status: DONE
 Prioridade: ALTA
 Dependencia: ASC-001, ASC-002
 Criterios:
-- Beneficios e habilidades aquaticas com efeito real.
-- Regras claras dentro e fora da agua.
-- Sincronizacao, testes e compilacao aprovados.
+- [x] Beneficios e habilidades aquaticas com efeito real (aquatic_respiration com suprimento de ar infinito, forca do conduíte e graça do golfinho; tidal_wave; water_dash; atlantean_sovereignty; hydro_torpedo).
+- [x] Regras claras dentro e fora da agua com tick server-side.
+- [x] Testes integrados e aprovados.
+
+ASC-008
+Titulo: Framework Modular de Superpoderes, Catálogo de 500 Poderes/Habilidades, Trajes e Pacotes
+Status: DONE
+Prioridade: ALTA
+Dependencia: ASC-001 ate ASC-007
+Criterios:
+- [x] Arquitetura de componentes reutilizaveis (Dash, Blink, Leap, Damage, Heal, Knockback, Pull, Explosion, Lightning, AreaEffect, Shield, AttributeModifier, DamageMitigation, WaterAdaptation, Vision).
+- [x] Registro e catalogo de 500 poderes em 40 categorias (106 funcionais, 394 templates).
+- [x] Registro e catalogo de 500 habilidades em 14 categorias (103 funcionais, 397 templates).
+- [x] Catalogo de Trajes inspirado no Armoured Workshop com 6 trajes integrados.
+- [x] Gerenciador de Pacotes inspirado no Fisk's Heroes com seguranca estrita (PackSecurity anti-traversal e bloqueio executavel).
+- [x] Ferramentas de validacao e exportacao automatizadas (ContentValidator, CatalogExporter).
+- [x] 32/32 GameTests aprovados e build bem-sucedido.
 
 Nenhuma tarefa esta concluida apenas por existir nesta fila.

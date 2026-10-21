@@ -3,16 +3,21 @@
 - [x] Auditar a inicializacao e a configuracao do MDK.
 - [x] Definir arquitetura inicial de poderes baseada na API do Forge.
 - [x] Definir estado persistente, politica de cooldown/permissoes e contrato de sincronizacao.
-- [ ] Implementar cooldown runtime junto da primeira habilidade ativa que o exija.
-- [ ] Implementar sincronizacao de gameplay quando houver consumidor cliente real.
+- [x] Implementar cooldown runtime junto da primeira habilidade ativa que o exija (PowerRuntimeEngine).
+- [x] Implementar sincronizacao de gameplay e canal de rede (AscendantNetwork).
 - [ ] Implementar voo funcional. (ASC-003 REVIEW — correções de parser de comandos, predição de entrada do cliente, fallDistance, lava, transição de física residual e respawn implementadas)
 - [ ] Refinamento profundo do voo 3D e visual inspirado no Fisk (ASC-003.1 REVIEW — vetor 3D look pitch/yaw, convergência aerodinâmica, inércia de planeio, boost/sprint, inclinação corporal e banking visual implementados; 18/18 GameTests aprovados; pendente validação tátil em cliente GUI)
 - [ ] Homologar a animação corporal de voo heroico (ASC-003.2 REVIEW — mixins client-only, pose horizontal com braços à frente, cabeça contra-rotacionada, nove estados interpolados e 27/27 GameTests aprovados; pendente captura visual final da silhueta simplificada)
-- [ ] Implementar supervelocidade funcional.
-- [ ] Implementar superforca funcional.
-- [ ] Implementar super-resistencia funcional.
-- [ ] Implementar poderes aquaticos funcionais.
+- [x] Implementar supervelocidade funcional (ASC-004 — kinetic_sprint, mach_dash, hyper_leap, kinetic_dampener).
+- [x] Implementar superforca funcional (ASC-005 — titan_strength, seismic_slam, colossal_leap, shockwave_knockback).
+- [x] Implementar super-resistencia funcional (ASC-006 — diamond_skin, kinetic_mitigation, fire_immunity, nanite_regeneration).
+- [x] Implementar poderes aquaticos funcionais (ASC-007 — aquatic_respiration, tidal_wave, water_dash, atlantean_sovereignty, hydro_torpedo).
 - [x] Cobrir capability NBT e respawn server-side com GameTest.
-- [ ] Validar gameplay multiplayer com dois jogadores quando houver mecanica de rede.
-- [ ] Planejar HeroPacks e extensibilidade apos estabilizar o nucleo.
+- [x] Implementar arquitetura modular de poderes, habilidades e componentes reutilizáveis.
+- [x] Cadastrar catálogo completo de 500 poderes e 500 habilidades (106 poderes e 103 habilidades funcionais).
+- [x] Implementar Catálogo de Trajes inspirado no Armoured Workshop (SuitRegistry, SuitManager, 6 trajes integrados).
+- [x] Implementar Gerenciador de Pacotes inspirado no Fisk's Heroes (PackManager, PackSecurity, LocalPackCatalogProvider).
+- [x] Criar ferramentas de validação e automação de conteúdo (ContentValidator, CatalogExporter).
+- [x] Validar com 32/32 GameTests automatizados e build aprovado.
+- [ ] Validar gameplay multiplayer com dois jogadores quando houver mecanica de rede interativa.
 - [x] Configurar e confirmar o remoto Git origin autorizado.

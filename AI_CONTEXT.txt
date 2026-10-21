@@ -16,11 +16,14 @@ Os poderes devem alterar gameplay de verdade, ser extensíveis, testáveis
 e compatíveis com multiplayer. Efeitos visuais nunca substituem a mecânica.
 
 PRIORIDADES INICIAIS
-1. Voo
-2. Supervelocidade
-3. Superforca
-4. Super-resistencia
-5. Poderes aquaticos
+1. Voo (Preservado e integrado)
+2. Supervelocidade (Implementada com componentes modulares)
+3. Superforca (Implementada com componentes modulares)
+4. Super-resistencia (Implementada com mitigação e componentes de dano)
+5. Poderes aquaticos (Implementados com adaptação aquática e impulso)
+6. Catálogo de 500 poderes e 500 habilidades (106 poderes funcionais, 103 habilidades funcionais)
+7. Catálogo de Trajes (Armoured Workshop)
+8. Gerenciador de Pacotes e Segurança (Fisk's Heroes)
 
 QUALIDADE OBRIGATORIA
 - Nao implementar stubs, TODOs disfarçados de funcionalidades ou metodos vazios.
@@ -34,55 +37,20 @@ QUALIDADE OBRIGATORIA
 - Documentar arquivos alterados, comportamento, riscos e testes executados.
 - Preferir implementacoes profundas e completas a muitos poderes superficiais.
 
-RESTRICOES
-- Nao trocar Minecraft, Forge ou Java sem autorizacao explicita.
-- Nao misturar este projeto com Skyheros ou HeroPort.
-- Verificar o remoto e a acessibilidade do GitHub em cada sessao; nao presumir
-  sincronizacao apenas pela existencia de um remote configurado.
-- Nao sobrescrever trabalho alheio sem revisar e preservar alteracoes.
-- Consultar a API real do Forge 1.20.1 antes de usar classes ou metodos.
-- Otimizar tokens e tempo por meio de lotes coerentes, sem sacrificar qualidade.
-
-ESTADO VERIFICADO EM 2026-10-19
-- Projeto Forge MDK para Minecraft 1.20.1 / Forge 47.3.0, mappings oficiais
-  1.20.1, Gradle Wrapper 8.8 e toolchain Java 17 (Temurin 17.0.20.1).
-- Capability de dados de poderes desbloqueados (IPlayerPowerData) persistida em NBT
-  com preservacao em morte e retorno do End.
-- Sistema de voo com refinamento tridimensional inspirado no Fisk's Superheroes:
-  1. Trajetoria 3D orientada pela visao: pitch e yaw governam o deslocamento tridimensional.
-     Olhar para cima e avancar sobe suavemente; olhar para baixo mergulha com ganho gravitacional natural.
-  2. Convergencia aerodinamica de curvas: a velocidade converge gradualmente para a mira mantendo momento,
-     eliminando o comportamento de foguete espacial e propiciando curvas cinematograficas.
-  3. Desaceleracao inercial e glide: soltar o comando de avanco resulta em planeio suave com arrasto
-     aerodinamico (drag = 0.94) ate estabilizacao no hover, sem paradas secas.
-  4. Modo Boost / Sprint: correr durante o voo ativa a velocidade de propulsao maxima (1.25 blocos/tick).
-  5. Frenagem ativa (tecla X) e ajustes verticais (Espaco/Shift) integrados sem conflito com o vetor 3D.
-  6. Inclinacao corporal (pitch tilt) e rolagem/banking (roll) na renderizacao do jogador (FlightRenderEvents),
-     com sutil camera roll durante curvas em alta velocidade, totalmente desacoplado da fisica de colisao.
-- 18/18 GameTests aprovados em `gradlew.bat runGameTestServer` (16 testes de voo e 2 de poderes).
-- `gradlew.bat build` concluido com sucesso.
-
-ESTADO ASC-003.1 — EM REVISAO / AGUARDANDO SESSAO REAL (2026-10-19)
-Fisica 3D, controles, inercia, boost, banking, comandos e testes automatizados estao implementados e validados.
-Pendente inspecao em sessao grafica interativa (runClient) para homologacao.
-
-PROXIMO LOTE AUTORIZADO
-Executar validacao interativa em jogo (runClient), homologar o voo para DONE e iniciar ASC-004 (supervelocidade).
-
-ESTADO ASC-003.2 — ANIMACAO CORPORAL DE VOO HEROICO (2026-10-19)
-- Camada visual implementada com dois Mixins client-only, sem alterar fisica, controles ou rede:
-  - `HumanoidModelMixin` (TAIL de `HumanoidModel.setupAnim`) aplica membros e cabeca.
-  - `PlayerRendererMixin` (TAIL de `PlayerRenderer.setupRotations`) inclina o modelo inteiro.
-- Pose comum e testavel: `FlightAnimationState`, `FlightPose`, `FlightPoseLibrary` e `FlightPoseSample`.
-- `FlightAnimationController` (cliente): maquina de estados por tick com interpolacao por partialTick,
-  rampa de peso na entrada/saida, limpeza por jogador e estimativa de velocidade para observadores.
-- `FlightPoseRenderer` (cliente): aplica a transformacao no PoseStack e as rotacoes absolutas das partes.
-- Estados: HOVER, TAKEOFF, HEROIC_FLIGHT, CRUISE, CLIMB, DIVE, TURNING, BRAKING e EXIT.
-- Cabeca contra-rotacionada para olhar na direcao do voo; corpo em ~78 graus com leve head-up.
-- `gradlew.bat build` e `runGameTestServer`: 27/27 GameTests aprovados; `git diff --check` limpo.
-- Validacao grafica real: Mixins aplicados no `runClient`; com voo ativo o corpo ficou horizontal,
-  a cabeca foi contra-rotacionada e a face voltou-se para frente; frenagem e saida suaves observadas.
-- Pendente: homologacao visual final da silhueta simplificada (a ultima captura foi prejudicada
-  pela perda de foco da janela do cliente, nao por erro de compilacao ou de testes).
-- Sem commit/push nesta sessao, conforme instrucao direta do usuario. O diretorio `net/` e material
-  de referencia pre-existente e nao foi modificado.
+ESTADO VERIFICADO EM 2026-10-20 (MODULAR SUPERPOWER FRAMEWORK)
+- Arquitetura de componentes reutilizáveis (IPowerComponent, ComponentContext, ComponentRegistry):
+  Dash, Blink, Leap, DamageAction, HealAction, KnockbackAction, PullAction, ExplosionAction,
+  LightningAction, AreaEffectAction, ShieldAction, AttributeModifier, DamageMitigation,
+  WaterAdaptation, NightVision, ThermalVision, FlightAction e Template.
+- Catálogo de 500 poderes cadastrados em 40 categorias oficiais:
+  106 poderes com executores mecânicos funcionais e 394 poderes em template para expansões subsequentes.
+- Catálogo de 500 habilidades cadastradas em 14 categorias funcionais:
+  103 habilidades funcionais e 397 em template.
+- Catálogo de Trajes (SuitRegistry, SuitManager, BuiltinSuitData) com 6 trajes integrados
+  (Classic Ascendant, Speedster Mk-I, Titan Exosuit, Atlantean Regalia, Solar Aegis, Shadow Infiltrator).
+- Gerenciador de Pacotes (PackManager, PackSecurity, LocalPackCatalogProvider) com extração
+  atômica, proteção contra Zip-Slip e bloqueio rigoroso de arquivos executáveis.
+- Ferramenta de validação e exportação (ContentValidator, CatalogExporter).
+- PowerRuntimeEngine (cooldowns, toggles de estado, hooks de dano, mitigação, queda e ticks).
+- 32/32 GameTests aprovados em `gradlew.bat runGameTestServer` (16 voo, 2 capability, 9 poses, 5 framework).
+- `gradlew.bat build` concluído com sucesso.

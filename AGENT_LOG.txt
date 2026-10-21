@@ -278,3 +278,72 @@ ANIMACAO CORPORAL DE VOO HEROICO (ASC-003.2)
     valores ainda precisa ser feita em sessao grafica normal.
   - O `net/` e material de referencia pre-existente, nao modificado e nao incluido no build.
 - Sem commit e sem push nesta sessao, conforme instrucao direta do usuario.
+
+LOTE MODULAR SUPERPOWER FRAMEWORK — 500 PODERES, 500 HABILIDADES, TRAJES E PACOTES
+- Data/hora local: 2026-10-20 21:20:00 -03:00
+- Agente: Antigravity
+- Tarefa: ASC-004, ASC-005, ASC-006, ASC-007, ASC-008
+- Arquivos criados:
+  - `src/main/java/br/com/ascendant/core/PowerCategory.java`
+  - `src/main/java/br/com/ascendant/core/PowerType.java`
+  - `src/main/java/br/com/ascendant/core/AbilityCategory.java`
+  - `src/main/java/br/com/ascendant/core/AbilityTrigger.java`
+  - `src/main/java/br/com/ascendant/power/component/IPowerComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/ComponentContext.java`
+  - `src/main/java/br/com/ascendant/power/component/ComponentRegistry.java`
+  - `src/main/java/br/com/ascendant/power/component/DashComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/BlinkComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/LeapComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/DamageActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/HealActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/KnockbackActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/PullActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/ExplosionActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/LightningActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/AreaEffectActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/ShieldActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/AttributeModifierComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/DamageMitigationComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/WaterAdaptationComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/NightVisionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/ThermalVisionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/FlightActionComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/SoundParticleComponent.java`
+  - `src/main/java/br/com/ascendant/power/component/TemplateComponent.java`
+  - `src/main/java/br/com/ascendant/power/PowerDefinition.java`
+  - `src/main/java/br/com/ascendant/power/AbilityDefinition.java`
+  - `src/main/java/br/com/ascendant/power/PowerRegistry.java`
+  - `src/main/java/br/com/ascendant/power/AbilityRegistry.java`
+  - `src/main/java/br/com/ascendant/power/runtime/PowerRuntimeEngine.java`
+  - `src/main/java/br/com/ascendant/power/catalog/PowerCatalogData.java`
+  - `src/main/java/br/com/ascendant/power/catalog/AbilityCatalogData.java`
+  - `src/main/java/br/com/ascendant/suit/SuitRarity.java`
+  - `src/main/java/br/com/ascendant/suit/SuitModelInfo.java`
+  - `src/main/java/br/com/ascendant/suit/SuitDefinition.java`
+  - `src/main/java/br/com/ascendant/suit/SuitRegistry.java`
+  - `src/main/java/br/com/ascendant/suit/SuitManager.java`
+  - `src/main/java/br/com/ascendant/suit/BuiltinSuitData.java`
+  - `src/main/java/br/com/ascendant/pack/PackManifest.java`
+  - `src/main/java/br/com/ascendant/pack/PackSecurity.java`
+  - `src/main/java/br/com/ascendant/pack/IPackCatalogProvider.java`
+  - `src/main/java/br/com/ascendant/pack/LocalPackCatalogProvider.java`
+  - `src/main/java/br/com/ascendant/pack/PackManager.java`
+  - `src/main/java/br/com/ascendant/network/AscendantNetwork.java`
+  - `src/main/java/br/com/ascendant/tools/ContentValidator.java`
+  - `src/main/java/br/com/ascendant/tools/CatalogExporter.java`
+  - `src/main/java/br/com/ascendant/test/FrameworkGameTests.java`
+  - `docs/DEVELOPMENT_STATUS.md`
+- Arquivos modificados:
+  - `src/main/java/br/com/ascendant/Ascendant.java` (inicialização de rede, eventos, catálogos, packs e testes)
+  - `src/main/java/br/com/ascendant/command/AscendantCommands.java` (comandos /ascendant power activate/info, suit equip/unequip/list, pack list/reload/export, stats)
+  - `TODO.md`, `AI_CONTEXT.txt`, `AGENT_COORDINATION.txt`, `AGENT_LOG.txt`
+- Decisões de design:
+  - Preservado o voo tridimensional existente e todos os componentes sem alterações estruturais no `FlightController` ou `FlightPhysics`.
+  - Componentização desacoplada permitindo montar centenas de poderes sem uma classe Java por poder.
+  - Catálogo de 500 poderes cadastrados em 40 categorias com 106 executores funcionais reais.
+  - Catálogo de 500 habilidades cadastradas em 14 categorias com 103 executores funcionais reais.
+  - Catálogo de Trajes (Armoured Workshop) e Gerenciador de Pacotes (Fisk's Heroes) com segurança Zip-Slip e bloqueio de executáveis.
+- Validação executada:
+  - `gradlew.bat compileJava`: BUILD SUCCESSFUL.
+  - `gradlew.bat build`: BUILD SUCCESSFUL (jar reobfuscado com mixins e recursos).
+  - `gradlew.bat runGameTestServer`: 32/32 GameTests aprovados (27 voo/poses/capability + 5 framework).

@@ -6,20 +6,29 @@ import br.com.ascendant.flight.FlightEvents;
 import br.com.ascendant.flight.FlightGameTests;
 import br.com.ascendant.flight.FlightNetwork;
 import br.com.ascendant.flight.FlightTuning;
+import br.com.ascendant.network.AscendantNetwork;
+import br.com.ascendant.pack.PackManager;
+import br.com.ascendant.power.catalog.AbilityCatalogData;
+import br.com.ascendant.power.catalog.PowerCatalogData;
+import br.com.ascendant.power.runtime.PowerRuntimeEngine;
 import br.com.ascendant.powers.PlayerPowerDataEvents;
 import br.com.ascendant.powers.PlayerPowerDataGameTests;
+import br.com.ascendant.suit.BuiltinSuitData;
+import br.com.ascendant.suit.SuitManager;
+import br.com.ascendant.test.FrameworkGameTests;
+import br.com.ascendant.tools.ContentValidator;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterGameTestsEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
 /**
- * Main entry point for Ascendant.
- *
- * Gameplay systems will be registered through dedicated modules.
+ * Main entry point for Ascendant — Superhuman Framework.
+ * Integrates flight, modular power engine, ability engine, suit catalog, and pack manager.
  */
 @Mod(Ascendant.MOD_ID)
 public final class Ascendant {
@@ -27,17 +36,41 @@ public final class Ascendant {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public Ascendant() {
+        // Networking
         FlightNetwork.register();
+        AscendantNetwork.register();
+
+        // Configs
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, FlightTuning.SPEC);
+
+        // Core Event Handlers
         MinecraftForge.EVENT_BUS.register(PlayerPowerDataEvents.class);
         MinecraftForge.EVENT_BUS.register(FlightEvents.class);
         MinecraftForge.EVENT_BUS.register(CommandEvents.class);
+        MinecraftForge.EVENT_BUS.register(PowerRuntimeEngine.class);
+        MinecraftForge.EVENT_BUS.register(SuitManager.class);
+
+        // Catalogs Initialization (500 powers, 500 abilities, modular suits)
+        PowerCatalogData.registerAll();
+        AbilityCatalogData.registerAll();
+        BuiltinSuitData.registerAll();
+
+        // Pack Manager
+        PackManager.init(FMLPaths.GAMEDIR.get());
+        PackManager.loadAllInstalledPacks();
+
+        // Automated Validation Report on Startup
+        ContentValidator.ValidationReport report = ContentValidator.validate();
+        LOGGER.info("[ASC] Content initialized. {}", report.summary());
+
+        // GameTests
         FMLJavaModLoadingContext.get().getModEventBus().addListener(Ascendant::registerGameTests);
-        LOGGER.info("Ascendant - Superhuman Framework initialized.");
+        LOGGER.info("Ascendant - Modular Superhuman Framework initialized successfully.");
     }
 
     private static void registerGameTests(RegisterGameTestsEvent event) {
         event.register(PlayerPowerDataGameTests.class);
         event.register(FlightGameTests.class);
+        event.register(FrameworkGameTests.class);
     }
 }
