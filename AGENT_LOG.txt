@@ -487,5 +487,8 @@ REVISAO COMPLEMENTAR ASC-010 — REVOGACAO DO PODER DE VELOCIDADE
 - Validação executada: `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
   `.\gradlew.bat runGameTestServer --no-daemon` — servidor encerrou com 45/45 testes
   obrigatórios aprovados; `.\gradlew.bat build --no-daemon` — BUILD SUCCESSFUL
-  (`test` NO-SOURCE). Revisão do diff e `git diff --check` aprovados; commit e
-  sincronização permanecem pendentes nesta etapa.
+  (`test` NO-SOURCE). Revisão do diff e `git diff --check` aprovados.
+- Git: commit `29cbc562eff0dc2e3dfa47a1e17677da074316f0`, mensagem
+  `feat(speedster): add server-authoritative movement core`, publicado em
+  `origin/srkaiohshin-droid-ascendant-gameplay-ui`; fetch confirmou o mesmo SHA
+  remoto e a branch ficou sincronizada.

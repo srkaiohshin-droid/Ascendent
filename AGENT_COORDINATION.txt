@@ -226,6 +226,8 @@ Validacao: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` encerrou
   de fonte intrínseca; `build` BUILD SUCCESSFUL; `git diff --check`
   aprovado. `runClient` iniciou e carregou um mundo local, mas o envio de inputs pela
   automação de UI não teve caminho seguro; controles em gameplay permanecem pendentes.
-  Revisão final, commit e publicação pendentes.
+Git: commit `29cbc562eff0dc2e3dfa47a1e17677da074316f0` publicado em
+  `origin/srkaiohshin-droid-ascendant-gameplay-ui`; fetch confirmou o mesmo SHA.
+  A validação interativa em cliente real continua pendente.
 
 Nenhuma tarefa esta concluida apenas por existir nesta fila.
