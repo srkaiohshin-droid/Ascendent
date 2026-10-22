@@ -436,7 +436,8 @@ LOTE ASC-009 — IMPORTACAO SEGURA DE HERO PACKS E FALLBACK DE INVOCACAO
   `.\gradlew.bat runGameTestServer --no-daemon` — servidor encerrou normalmente,
   39/39 testes obrigatorios aprovados; `.\gradlew.bat build --no-daemon` —
   BUILD SUCCESSFUL; tarefa `test` — NO-SOURCE.
-- `git diff --check`: aprovado sem ocorrencias. Commit e sincronizacao remota pendentes
-  no momento deste registro.
+- `git diff --check`: aprovado sem ocorrencias. Commit
+  `1a04994d09abc3090c72a0bb82746c708c80e6c7` foi publicado em
+  `origin/srkaiohshin-droid-ascendant-gameplay-ui`; fetch confirmou o mesmo SHA remoto.
 - Limites: o HeroPack ainda nao aplica definicoes a registries de forma transacional,
   nem resolve compatibilidade/dependencias semanticas. Validacao visual B2 nao executada.
