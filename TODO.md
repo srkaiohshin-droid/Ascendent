@@ -24,7 +24,8 @@
 - [x] ASC-009: validar IDs e caminhos de HeroPacks, limitar extração por bytes escritos, rejeitar entradas ZIP duplicadas e substituir instalação com rollback testado; melhorar busca de posições de invocação seguras para lobos. `compileJava`, build e 39/39 GameTests aprovados.
 - [x] ASC-010 Lote B: núcleo server-authoritative inicial de supervelocidade com 10 níveis, aceleração, direção, inércia, frenagem, keybinds e exclusão mútua com voo; 45/45 GameTests após cobertura de revogação de poder concedido por traje.
 - [x] ASC-011 Lote A (código): auditar conflito dos keybinds Ascendant e mover o default `flight_brake` de X para K, evitando a tecla vanilla `loadToolbarActivator`.
-- [ ] ASC-011 Lote A (cliente): conferir/resetar keybinds persistidos em K e testar ativação, níveis, frenagem, aceleração, direção, voo e ciclo de vida em gameplay interativo.
+- [x] ASC-011 Lote A (cliente): confirmar `Brake while flying` persistido em K; `run/options.txt` relido após sair de Controls/Options e `loadToolbarActivator` segue em X.
+- [ ] ASC-011 Lote A (gameplay): testar ativação, níveis, frenagem, aceleração, direção, voo e ciclo de vida em gameplay interativo.
 - [ ] ASC-010 próximos lotes: perfis extensíveis, habilidades completas, percepção, corrida em parede/água, faseamento, colisões/impactos especializados, efeitos, animações e HUD cinemático.
 - [ ] Validar visualmente catálogo, busca, ações e menu radial em `runClient`.
 - [ ] Validar controles, física e estado do velocista em cliente real com `runClient`.

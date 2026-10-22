@@ -242,9 +242,9 @@ Resultado: defaults Ascendant distintos por inspeção do código; a configuraç
   supervelocidade mantêm ações e pacotes separados. A configuração local já existente
   não é sobrescrita automaticamente por um novo default.
 Validacao: `compileJava`, `build` e `runGameTestServer` (45/45) passaram após a
-  correção. `runClient` abriu as páginas Options/Controls/Key Binds e mostrou as
-  categorias; entrada interativa foi bloqueada por falta de despacho seguro de teclado
-  e pela atividade do usuário. Conferir K na configuração persistida e testar gameplay
-  manualmente seguem pendentes.
+  correção. `runClient` abriu Options/Controls/Key Binds; `Brake while flying` foi
+  definido para K, salvo ao sair das telas e confirmado em `run/options.txt`. O
+  keybind vanilla `loadToolbarActivator` continua em X. Gameplay e transições dos
+  controles permanecem pendentes; não houve validação de movimento em jogo.
 
 Nenhuma tarefa esta concluida apenas por existir nesta fila.

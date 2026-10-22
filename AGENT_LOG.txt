@@ -515,3 +515,12 @@ ASC-011 — LOTE A — AUDITORIA DE CONTROLES
   BUILD SUCCESSFUL (`test` NO-SOURCE). Próximo teste manual: conferir `Brake while flying`
   em K (ou outra tecla livre), confirmar ausência de marca de conflito, testar controles
   do velocista/voo e transições/ciclo de vida conforme lista ASC-011.
+
+ASC-011 — LOTE A — CONFIRMAÇÃO DA PREFERÊNCIA PERSISTIDA
+- Na sessão `runClient`, `Brake while flying` foi definido para K e as telas Controls e
+  Options foram fechadas normalmente. A leitura posterior de `run/options.txt` confirmou
+  `key_key.ascendant.flight_brake:key.keyboard.k`; `loadToolbarActivator` continua em X.
+- Isso confirma a configuração local e remove a colisão observada neste arquivo; não
+  valida frenagem, voo, velocista ou transições em gameplay. Nenhum teste Gradle foi
+  reexecutado nesta confirmação; os resultados de compile/build/45 GameTests acima são
+  os resultados da validação anterior à sessão.

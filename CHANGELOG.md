@@ -7,8 +7,9 @@
   persistido precisam redefinir/alterar essa tecla nas opções; o Minecraft preserva
   preferências existentes.
 - `compileJava`, `runGameTestServer` (45/45) e `build` aprovados após a correção.
-  `runClient` exibiu o menu Key Binds, mas a conferência interativa final e gameplay
-  permanecem pendentes; não declarar controles validados em jogo.
+  Em `runClient`, `Brake while flying` foi salvo em K e confirmado em `run/options.txt`;
+  `loadToolbarActivator` segue em X. Gameplay e transições ainda não foram testados,
+  portanto os controles não estão validados em jogo.
 
 ## 0.1.0 — ASC-010: núcleo inicial de supervelocidade
 - Adicionado estado transitório de velocista com 10 níveis, progressão de velocidade configurável,
