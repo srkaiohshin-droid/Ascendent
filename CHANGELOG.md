@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0 — ASC-010: núcleo inicial de supervelocidade
+- Adicionado estado transitório de velocista com 10 níveis, progressão de velocidade configurável,
+  aceleração, convergência direcional, inércia, sprint e frenagem de emergência.
+- Keybinds configuráveis usam o canal de rede existente; o servidor valida posse de `kinetic_sprint`,
+  controla o movimento e sincroniza modo/nível. A ativação de voo encerra supervelocidade primeiro;
+  perder a última fonte do poder encerra o modo imediatamente, preservando-o se outra fonte permanecer.
+- Seis GameTests cobrem progressão, frenagem, direção, colisão vanilla, limites do estado, autorização,
+  exclusão mútua com voo e remoção de traje com preservação de fonte intrínseca.
+  `runGameTestServer`: 45/45 aprovados.
+- `compileJava` e `build` aprovados. `runClient` carregou o menu e mundo local; automação não
+  conseguiu enviar controles durante gameplay, portanto não há validação visual/funcional no cliente.
+- Este lote não implementa habilidades especiais, perfis de personagens, HUD cinemático, animações,
+  efeitos de velocidade, corrida sobre água/parede, faseamento ou validação visual em `runClient`.
+
 ## 0.1.0 — Importação local segura de HeroPacks
 - IDs de manifesto agora precisam ser identificadores portáveis; campos de contagem e dependências
   são validados antes de selecionar o diretório de instalação.

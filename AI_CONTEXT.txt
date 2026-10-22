@@ -72,3 +72,14 @@ ESTADO VERIFICADO EM 2026-10-21 (MODULAR SUPERPOWER FRAMEWORK)
   a tarefa `test` do Gradle permanece `NO-SOURCE`.
 - Limites pendentes: validacao visual da UI em `runClient`; compatibilidade semantica/dependencias e
   aplicacao transacional do conteudo ainda nao fazem parte da importacao do HeroPack.
+- ASC-010 (lote inicial): subsistema transitório `br.com.ascendant.speedster` com 10 níveis,
+  aceleração horizontal, curva direcional, inércia, sprint e frenagem de emergência configuráveis.
+  Ativa com `kinetic_sprint` próprio ou concedido por traje; estado e entrada são validados no servidor,
+  sincronizados pelo canal Ascendant existente e limpos em morte/respawn, logout e troca de dimensão.
+  A perda da última fonte de `kinetic_sprint` também interrompe o modo imediatamente; conceder o poder
+  por outra fonte preserva o estado ativo ao remover um traje.
+  Fase de voo e supervelocidade são mutuamente exclusivas. `runGameTestServer` passou 45/45;
+  `compileJava`, `build` e 45/45 GameTests passaram. `runClient` chegou ao menu e a um
+  mundo local, mas não foi possível enviar teclas à janela custom-drawn; controles e
+  física não tiveram validação interativa. HUD, habilidades adicionais, efeitos,
+  animações e perfis de personagens ainda não estão implementados.

@@ -16,6 +16,9 @@ import br.com.ascendant.powers.PlayerPowerDataEvents;
 import br.com.ascendant.powers.PlayerPowerDataGameTests;
 import br.com.ascendant.suit.BuiltinSuitData;
 import br.com.ascendant.suit.SuitManager;
+import br.com.ascendant.speedster.SpeedsterEvents;
+import br.com.ascendant.speedster.SpeedsterGameTests;
+import br.com.ascendant.speedster.SpeedsterTuning;
 import br.com.ascendant.test.FrameworkGameTests;
 import br.com.ascendant.tools.ContentValidator;
 import net.minecraftforge.common.MinecraftForge;
@@ -43,6 +46,8 @@ public final class Ascendant {
 
         // Configs
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, FlightTuning.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SpeedsterTuning.SPEC,
+                "ascendant-speedster.toml");
 
         // Core Event Handlers
         MinecraftForge.EVENT_BUS.register(PlayerPowerDataEvents.class);
@@ -50,6 +55,7 @@ public final class Ascendant {
         MinecraftForge.EVENT_BUS.register(CommandEvents.class);
         MinecraftForge.EVENT_BUS.register(PowerRuntimeEngine.class);
         MinecraftForge.EVENT_BUS.register(SuitManager.class);
+        MinecraftForge.EVENT_BUS.register(SpeedsterEvents.class);
 
         // Catalogs Initialization (500 powers, 500 abilities, modular suits)
         PowerCatalogData.registerAll();
@@ -74,5 +80,6 @@ public final class Ascendant {
         event.register(FlightGameTests.class);
         event.register(FrameworkGameTests.class);
         event.register(PackManagerGameTests.class);
+        event.register(SpeedsterGameTests.class);
     }
 }

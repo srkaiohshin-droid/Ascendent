@@ -22,7 +22,10 @@
 - [x] Lote B1: conectar invisibilidade, levitação sustentada, vórtice sustentado, invocação de lobos e faseamento; limpar estado runtime ao perder a última fonte do traje. `compileJava`, GameTests e `build` aprovados.
 - [x] Lote B2: catálogo de poderes/habilidades/trajes, busca e filtro, detalhes funcionais/templates, ações server-authoritative, keybinds configuráveis e menu radial paginado; validação original B2: `compileJava`, build e 36/36 GameTests. Validação ASC-009 posterior: build e 39/39 GameTests. Falta validação visual/interativa em `runClient`.
 - [x] ASC-009: validar IDs e caminhos de HeroPacks, limitar extração por bytes escritos, rejeitar entradas ZIP duplicadas e substituir instalação com rollback testado; melhorar busca de posições de invocação seguras para lobos. `compileJava`, build e 39/39 GameTests aprovados.
+- [x] ASC-010 Lote B: núcleo server-authoritative inicial de supervelocidade com 10 níveis, aceleração, direção, inércia, frenagem, keybinds e exclusão mútua com voo; 45/45 GameTests após cobertura de revogação de poder concedido por traje.
+- [ ] ASC-010 próximos lotes: perfis extensíveis, habilidades completas, percepção, corrida em parede/água, faseamento, colisões/impactos especializados, efeitos, animações e HUD cinemático.
 - [ ] Validar visualmente catálogo, busca, ações e menu radial em `runClient`.
+- [ ] Validar controles, física e estado do velocista em cliente real com `runClient`.
 - [ ] Validar gameplay multiplayer com dois jogadores quando houver mecanica de rede interativa.
 - [ ] Validar compatibilidade/dependências e carregamento transacional de conteúdo de HeroPacks.
 - [x] Configurar e confirmar o remoto Git origin autorizado.

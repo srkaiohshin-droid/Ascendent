@@ -685,6 +685,9 @@ Objetivos:
 ## Fase 3 — Supervelocidade
 
 Implementar o sistema de movimentação e suas primeiras habilidades completas, com colisões, controle, combate e testes.
+ASC-010 inicia esta fase com um núcleo transitório de 10 níveis, aceleração,
+curva direcional e frenagem server-authoritative; isso não conclui os requisitos
+de perfis, habilidades, animação, efeitos, HUD nem validação interativa.
 
 ## Fase 4 — Superforça
 

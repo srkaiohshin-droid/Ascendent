@@ -441,3 +441,51 @@ LOTE ASC-009 — IMPORTACAO SEGURA DE HERO PACKS E FALLBACK DE INVOCACAO
   `origin/srkaiohshin-droid-ascendant-gameplay-ui`; fetch confirmou o mesmo SHA remoto.
 - Limites: o HeroPack ainda nao aplica definicoes a registries de forma transacional,
   nem resolve compatibilidade/dependencias semanticas. Validacao visual B2 nao executada.
+
+LOTE ASC-010 — NUCLEO INICIAL DE SUPERVELOCIDADE
+- Data: 2026-10-21.
+- Branch: `srkaiohshin-droid-ascendant-gameplay-ui`, worktree isolada do projeto.
+- Auditoria: checkout limpo em `8a964dd`, sincronizado com `origin`; B1/B2/ASC-009
+  presentes no histórico. Foram preservadas todas as outras worktrees. O ambiente
+  da sessão já era uma worktree de feature isolada; nenhuma branch nova foi criada.
+- Implementado: capability transitória `SpeedsterState`; `SpeedsterPhysics` com 10 níveis
+  não lineares, aceleração, curva, inércia, boost de sprint e frenagem; tuning em
+  `ascendant-speedster.toml`; keybinds configuráveis para modo, níveis e freio;
+  inputs enviados no canal existente, limitados por tick e calculados pelo servidor;
+  estado/nível sincronizados para cliente e tracking players. Requer `kinetic_sprint`
+  desbloqueado ou concedido pela suit. A ativação do voo encerra supervelocidade.
+- Ciclo de vida: capability transient não serializada; limpeza em clone, respawn,
+  logout e troca de dimensão; perda de permissão/configuração encerra o modo.
+- Testes: cinco GameTests novos cobrem física/progressão/freio, curvas, controle e
+  limpeza de estado, acesso/integração de voo e clipping vanilla. `compileJava`
+  executado explicitamente — BUILD SUCCESSFUL. `runGameTestServer` executado após
+  correções — servidor encerrou normalmente, **44/44** testes necessários passaram.
+  `build --no-daemon` executado — BUILD SUCCESSFUL; `test` é NO-SOURCE.
+  Na primeira execução também passaram 44/44, mas um nome de fixture excedia 16
+  caracteres e gerava erro assíncrono de codificação; reduzido antes da execução final.
+- Cliente: `runClient` iniciou sem falha de carregamento, registrou
+  `ascendant-speedster.toml`, capability e Ascendant, e chegou ao menu e a um mundo
+  local. Os controles não foram exercitados: a ferramenta de UI não conseguiu enviar
+  teclas ao canvas do jogo (sem nó acessível e sem via segura de envio). O processo foi
+  encerrado após a tentativa; logo, não há validação gráfica/de gameplay do velocista.
+- Pendências: `build` completo, `git diff --check`, revisão final, commit/push e
+  confirmação do SHA remoto ainda precisam ser executados. Keybinds em gameplay e
+  multiplayer real não foram testados. Perfis pessoais, habilidades especiais, HUD, animações,
+  efeitos/áudio e física especializada permanecem fora deste lote.
+
+REVISAO COMPLEMENTAR ASC-010 — REVOGACAO DO PODER DE VELOCIDADE
+- `PowerRuntimeEngine.deactivatePowerIfInaccessible` agora interrompe o estado do velocista
+  imediatamente quando `kinetic_sprint` perde sua última fonte de acesso, sem usar
+  `togglePower` após remover a permissão. A verificação de posse existente preserva o estado
+  quando a autorização continua intrínseca ou concedida por outra fonte.
+- `SpeedsterGameTests.suitRevocationStopsSpeedsterUnlessAnotherSourceRemains` cobre
+  ativação via traje, remoção imediata, re-equipamento e preservação quando também há
+  concessão intrínseca. A suíte ASC-010 passa a ter seis testes e o total do projeto é 45.
+- Arquivos desta revisão: `PowerRuntimeEngine.java`, `SpeedsterGameTests.java`,
+  `AGENT_COORDINATION.txt`, `AGENT_LOG.txt`, `AI_CONTEXT.txt`, `CHANGELOG.md`,
+  `TODO.md` e `docs/DEVELOPMENT_STATUS.md`.
+- Validação executada: `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
+  `.\gradlew.bat runGameTestServer --no-daemon` — servidor encerrou com 45/45 testes
+  obrigatórios aprovados; `.\gradlew.bat build --no-daemon` — BUILD SUCCESSFUL
+  (`test` NO-SOURCE). Revisão do diff e `git diff --check` aprovados; commit e
+  sincronização permanecem pendentes nesta etapa.

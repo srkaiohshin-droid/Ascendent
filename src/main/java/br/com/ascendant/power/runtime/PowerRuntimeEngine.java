@@ -10,6 +10,7 @@ import br.com.ascendant.power.component.IPowerComponent;
 import br.com.ascendant.powers.IPlayerPowerData;
 import br.com.ascendant.powers.PlayerPowerDataProvider;
 import br.com.ascendant.suit.SuitManager;
+import br.com.ascendant.speedster.SpeedsterController;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.TickEvent;
@@ -133,6 +134,9 @@ public final class PowerRuntimeEngine {
     public static boolean deactivatePowerIfInaccessible(ServerPlayer player, ResourceLocation powerId) {
         if (hasPowerAccess(player, powerId)) {
             return false;
+        }
+        if (SpeedsterController.REQUIRED_POWER.equals(powerId)) {
+            SpeedsterController.deactivateIfPowerWasRevoked(player);
         }
 
         Map<ResourceLocation, Long> playerCooldowns = COOLDOWNS.get(player.getUUID());

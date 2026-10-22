@@ -2,6 +2,7 @@ package br.com.ascendant.network;
 
 import br.com.ascendant.Ascendant;
 import br.com.ascendant.power.runtime.PowerRuntimeEngine;
+import br.com.ascendant.speedster.SpeedsterController;
 import br.com.ascendant.suit.SuitManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -9,6 +10,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.NetworkRegistry;
+import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 import java.util.Optional;
@@ -50,6 +52,16 @@ public final class AscendantNetwork {
         CHANNEL.registerMessage(id, TogglePowerRequestPacket.class,
                 TogglePowerRequestPacket::encode, TogglePowerRequestPacket::decode,
                 TogglePowerRequestPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        id++;
+        CHANNEL.registerMessage(id++, SpeedsterControlPacket.class,
+                SpeedsterControlPacket::encode, SpeedsterControlPacket::decode,
+                SpeedsterControlPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        CHANNEL.registerMessage(id++, SpeedsterInputPacket.class,
+                SpeedsterInputPacket::encode, SpeedsterInputPacket::decode,
+                SpeedsterInputPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        CHANNEL.registerMessage(id, SpeedsterStatePacket.class,
+                SpeedsterStatePacket::encode, SpeedsterStatePacket::decode,
+                SpeedsterStatePacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         registered = true;
     }
 
@@ -75,6 +87,88 @@ public final class AscendantNetwork {
 
     public static void sendActivatePower(ResourceLocation powerId) {
         CHANNEL.sendToServer(new ActivatePowerPacket(powerId));
+    }
+
+    public static void sendSpeedsterControl(int action) {
+        CHANNEL.sendToServer(new SpeedsterControlPacket(action));
+    }
+
+    public static void sendSpeedsterInput(int inputMask) {
+        CHANNEL.sendToServer(new SpeedsterInputPacket(inputMask));
+    }
+
+    public static void syncSpeedsterState(ServerPlayer player, boolean active, int level) {
+        CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player),
+                new SpeedsterStatePacket(player.getId(), active, level));
+    }
+
+    public static void syncSpeedsterState(ServerPlayer recipient, int targetEntityId,
+                                          boolean active, int level) {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> recipient),
+                new SpeedsterStatePacket(targetEntityId, active, level));
+    }
+
+    public record SpeedsterControlPacket(int action) {
+        public static void encode(SpeedsterControlPacket msg, FriendlyByteBuf buf) {
+            buf.writeByte(msg.action());
+        }
+
+        public static SpeedsterControlPacket decode(FriendlyByteBuf buf) {
+            return new SpeedsterControlPacket(buf.readUnsignedByte());
+        }
+
+        public static void handle(SpeedsterControlPacket msg, Supplier<NetworkEvent.Context> ctxSupplier) {
+            NetworkEvent.Context ctx = ctxSupplier.get();
+            ctx.enqueueWork(() -> {
+                ServerPlayer player = ctx.getSender();
+                if (player != null) {
+                    SpeedsterController.handleControl(player, msg.action());
+                }
+            });
+            ctx.setPacketHandled(true);
+        }
+    }
+
+    public record SpeedsterInputPacket(int inputMask) {
+        public static void encode(SpeedsterInputPacket msg, FriendlyByteBuf buf) {
+            buf.writeByte(msg.inputMask());
+        }
+
+        public static SpeedsterInputPacket decode(FriendlyByteBuf buf) {
+            return new SpeedsterInputPacket(buf.readUnsignedByte());
+        }
+
+        public static void handle(SpeedsterInputPacket msg, Supplier<NetworkEvent.Context> ctxSupplier) {
+            NetworkEvent.Context ctx = ctxSupplier.get();
+            ctx.enqueueWork(() -> {
+                ServerPlayer player = ctx.getSender();
+                if (player != null) {
+                    SpeedsterController.acceptInput(player, msg.inputMask());
+                }
+            });
+            ctx.setPacketHandled(true);
+        }
+    }
+
+    public record SpeedsterStatePacket(int entityId, boolean active, int level) {
+        public static void encode(SpeedsterStatePacket msg, FriendlyByteBuf buf) {
+            buf.writeVarInt(msg.entityId());
+            buf.writeBoolean(msg.active());
+            buf.writeByte(msg.level());
+        }
+
+        public static SpeedsterStatePacket decode(FriendlyByteBuf buf) {
+            return new SpeedsterStatePacket(buf.readVarInt(), buf.readBoolean(), buf.readUnsignedByte());
+        }
+
+        public static void handle(SpeedsterStatePacket msg, Supplier<NetworkEvent.Context> ctxSupplier) {
+            NetworkEvent.Context ctx = ctxSupplier.get();
+            ctx.enqueueWork(() -> net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(
+                    net.minecraftforge.api.distmarker.Dist.CLIENT,
+                    () -> () -> br.com.ascendant.speedster.client.SpeedsterClientPackets
+                            .update(msg.entityId(), msg.active(), msg.level())));
+            ctx.setPacketHandled(true);
+        }
     }
 
     public record ActivatePowerPacket(ResourceLocation powerId) {
