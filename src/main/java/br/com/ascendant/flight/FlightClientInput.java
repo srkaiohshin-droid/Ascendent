@@ -19,7 +19,7 @@ public final class FlightClientInput {
             "key.ascendant.toggle_flight", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R,
             "key.categories.ascendant.flight");
     private static final KeyMapping BRAKE = new KeyMapping(
-            "key.ascendant.flight_brake", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_X,
+            "key.ascendant.flight_brake", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K,
             "key.categories.ascendant.flight");
 
     private static boolean requestPending;

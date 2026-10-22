@@ -230,4 +230,21 @@ Git: commit `29cbc562eff0dc2e3dfa47a1e17677da074316f0` publicado em
   `origin/srkaiohshin-droid-ascendant-gameplay-ui`; fetch confirmou o mesmo SHA.
   A validação interativa em cliente real continua pendente.
 
+ASC-011 — LOTE A: AUDITORIA DOS CONTROLES DO VELOCISTA
+Titulo: Validar controles ASC-010 e corrigir conflitos de integração
+Status: REVIEW
+Prioridade: ALTA
+Arquivos: `FlightClientInput.java`, controles client-side do velocista/voo/catálogo,
+  GameTests existentes e documentação ASC-011.
+Resultado: defaults Ascendant distintos por inspeção do código; a configuração
+  `run/options.txt` indicou conflito entre `flight_brake` (X) e vanilla
+  `loadToolbarActivator` (X). Default de frenagem do voo alterado para K; voo e
+  supervelocidade mantêm ações e pacotes separados. A configuração local já existente
+  não é sobrescrita automaticamente por um novo default.
+Validacao: `compileJava`, `build` e `runGameTestServer` (45/45) passaram após a
+  correção. `runClient` abriu as páginas Options/Controls/Key Binds e mostrou as
+  categorias; entrada interativa foi bloqueada por falta de despacho seguro de teclado
+  e pela atividade do usuário. Conferir K na configuração persistida e testar gameplay
+  manualmente seguem pendentes.
+
 Nenhuma tarefa esta concluida apenas por existir nesta fila.

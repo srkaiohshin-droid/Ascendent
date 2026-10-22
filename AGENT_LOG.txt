@@ -492,3 +492,26 @@ REVISAO COMPLEMENTAR ASC-010 — REVOGACAO DO PODER DE VELOCIDADE
   `feat(speedster): add server-authoritative movement core`, publicado em
   `origin/srkaiohshin-droid-ascendant-gameplay-ui`; fetch confirmou o mesmo SHA
   remoto e a branch ficou sincronizada.
+
+ASC-011 — LOTE A — AUDITORIA DE CONTROLES
+- Base verificada antes da edição: branch `srkaiohshin-droid-ascendant-gameplay-ui`,
+  HEAD `abfd3a07cec2a0d940f9e42815debe52189fdd4b`, limpa e sincronizada com
+  `origin`; outras worktrees e a branch `agent01/core-gameplay-audit` foram preservadas.
+- Código: os defaults Ascendant são únicos (voo R/K, catálogo F6, radial G, ativar V,
+  alternar B, navegação PageUp/PageDown; velocista Z, colchetes, Left Alt). O arquivo
+  local ignorado `run/options.txt` mostrou `key_key.loadToolbarActivator` e
+  `key.ascendant.flight_brake` ambos em X, conflito entre o default do voo e o vanilla.
+  Corrigido `FlightClientInput` para usar K, tecla sem outra atribuição naquele arquivo;
+  os defaults de movimento e ações foram preservados.
+- `runClient --no-daemon` iniciou Forge 47.3.0/Minecraft 1.20.1 em Java 17, carregou o
+  menu e mostrou a página Key Binds com as categorias Ascendant. A preferência existente
+  manteve X (Minecraft não migra automaticamente keybinds persistidos quando o default
+  muda). A automação não pôde enviar teclado com segurança; durante a tentativa, foi
+  detectada atividade do usuário na janela e a inspeção foi interrompida para não disputar
+  controle. Não há confirmação visual do K efetivamente aplicado nem teste de gameplay.
+- Validação após a mudança do default: `.\gradlew.bat compileJava --no-daemon` —
+  BUILD SUCCESSFUL; `.\gradlew.bat runGameTestServer --no-daemon` — servidor terminou
+  normalmente com 45/45 testes obrigatórios; `.\gradlew.bat build --no-daemon` —
+  BUILD SUCCESSFUL (`test` NO-SOURCE). Próximo teste manual: conferir `Brake while flying`
+  em K (ou outra tecla livre), confirmar ausência de marca de conflito, testar controles
+  do velocista/voo e transições/ciclo de vida conforme lista ASC-011.

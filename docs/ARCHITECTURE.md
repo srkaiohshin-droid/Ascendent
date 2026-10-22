@@ -80,6 +80,9 @@ registrado; `runGameTestServer` e o comando para executa-lo.
 - Os pacotes não carregam posição nem velocidade final escolhidas pelo cliente. Estado/nível visível
   é sincronizado para o jogador e observadores; inputs repetidos no mesmo tick são rejeitados e
   entradas antigas são descartadas.
+- Os defaults próprios do Ascendant não compartilham teclas entre voo, catálogo/radial e velocista.
+  `flight_brake` usa K porque X colidia com `loadToolbarActivator` vanilla observado na configuração
+  local. Minecraft mantém keybinds persistidos ao atualizar; não sobrescrever preferências antigas.
 - O primeiro lote não define um registry de perfis nem afirma perfis de Barry/Wally/outros,
   recursos energéticos, ataques, slow motion, habilidades de parede/água/fase, HUD ou animação.
   Essas mecânicas exigem lotes e critérios independentes.

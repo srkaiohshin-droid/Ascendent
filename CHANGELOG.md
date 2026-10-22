@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0 — ASC-011 Lote A: auditoria e correção de keybind
+- O default de frenagem do voo mudou de X para K: o audit encontrou X compartilhado
+  com o keybind vanilla de ativação da barra de ferramentas (`loadToolbarActivator`).
+- Os demais defaults Ascendant são distintos no código. Instalações com o valor X já
+  persistido precisam redefinir/alterar essa tecla nas opções; o Minecraft preserva
+  preferências existentes.
+- `compileJava`, `runGameTestServer` (45/45) e `build` aprovados após a correção.
+  `runClient` exibiu o menu Key Binds, mas a conferência interativa final e gameplay
+  permanecem pendentes; não declarar controles validados em jogo.
+
 ## 0.1.0 — ASC-010: núcleo inicial de supervelocidade
 - Adicionado estado transitório de velocista com 10 níveis, progressão de velocidade configurável,
   aceleração, convergência direcional, inércia, sprint e frenagem de emergência.

@@ -83,3 +83,12 @@ ESTADO VERIFICADO EM 2026-10-21 (MODULAR SUPERPOWER FRAMEWORK)
   mundo local, mas não foi possível enviar teclas à janela custom-drawn; controles e
   física não tiveram validação interativa. HUD, habilidades adicionais, efeitos,
   animações e perfis de personagens ainda não estão implementados.
+- ASC-011 Lote A: a auditoria do cliente encontrou `flight_brake` em X duplicando a tecla
+  vanilla `loadToolbarActivator` no `run/options.txt`; o default de voo foi movido para K,
+  livre nas atribuições observadas. Os demais defaults Ascendant são distintos entre si.
+  `compileJava`, `build` e `runGameTestServer` (45/45) passaram depois da correção. A
+  interface de keybinds foi aberta em `runClient`, mas não foi possível concluir a troca/
+  conferência interativa porque a automação não obteve despacho seguro de teclado e o
+  cliente passou a receber entrada do usuário. Configuração local existente prevalece
+  sobre defaults, então verificar/resetar `Brake while flying` para K é uma checagem manual
+  pendente; gameplay real dos controles ainda não foi exercitado.

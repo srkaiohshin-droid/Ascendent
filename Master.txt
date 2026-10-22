@@ -688,6 +688,9 @@ Implementar o sistema de movimentação e suas primeiras habilidades completas, 
 ASC-010 inicia esta fase com um núcleo transitório de 10 níveis, aceleração,
 curva direcional e frenagem server-authoritative; isso não conclui os requisitos
 de perfis, habilidades, animação, efeitos, HUD nem validação interativa.
+ASC-011 Lote A corrigiu a colisão do default da frenagem do voo com a tecla vanilla
+X ao movê-la para K; opções existentes são preservadas pelo Minecraft, portanto a
+confirmação do keybind persistido e do gameplay depende de uma sessão interativa.
 
 ## Fase 4 — Superforça
 
