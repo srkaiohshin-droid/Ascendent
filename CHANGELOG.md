@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0 — Importação local segura de HeroPacks
+- IDs de manifesto agora precisam ser identificadores portáveis; campos de contagem e dependências
+  são validados antes de selecionar o diretório de instalação.
+- A extração rejeita caminhos absolutos/traversal em formatos Windows e ZIP, nomes reservados do
+  Windows, aliases com ponto/espaço final, entradas duplicadas e limites excedidos durante a gravação;
+  manifesto acima de 1 MiB é recusado.
+- A atualização mantém a instalação anterior em staging até a nova pasta ser movida atomicamente;
+  falha na movimentação restaura a versão anterior e preserva o backup se o rollback também falhar.
+- GameTests cobrem importação inválida/válida, preservação/substituição e falha simulada na troca.
+- A invocação de lobos tenta pontos alternativos carregados, dentro do world border e sem colisão;
+  teste bloqueia o ponto preferencial para verificar o fallback.
+- `compileJava`, `runGameTestServer` (39/39) e `build` aprovados; a tarefa `test` do Gradle permanece `NO-SOURCE`.
+
 ## 0.1.0 — Interface de catálogo e menu radial B2
 - Adicionadas telas client-only para navegar poderes, habilidades e trajes, com busca por nome/ID/categoria,
   filtro de categoria, detalhes e indicação explícita de entradas funcionais ou templates.

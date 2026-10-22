@@ -20,7 +20,9 @@
 - [x] Criar ferramentas de validação e automação de conteúdo (ContentValidator, CatalogExporter).
 - [x] Validar com 35/35 GameTests automatizados e build aprovado.
 - [x] Lote B1: conectar invisibilidade, levitação sustentada, vórtice sustentado, invocação de lobos e faseamento; limpar estado runtime ao perder a última fonte do traje. `compileJava`, GameTests e `build` aprovados.
-- [x] Lote B2: catálogo de poderes/habilidades/trajes, busca e filtro, detalhes funcionais/templates, ações server-authoritative, keybinds configuráveis e menu radial paginado; `compileJava`, build e 36/36 GameTests aprovados. Falta validação visual/interativa em `runClient`.
+- [x] Lote B2: catálogo de poderes/habilidades/trajes, busca e filtro, detalhes funcionais/templates, ações server-authoritative, keybinds configuráveis e menu radial paginado; validação original B2: `compileJava`, build e 36/36 GameTests. Validação ASC-009 posterior: build e 39/39 GameTests. Falta validação visual/interativa em `runClient`.
+- [x] ASC-009: validar IDs e caminhos de HeroPacks, limitar extração por bytes escritos, rejeitar entradas ZIP duplicadas e substituir instalação com rollback testado; melhorar busca de posições de invocação seguras para lobos. `compileJava`, build e 39/39 GameTests aprovados.
 - [ ] Validar visualmente catálogo, busca, ações e menu radial em `runClient`.
 - [ ] Validar gameplay multiplayer com dois jogadores quando houver mecanica de rede interativa.
+- [ ] Validar compatibilidade/dependências e carregamento transacional de conteúdo de HeroPacks.
 - [x] Configurar e confirmar o remoto Git origin autorizado.

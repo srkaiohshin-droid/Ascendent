@@ -406,3 +406,37 @@ LOTE B2 — INTERFACE DE CATÁLOGO, KEYBINDS E MENU RADIAL
 - Limite: `runClient` e validação gráfica/entrada interativa não foram executados.
 - Próxima ação: inspecionar a UI em cliente real e corrigir eventuais problemas de layout/foco.
 - Git: alterações ainda não commitadas nem enviadas durante esta atualização.
+
+LOTE ASC-009 — IMPORTACAO SEGURA DE HERO PACKS E FALLBACK DE INVOCACAO
+- Data/hora local: 2026-10-21.
+- Agente: Agente 01.
+- Estado inicial: branch `srkaiohshin-droid-ascendant-gameplay-ui` limpa e sincronizada
+  com `origin`; B1 (`b528dc1`) e B2 (`9f25503`) sao ancestrais do HEAD. Worktrees
+  restantes estavam em branches distintas; nenhuma outra sessao de agente estava ativa.
+- Problemas confirmados: o importador apagava a pasta instalada antes de mover a nova,
+  o ID do manifesto era usado como caminho sem validacao, limites eram verificados so
+  depois de gravar a entrada inteira, e caminhos ZIP eram avaliados sem normalizacao
+  portavel de separadores. A primeira execucao do GameTest tambem reproduziu falha no
+  poder de invocacao quando os destinos preferenciais nao estavam livres.
+- Alteracoes: validacao de ID/campos/dependencias do manifesto; rejeicao de entradas
+  absolutas, traversal, nomes reservados/aliases do Windows, scripts/codigo, nomes duplicados e limites excedidos durante
+  extracao; limite de 1 MiB no manifesto; staging e troca atomica com rollback e
+  preservacao do backup se rollback falhar. `SummonEntityComponent` agora busca
+  posicoes carregadas, dentro do world border e livres de colisao antes de criar os
+  lobos; o GameTest bloqueia a posicao preferencial para cobrir o fallback.
+- Arquivos: `PackManifest.java`, `PackSecurity.java`, `PackManager.java`,
+  `PackManagerGameTests.java`, `SummonEntityComponent.java`, `FrameworkGameTests.java`,
+  `Ascendant.java`, `AI_CONTEXT.txt`, `AGENT_COORDINATION.txt`, `TODO.md`,
+  `CHANGELOG.md` e `docs/DEVELOPMENT_STATUS.md`.
+- Validacoes executadas: `compileJava` passou; as duas primeiras execucoes de
+  `runGameTestServer` iniciaram e completaram 38 testes, mas falharam no teste existente
+  de invocacao; apos implementar busca de fallback e obstrucao explicita no fixture,
+  a execucao seguinte terminou normalmente com 39/39 testes aprovados.
+- Validacoes finais: `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
+  `.\gradlew.bat runGameTestServer --no-daemon` — servidor encerrou normalmente,
+  39/39 testes obrigatorios aprovados; `.\gradlew.bat build --no-daemon` —
+  BUILD SUCCESSFUL; tarefa `test` — NO-SOURCE.
+- `git diff --check`: aprovado sem ocorrencias. Commit e sincronizacao remota pendentes
+  no momento deste registro.
+- Limites: o HeroPack ainda nao aplica definicoes a registries de forma transacional,
+  nem resolve compatibilidade/dependencias semanticas. Validacao visual B2 nao executada.

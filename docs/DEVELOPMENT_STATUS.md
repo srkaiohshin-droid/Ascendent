@@ -3,7 +3,7 @@
 > **Target Platform:** Minecraft Java 1.20.1 | Forge 47.3.0 | Java 17 (Temurin 17.0.20.1)  
 > **Package Base:** `br.com.ascendant`  
 > **Status Date:** 2026-10-21
-> **Build Status:** BUILD SUCCESSFUL (Gradle 8.8, 35/35 GameTests Passing)
+> **Build Status:** BUILD SUCCESSFUL (Gradle 8.8, Temurin JDK 17.0.20.1, 39/39 GameTests).
 
 ---
 
@@ -161,7 +161,7 @@ O módulo `br.com.ascendant.pack` implementa:
 ## 6. Resultado dos Testes e Build
 
 - **Gradle Build:** `BUILD SUCCESSFUL` (compilação limpa sem erros).
-- **GameTests (`runGameTestServer`):** **36/36 testes obrigatórios aprovados** na validação B2; servidor iniciou, executou os testes e encerrou normalmente.
+- **GameTests (`runGameTestServer`):** **39/39 testes obrigatórios aprovados** na validação mais recente; servidor iniciou, executou os testes e encerrou normalmente. O lote B2 original havia aprovado 36/36.
 - **Poderes funcionais antes/depois do lote B1:** 108 → 113 (o estado anterior tinha 500 registros; a contagem de habilidades funcionais não foi alterada pelo B1: 111).
 - **Catálogo após B1:** 500 poderes (113 funcionais, 387 templates); 500 habilidades (111 funcionais, 389 templates).
 - **Poderes conectados:** `refractive_invisibility` (ACTIVE), `telekinetic_levitate` (SUSTAINED), `vortex_maelstrom` (SUSTAINED), `spectral_wolf_pack` (ACTIVE) e `void_step` (ACTIVE). Levitação levita uma entidade visível não aliada; vórtice atrai entidades próximas não aliadas; invocação cria três lobos vanilla domados e associados ao jogador; faseamento move o jogador para destino carregado e sem colisão.
@@ -176,6 +176,9 @@ O módulo `br.com.ascendant.pack` implementa:
 - **Ações disponíveis:** somente poderes funcionais `ACTIVE`, `TOGGLE`/`SUSTAINED` e habilidades funcionais de gatilho manual são acionáveis; templates e entradas de acionamento automático continuam visíveis, mas indisponíveis. Equipar/desequipar usa os pacotes existentes e o servidor permanece autoritativo.
 - **GameTest B2:** `catalogFilteringAndActionClassification` cobre busca, categoria, classificação dos tipos acionáveis e geometria do radial. A suíte passou com **36/36**; não foram adicionados testes de tela gráfica.
 - **Limite de validação B2:** `runClient` não foi executado; renderização, layout, foco de busca e captura real de keybinds ainda precisam de inspeção em cliente interativo.
+- **ASC-009 — Importação local de HeroPacks:** IDs do manifesto são limitados a identificadores em minúsculas seguros como um único diretório; campos do manifesto, dependências e contagens são validados. A extração verifica caminhos relativos portáveis, rejeita traversal, nomes reservados/aliases do Windows, arquivos executáveis e entradas duplicadas, aplicando limites enquanto grava e limitando o manifesto a 1 MiB. Uma instalação válida é preparada em staging no mesmo diretório de pacotes e substitui a versão anterior por movimentação atômica; falha na instalação tenta restaurar a cópia anterior, preservando o backup e emitindo erro explícito se o rollback falhar.
+- **ASC-009 — Invocação:** `SummonEntityComponent` procura candidatos alternativos carregados e sem colisão dentro do world border, antes de adicionar as entidades, evitando falha por um ponto de spawn ocupado. A suíte agora tem **39 GameTests**, incluindo importação válida/inválida, substituição, rollback simulado, validação do manifesto e fallback de spawn.
+- **Limites ASC-009:** os pacotes ainda não são carregados por uma transação com validação semântica de dependências/referências; não há remoção/atualização por UI. A validação visual B2 em `runClient` segue pendente.
 - **Testes novos cobertos:**
   1. `catalogIntegrityAndCountValidation`: valida contagem de 500 poderes/500 habilidades, contagens funcionais/templates e integridade de referências.
   2. `coreComponentsExecution`: valida impulsão do DashComponent, cura do HealActionComponent e absorção do ShieldActionComponent.
@@ -195,5 +198,5 @@ O módulo `br.com.ascendant.pack` implementa:
    - Se for introduzir uma nova mecânica, crie um novo componente em `br.com.ascendant.power.component` implementando `IPowerComponent` e registre sua fábrica em `ComponentRegistry`.
 2. **Executar validação de catálogo e compilação:**
    - Execute `.\gradlew.bat compileJava` para verificar a compilação.
-   - Execute `.\gradlew.bat runGameTestServer` para rodar os 35 GameTests automatizados.
+   - Execute `.\gradlew.bat runGameTestServer` para rodar os 39 GameTests automatizados atuais.
 3. **Próxima implementação:** validar a UI B2 em `runClient` e corrigir eventuais problemas visuais/entrada; não duplicar registries ou networking.

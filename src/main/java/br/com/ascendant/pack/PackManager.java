@@ -10,10 +10,10 @@ import br.com.ascendant.suit.SuitRegistry;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 
 import java.io.*;
 import java.nio.file.*;
-import java.security.MessageDigest;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -31,11 +31,9 @@ public final class PackManager {
     }
 
     public static synchronized void init(Path gameDir) {
-        packsDir = gameDir.resolve("ascendant_packs");
+        packsDir = gameDir.toAbsolutePath().normalize().resolve("ascendant_packs");
         try {
-            if (!Files.exists(packsDir)) {
-                Files.createDirectories(packsDir);
-            }
+            Files.createDirectories(packsDir);
         } catch (IOException e) {
             Ascendant.LOGGER.error("[ASC] Failed to create packs directory", e);
         }
@@ -50,67 +48,169 @@ public final class PackManager {
         return localCatalog;
     }
 
-    public static boolean importPack(Path zipFilePath) {
-        if (!Files.exists(zipFilePath) || !zipFilePath.toString().endsWith(".zip")) {
+    public static synchronized boolean importPack(Path zipFilePath) {
+        if (packsDir == null) {
+            Ascendant.LOGGER.error("[ASC] Cannot import a pack before PackManager initialization.");
+            return false;
+        }
+        return importPack(zipFilePath, packsDir);
+    }
+
+    static boolean importPack(Path zipFilePath, Path configuredPacksDir) {
+        if (configuredPacksDir == null) {
+            Ascendant.LOGGER.error("[ASC] Cannot import a pack without a configured destination.");
+            return false;
+        }
+        if (zipFilePath == null || !Files.isRegularFile(zipFilePath)
+                || !zipFilePath.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")) {
             Ascendant.LOGGER.warn("[ASC] Invalid pack file: {}", zipFilePath);
             return false;
         }
 
-        try (ZipFile zip = new ZipFile(zipFilePath.toFile())) {
-            ZipEntry manifestEntry = zip.getEntry("manifest.json");
-            if (manifestEntry == null) {
-                Ascendant.LOGGER.error("[ASC] Pack zip missing manifest.json: {}", zipFilePath);
-                return false;
+        Path root = configuredPacksDir.toAbsolutePath().normalize();
+        Path stagingRoot = null;
+        Path backup = null;
+        boolean installed = false;
+        try {
+            Files.createDirectories(root);
+            if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Pack directory is not a regular directory: " + root);
             }
 
-            PackManifest manifest;
-            try (var reader = new InputStreamReader(zip.getInputStream(manifestEntry))) {
-                manifest = PackManifest.fromJson(GSON.fromJson(reader, JsonObject.class));
-            }
-
-            Path targetFolder = packsDir.resolve(manifest.getId());
-            Path tempFolder = packsDir.resolve(manifest.getId() + "_temp_" + System.currentTimeMillis());
-            Files.createDirectories(tempFolder);
-
+            stagingRoot = Files.createTempDirectory(root, ".ascendant-import-");
+            Path contents = Files.createDirectory(stagingRoot.resolve("contents"));
             int entryCount = 0;
             long totalBytes = 0;
             byte[] buffer = new byte[8192];
+            Set<String> seenPaths = new HashSet<>();
 
-            Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry entry = entries.nextElement();
-                entryCount++;
-                PackSecurity.validateEntryName(entry.getName(), tempFolder);
+            try (ZipFile zip = new ZipFile(zipFilePath.toFile())) {
+                if (zip.getEntry("manifest.json") == null) {
+                    throw new IOException("Pack archive is missing its root manifest.json.");
+                }
 
-                Path destFile = tempFolder.resolve(entry.getName()).normalize();
-                if (entry.isDirectory()) {
-                    Files.createDirectories(destFile);
-                } else {
-                    Files.createDirectories(destFile.getParent());
+                Enumeration<? extends ZipEntry> entries = zip.entries();
+                while (entries.hasMoreElements()) {
+                    ZipEntry entry = entries.nextElement();
+                    entryCount++;
+                    PackSecurity.checkLimits(entryCount, totalBytes);
+
+                    Path destination = PackSecurity.resolveEntryPath(entry.getName(), contents);
+                    String relativePath = contents.toAbsolutePath().normalize().relativize(destination)
+                            .toString().replace('\\', '/').toLowerCase(Locale.ROOT);
+                    if (!seenPaths.add(relativePath)) {
+                        throw new SecurityException("Pack contains duplicate entry paths: " + entry.getName());
+                    }
+
+                    if (entry.isDirectory()) {
+                        Files.createDirectories(destination);
+                        continue;
+                    }
+
+                    Files.createDirectories(destination.getParent());
                     try (InputStream in = zip.getInputStream(entry);
-                         OutputStream out = Files.newOutputStream(destFile)) {
+                         OutputStream out = Files.newOutputStream(destination,
+                                 StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
                         int read;
                         while ((read = in.read(buffer)) != -1) {
+                            if (read == 0) {
+                                continue;
+                            }
                             totalBytes += read;
+                            PackSecurity.checkLimits(entryCount, totalBytes);
                             out.write(buffer, 0, read);
                         }
                     }
                 }
-                PackSecurity.checkLimits(entryCount, totalBytes);
             }
 
-            // Atomic switch
-            if (Files.exists(targetFolder)) {
-                deleteDirectoryRecursively(targetFolder);
+            Path manifestPath = contents.resolve("manifest.json");
+            if (!Files.isRegularFile(manifestPath, LinkOption.NOFOLLOW_LINKS)
+                    || Files.size(manifestPath) > PackSecurity.MAX_MANIFEST_SIZE_BYTES) {
+                throw new IOException("Pack manifest is missing, not a regular file, or exceeds 1 MiB.");
             }
-            Files.move(tempFolder, targetFolder, StandardCopyOption.ATOMIC_MOVE);
-            Ascendant.LOGGER.info("[ASC] Successfully imported content pack: {} v{}", manifest.getId(), manifest.getVersion());
+
+            PackManifest manifest;
+            try (var reader = Files.newBufferedReader(manifestPath)) {
+                manifest = PackManifest.fromJson(GSON.fromJson(reader, JsonObject.class));
+            }
+
+            Path target = root.resolve(manifest.getId()).normalize();
+            if (!target.startsWith(root) || target.equals(root)) {
+                throw new SecurityException("Pack ID resolves outside the configured pack directory.");
+            }
+            if (Files.isSymbolicLink(target)
+                    || (Files.exists(target, LinkOption.NOFOLLOW_LINKS)
+                    && !Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS))) {
+                throw new IOException("Existing pack target is not a regular directory: " + target);
+            }
+
+            backup = stagingRoot.resolve("previous");
+            replaceDirectoryAtomically(contents, target, backup, PackManager::moveDirectoryAtomically);
+            installed = true;
+            Ascendant.LOGGER.info("[ASC] Successfully imported content pack: {} v{}",
+                    manifest.getId(), manifest.getVersion());
             return true;
-
-        } catch (Exception e) {
+        } catch (IOException | IllegalArgumentException | SecurityException | JsonParseException e) {
             Ascendant.LOGGER.error("[ASC] Error importing pack: {}", zipFilePath, e);
             return false;
+        } finally {
+            if (stagingRoot != null && Files.exists(stagingRoot, LinkOption.NOFOLLOW_LINKS)) {
+                boolean preserveBackup = !installed && backup != null
+                        && Files.exists(backup, LinkOption.NOFOLLOW_LINKS);
+                if (preserveBackup) {
+                    Ascendant.LOGGER.error("[ASC] Previous pack data was preserved for manual recovery at {}",
+                            backup);
+                } else {
+                    try {
+                        deleteDirectoryRecursively(stagingRoot);
+                    } catch (IOException cleanupFailure) {
+                        Ascendant.LOGGER.error("[ASC] Failed to clean pack import staging directory: {}",
+                                stagingRoot, cleanupFailure);
+                    }
+                }
+            }
         }
+    }
+
+    static void replaceDirectoryAtomically(Path staged, Path target, Path backup,
+                                           DirectoryMover mover) throws IOException {
+        Objects.requireNonNull(staged, "staged");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(backup, "backup");
+        Objects.requireNonNull(mover, "mover");
+
+        if (Files.exists(backup, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("Pack backup path already exists: " + backup);
+        }
+
+        boolean previousMoved = false;
+        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            mover.move(target, backup);
+            previousMoved = true;
+        }
+
+        try {
+            mover.move(staged, target);
+        } catch (IOException | RuntimeException installFailure) {
+            if (previousMoved) {
+                try {
+                    mover.move(backup, target);
+                } catch (IOException | RuntimeException rollbackFailure) {
+                    installFailure.addSuppressed(rollbackFailure);
+                }
+            }
+            throw installFailure;
+        }
+    }
+
+    private static void moveDirectoryAtomically(Path source, Path destination) throws IOException {
+        Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    @FunctionalInterface
+    interface DirectoryMover {
+        void move(Path source, Path destination) throws IOException;
     }
 
     public static boolean exportPack(Path sourceFolder, Path destinationZip) {
@@ -159,7 +259,6 @@ public final class PackManager {
         }
 
         try {
-            // Load powers
             Path powersDir = packFolder.resolve("powers");
             if (Files.isDirectory(powersDir)) {
                 try (var pStream = Files.list(powersDir)) {
@@ -175,7 +274,6 @@ public final class PackManager {
                 }
             }
 
-            // Load abilities
             Path abilitiesDir = packFolder.resolve("abilities");
             if (Files.isDirectory(abilitiesDir)) {
                 try (var aStream = Files.list(abilitiesDir)) {
@@ -191,7 +289,6 @@ public final class PackManager {
                 }
             }
 
-            // Load suits
             Path suitsDir = packFolder.resolve("suits");
             if (Files.isDirectory(suitsDir)) {
                 try (var sStream = Files.list(suitsDir)) {
@@ -206,17 +303,20 @@ public final class PackManager {
                     });
                 }
             }
-
         } catch (Exception e) {
             Ascendant.LOGGER.error("[ASC] Error loading pack from folder: {}", packFolder, e);
         }
     }
 
     private static void deleteDirectoryRecursively(Path dir) throws IOException {
+        if (!Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
         try (var walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder())
-                    .map(Path::toFile)
-                    .forEach(File::delete);
+            Iterator<Path> paths = walk.sorted(Comparator.reverseOrder()).iterator();
+            while (paths.hasNext()) {
+                Files.deleteIfExists(paths.next());
+            }
         }
     }
 }

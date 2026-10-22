@@ -53,7 +53,8 @@ ESTADO VERIFICADO EM 2026-10-21 (MODULAR SUPERPOWER FRAMEWORK)
   atômica, proteção contra Zip-Slip e bloqueio rigoroso de arquivos executáveis.
 - Ferramenta de validação e exportação (ContentValidator, CatalogExporter).
 - PowerRuntimeEngine (cooldowns, toggles de estado, hooks de dano, mitigação, queda e ticks).
-- 36/36 GameTests aprovados em `gradlew.bat runGameTestServer` no lote B2; o resultado B1 foi 35/35.
+- 39/39 GameTests aprovados na validacao mais recente de `gradlew.bat runGameTestServer`;
+  o lote B2 original havia aprovado 36/36.
 - `gradlew.bat build` concluído com sucesso.
 - Lote B1: cinco componentes ligados a poderes server-side; ACTIVE powers têm caminho de ativação
   no runtime, pacote e comando. Limpeza de toggles, efeitos e modificadores ao perder a última
@@ -63,5 +64,11 @@ ESTADO VERIFICADO EM 2026-10-21 (MODULAR SUPERPOWER FRAMEWORK)
   Catálogo inclui entradas funcionais e templates; radial inclui apenas poderes/abilities com
   ativação manual. `compileJava`, `runGameTestServer` (36/36) e `build` passaram. Teste gráfico
   interativo em `runClient` permanece pendente.
-- Próxima tarefa: validar a UI em cliente real e corrigir achados de layout/entrada antes de
-  ampliar o catálogo ou adicionar novas interfaces.
+- Lote ASC-009: importacao local valida o ID do manifesto e caminhos ZIP, limita tamanho descompactado
+  durante a escrita, rejeita caminhos duplicados e instala em staging com rollback da versao anterior.
+  GameTests cobrem IDs/entradas maliciosas, preservacao e substituicao de instalacao e rollback.
+  A invocacao de lobos agora procura destinos carregados e sem colisao; o GameTest cobre destino
+  preferencial bloqueado. `compileJava`, `runGameTestServer` (39/39) e `build` passaram nesta etapa;
+  a tarefa `test` do Gradle permanece `NO-SOURCE`.
+- Limites pendentes: validacao visual da UI em `runClient`; compatibilidade semantica/dependencias e
+  aplicacao transacional do conteudo ainda nao fazem parte da importacao do HeroPack.

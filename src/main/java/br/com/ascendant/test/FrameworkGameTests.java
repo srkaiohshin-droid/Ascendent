@@ -26,6 +26,7 @@ import br.com.ascendant.tools.ContentValidator;
 import com.mojang.authlib.GameProfile;
 import io.netty.channel.embedded.EmbeddedChannel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.world.effect.MobEffects;
@@ -150,10 +151,13 @@ public final class FrameworkGameTests {
                 "Active invisibility should execute through the server runtime");
         helper.assertTrue(serverPlayer.hasEffect(MobEffects.INVISIBILITY),
                 "Invisibility should apply its bounded vanilla status effect");
+        BlockPos blockedWolfSpawn = BlockPos.containing(serverPlayer.getX() + 2.5D,
+                serverPlayer.getY(), serverPlayer.getZ());
+        serverPlayer.serverLevel().setBlock(blockedWolfSpawn, Blocks.STONE.defaultBlockState(), 3);
         var wolvesBefore = serverPlayer.serverLevel().getEntitiesOfClass(Wolf.class,
                 serverPlayer.getBoundingBox().inflate(8.0D), wolf -> true);
         helper.assertTrue(PowerRuntimeEngine.activatePower(serverPlayer, summonId),
-                "Wolf summon should execute through the server runtime");
+                "Wolf summon should find collision-free alternatives when the preferred position is blocked");
         var nearbyWolves = serverPlayer.serverLevel().getEntitiesOfClass(Wolf.class,
                 serverPlayer.getBoundingBox().inflate(8.0D), wolf -> true);
         var summonedWolves = nearbyWolves.stream().filter(Wolf::isTame).toList();
@@ -162,6 +166,7 @@ public final class FrameworkGameTests {
                 "Summoning must add three tamed Minecraft 1.20.1 wolves; delta "
                         + (nearbyWolves.size() - wolvesBefore.size()) + " total, "
                         + (summonedWolves.size() - wolvesBefore.stream().filter(Wolf::isTame).count()) + " tamed");
+        serverPlayer.serverLevel().removeBlock(blockedWolfSpawn, false);
 
         Mob levitationTarget = EntityType.ZOMBIE.create(serverPlayer.serverLevel());
         Mob vortexTarget = EntityType.ZOMBIE.create(serverPlayer.serverLevel());
@@ -400,6 +405,22 @@ public final class FrameworkGameTests {
         }
         helper.assertTrue(threwTraversal, "PackSecurity must reject directory traversal");
 
+        boolean threwWindowsPath = false;
+        try {
+            PackSecurity.validateEntryName("C:\\outside.json", dummyDir);
+        } catch (SecurityException e) {
+            threwWindowsPath = true;
+        }
+        helper.assertTrue(threwWindowsPath, "PackSecurity must reject Windows drive paths");
+
+        boolean threwWindowsDevice = false;
+        try {
+            PackSecurity.validateEntryName("CON/metadata.json", dummyDir);
+        } catch (SecurityException e) {
+            threwWindowsDevice = true;
+        }
+        helper.assertTrue(threwWindowsDevice, "PackSecurity must reject Windows device names");
+
         // Executable rejection test
         boolean threwExecutable = false;
         try {
@@ -408,6 +429,15 @@ public final class FrameworkGameTests {
             threwExecutable = true;
         }
         helper.assertTrue(threwExecutable, "PackSecurity must reject executable .class files");
+
+        boolean threwExecutableSuffix = false;
+        try {
+            PackSecurity.validateEntryName("payload.jar.", dummyDir);
+        } catch (SecurityException e) {
+            threwExecutableSuffix = true;
+        }
+        helper.assertTrue(threwExecutableSuffix,
+                "PackSecurity must reject trailing-dot aliases of prohibited executable files");
 
         // Valid file test
         boolean validPassed = false;
@@ -418,6 +448,16 @@ public final class FrameworkGameTests {
             validPassed = false;
         }
         helper.assertTrue(validPassed, "PackSecurity must accept valid content json path");
+
+        boolean benignDoubleDotsPassed = false;
+        try {
+            PackSecurity.validateEntryName("powers/part..json", dummyDir);
+            benignDoubleDotsPassed = true;
+        } catch (SecurityException e) {
+            benignDoubleDotsPassed = false;
+        }
+        helper.assertTrue(benignDoubleDotsPassed,
+                "PackSecurity should reject traversal segments, not harmless double dots inside a filename");
 
         helper.succeed();
     }

@@ -8,6 +8,7 @@ import br.com.ascendant.flight.FlightNetwork;
 import br.com.ascendant.flight.FlightTuning;
 import br.com.ascendant.network.AscendantNetwork;
 import br.com.ascendant.pack.PackManager;
+import br.com.ascendant.pack.PackManagerGameTests;
 import br.com.ascendant.power.catalog.AbilityCatalogData;
 import br.com.ascendant.power.catalog.PowerCatalogData;
 import br.com.ascendant.power.runtime.PowerRuntimeEngine;
@@ -72,5 +73,6 @@ public final class Ascendant {
         event.register(PlayerPowerDataGameTests.class);
         event.register(FlightGameTests.class);
         event.register(FrameworkGameTests.class);
+        event.register(PackManagerGameTests.class);
     }
 }

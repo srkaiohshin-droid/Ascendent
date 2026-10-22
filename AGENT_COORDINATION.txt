@@ -194,4 +194,18 @@ Validação: `compileJava`, `runGameTestServer` (36/36) e `build` aprovados.
 Próxima tarefa: validar renderização, foco e keybinds em cliente interativo; corrigir
   achados antes de ampliar UI.
 
+ASC-009
+Titulo: Tornar importacao local de HeroPacks validada e recuperavel
+Status: REVIEW
+Prioridade: ALTA
+Reserva: Agente 01; pacote `br.com.ascendant.pack`, registro de GameTests e
+  documentacao deste lote.
+Escopo: validar IDs de manifesto e caminhos ZIP, limitar extracao durante a
+  escrita, rejeitar entradas duplicadas e substituir instalacoes existentes
+  com rollback se a troca falhar.
+Fora do escopo: executar codigo de pacotes, instalar conteudo de rede ou
+  reescrever a interface B2.
+Validacao: `compileJava`, `build` e `runGameTestServer` (39/39) aprovados;
+  revisao final do diff e `git diff --check` aprovados; commit e sincronizacao pendentes.
+
 Nenhuma tarefa esta concluida apenas por existir nesta fila.

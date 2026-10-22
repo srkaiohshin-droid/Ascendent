@@ -1,12 +1,14 @@
 package br.com.ascendant.power.component;
 
 import com.google.gson.JsonObject;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.Wolf;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,20 +39,22 @@ public final class SummonEntityComponent implements IPowerComponent {
         ServerPlayer owner = context.getPlayer();
         ServerLevel level = context.getLevel();
         List<Wolf> wolves = new ArrayList<>(count);
+        List<Vec3> spawnPositions = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             Wolf wolf = EntityType.WOLF.create(level);
             if (wolf == null) {
                 return false;
             }
-            double angle = (Math.PI * 2.0D * index) / count;
-            wolf.moveTo(owner.getX() + Math.cos(angle) * spread, owner.getY(),
-                    owner.getZ() + Math.sin(angle) * spread, owner.getYRot(), 0.0F);
             wolf.setTame(true);
             wolf.setOwnerUUID(owner.getUUID());
             wolf.setOrderedToSit(false);
-            if (!level.noCollision(wolf)) {
+
+            Vec3 spawn = findSpawnPosition(level, owner, wolf, index, spawnPositions);
+            if (spawn == null) {
                 return false;
             }
+            wolf.moveTo(spawn.x, spawn.y, spawn.z, owner.getYRot(), 0.0F);
+            spawnPositions.add(spawn);
             wolves.add(wolf);
         }
 
@@ -72,6 +76,42 @@ public final class SummonEntityComponent implements IPowerComponent {
             spawned++;
         }
         return true;
+    }
+
+    private Vec3 findSpawnPosition(ServerLevel level, ServerPlayer owner, Wolf wolf,
+                                   int wolfIndex, List<Vec3> reservedPositions) {
+        int angleSteps = Math.max(16, count * 4);
+        for (int ring = 0; ring < 5; ring++) {
+            double radius = spread + ring * 1.25D;
+            for (int step = 0; step < angleSteps; step++) {
+                double angle = (Math.PI * 2.0D * (step + wolfIndex)) / angleSteps;
+                double x = owner.getX() + Math.cos(angle) * radius;
+                double z = owner.getZ() + Math.sin(angle) * radius;
+                for (int verticalOffset = 0; verticalOffset <= 2; verticalOffset++) {
+                    double y = owner.getY() + verticalOffset;
+                    if (y < level.getMinBuildHeight() || y + wolf.getBbHeight() > level.getMaxBuildHeight()) {
+                        continue;
+                    }
+                    BlockPos blockPos = BlockPos.containing(x, y, z);
+                    if (!level.hasChunkAt(blockPos)) {
+                        continue;
+                    }
+
+                    wolf.moveTo(x, y, z, owner.getYRot(), 0.0F);
+                    AABB bounds = wolf.getBoundingBox();
+                    if (!level.getWorldBorder().isWithinBounds(bounds) || !level.noCollision(wolf)) {
+                        continue;
+                    }
+
+                    boolean overlapsReserved = reservedPositions.stream()
+                            .anyMatch(position -> position.distanceToSqr(x, y, z) < 1.0D);
+                    if (!overlapsReserved) {
+                        return new Vec3(x, y, z);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     @Override
