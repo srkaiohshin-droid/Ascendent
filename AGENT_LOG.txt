@@ -421,3 +421,35 @@ LOTE DE RECUPERACAO DE REGRESSOES DO COMMIT a88f1cb (2026-10-22)
 - Pendencias:
   - Inspecao visual manual em runClient quando houver ambiente grafico acompanhado.
   - Push normal para origin e confirmacao do SHA remoto pelo agente responsavel pelo envio.
+
+LOTE DE INTEGRACAO DO RUNTIME DE HABILIDADES E CATALOGO HERO/PACK (2026-10-22)
+- Data: 2026-10-22
+- Agente: OpenCode (DeepSeek V4.1 Flash Free)
+- Tarefa: integrar o lote interrompido de runtime/catalogo do clone separado sobre a linhagem publicada de recuperacao, validar e documentar.
+- Origem: worktree C:\Users\srkai\.copilot\repos\copilot-worktrees\Ascendent\srkaiohshin-droid-glowing-fortnight, HEAD 7f55404 com alteracoes nao commitadas.
+- Base de destino: C:\Users\srkai\Documents\Ascendant, branch srkaiohshin-droid-ascendant-gameplay-ui, HEAD publicado ee2fa9d.
+- Metodo: git diff --3way do lote de origem sobre ee2fa9d, resolucao manual dos conflitos e copia dos tres arquivos novos (FireWardComponent, ManagedEffectLease, CatalogClientState). Nenhum reset, clean ou force-push foi usado.
+- Integracao:
+  1. PowerRuntimeEngine mantem as APIs anteriores (activateAbilityWithFeedback, getActivationFailureReason, dispatchPassiveAbilities, dispatchTickAbilities, dispatchHurtAbilities, dispatchAttackAbilities, clearActiveToggles) e adiciona AbilityResult, activateAbilityWithResult, toggleAbility(id, enable), getAccessibleAbilities e tickAbilities.
+  2. Autorizacao de habilidade considera poder pai, habilidade universal e concessao direta por traje.
+  3. Gatilhos KEY_PRESS, SNEAK_KEY, TOGGLE, PASSIVE, TICK, HURT_EVENT e ATTACK_HIT possuem caminhos explicitos; templates e habilidades sem acao executavel nao ativam.
+  4. titan_mass_form e titan_growth_boost passaram a TOGGLE com identidades de modificador distintas.
+  5. Efeitos gerenciados usam ManagedEffectLease; FireWardComponent executa resistencia ao fogo real e a limpeza preserva efeitos de fontes externas.
+  6. Limpeza de runtime em logout, respawn, troca de dimensao e perda da ultima fonte de acesso.
+  7. PackManager rastreia packs carregados e origem de poderes/habilidades/trajes; a UI usa esses dados.
+  8. Catalogo e radial compartilham CatalogInteraction. PowerCatalogScreen abre em HEROES, tem abas persistentes POWERS/ABILITIES/SUITS e usa CatalogClientState autoritativo. HeroPackScreen continua como entrada F6 de Herois/Packs e lista somente packs instalados.
+  9. Corrigido o filtro de categoria da aba HEROES (suits/packs) e ocultado o filtro de origem quando nao se aplica.
+  10. Ajustes finais: TICK sem cooldown executa a cada tick (com assercao no GameTest), cooldown do cliente conta por game time, toggles ativos podem ser desligados durante cooldown no catalogo/radial, habilidade removida do registro limpa toggles/passives/cooldown e botoes do catalogo cabem em telas estreitas.
+- Validacao executada em Java 17 (Temurin 17.0.20.1), Gradle Wrapper 8.8:
+  - .\gradlew.bat compileJava --no-daemon --console=plain: BUILD SUCCESSFUL.
+  - .\gradlew.bat runGameTestServer --no-daemon --console=plain: 59/59 required tests passed; "All 59 required tests passed".
+  - .\gradlew.bat build --no-daemon --console=plain: BUILD SUCCESSFUL.
+  - git diff HEAD --check: sem erros (apenas aviso LF/CRLF em PowerRuntimeEngine.java).
+  - .\gradlew.bat runClient --no-daemon --console=plain: iniciou sem crash, carregou mixins, atlas, audio e conectou ao servidor integrado; permaneceu estavel ate o ambiente encerrar a janela (execucao final de ~49s; uma execucao anterior passou de 2 minutos). Nao houve inspecao visual interativa humana.
+- Limitacoes:
+  - A validacao visual das telas, busca, filtros, botoes, feedback e menu radial nao foi feita por observacao humana.
+  - Manifests de packs nao possuem perfis/retratos de personagens; a UI nao inventa esses dados.
+  - Aviso LF/CRLF permanece em PowerRuntimeEngine.java e nao representa erro de conteudo.
+- Pendencias:
+  - Inspecao visual humana em cliente grafico.
+  - Commit deste lote, push normal para a branch de trabalho e confirmacao do SHA remoto.

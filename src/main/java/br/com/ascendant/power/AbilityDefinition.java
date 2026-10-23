@@ -2,6 +2,7 @@ package br.com.ascendant.power;
 
 import br.com.ascendant.core.AbilityCategory;
 import br.com.ascendant.core.AbilityTrigger;
+import br.com.ascendant.power.component.AttributeModifierComponent;
 import br.com.ascendant.power.component.ComponentRegistry;
 import br.com.ascendant.power.component.IPowerComponent;
 import com.google.gson.JsonArray;
@@ -27,13 +28,14 @@ public final class AbilityDefinition {
     private final AbilityCategory category;
     private final AbilityTrigger trigger;
     private final int cooldownTicks;
+    private final float healthThreshold;
     private final List<IPowerComponent> actions;
     private final boolean functional;
 
     public AbilityDefinition(ResourceLocation id, @Nullable ResourceLocation powerId,
                              String nameKey, String descriptionKey,
                              AbilityCategory category, AbilityTrigger trigger,
-                             int cooldownTicks, List<IPowerComponent> actions,
+                             int cooldownTicks, float healthThreshold, List<IPowerComponent> actions,
                              boolean functional) {
         this.id = Objects.requireNonNull(id, "id");
         this.powerId = powerId;
@@ -42,7 +44,17 @@ public final class AbilityDefinition {
         this.category = Objects.requireNonNull(category, "category");
         this.trigger = Objects.requireNonNull(trigger, "trigger");
         this.cooldownTicks = Math.max(0, cooldownTicks);
-        this.actions = List.copyOf(actions);
+        this.healthThreshold = Float.isFinite(healthThreshold)
+                ? Math.max(0.0F, Math.min(1.0F, healthThreshold)) : 1.0F;
+        List<IPowerComponent> ownedActions = new ArrayList<>(actions.size());
+        for (int index = 0; index < actions.size(); index++) {
+            IPowerComponent action = actions.get(index);
+            if (action instanceof AttributeModifierComponent modifier) {
+                action = modifier.withIdentity(id + ":action:" + index);
+            }
+            ownedActions.add(action);
+        }
+        this.actions = List.copyOf(ownedActions);
         this.functional = functional;
     }
 
@@ -79,6 +91,10 @@ public final class AbilityDefinition {
         return cooldownTicks;
     }
 
+    public float getHealthThreshold() {
+        return healthThreshold;
+    }
+
     public List<IPowerComponent> getActions() {
         return actions;
     }
@@ -98,6 +114,7 @@ public final class AbilityDefinition {
         json.addProperty("category", category.name());
         json.addProperty("trigger", trigger.name());
         json.addProperty("cooldownTicks", cooldownTicks);
+        json.addProperty("healthThreshold", healthThreshold);
         json.addProperty("functional", functional);
 
         JsonArray actArray = new JsonArray();
@@ -120,6 +137,7 @@ public final class AbilityDefinition {
         AbilityCategory category = AbilityCategory.valueOf(json.get("category").getAsString().toUpperCase());
         AbilityTrigger trigger = AbilityTrigger.valueOf(json.get("trigger").getAsString().toUpperCase());
         int cooldown = json.has("cooldownTicks") ? json.get("cooldownTicks").getAsInt() : 0;
+        float healthThreshold = json.has("healthThreshold") ? json.get("healthThreshold").getAsFloat() : 1.0F;
         boolean functional = json.has("functional") && json.get("functional").getAsBoolean();
 
         List<IPowerComponent> actions = new ArrayList<>();
@@ -131,7 +149,8 @@ public final class AbilityDefinition {
             }
         }
 
-        return new AbilityDefinition(id, powerId, nameKey, descKey, category, trigger, cooldown, actions, functional);
+        return new AbilityDefinition(id, powerId, nameKey, descKey, category, trigger,
+                cooldown, healthThreshold, actions, functional);
     }
 
     public static Builder builder(ResourceLocation id) {
@@ -146,6 +165,7 @@ public final class AbilityDefinition {
         private AbilityCategory category = AbilityCategory.OFFENSIVE;
         private AbilityTrigger trigger = AbilityTrigger.KEY_PRESS;
         private int cooldownTicks = 0;
+        private float healthThreshold = 1.0F;
         private final List<IPowerComponent> actions = new ArrayList<>();
         private boolean functional = false;
 
@@ -185,6 +205,11 @@ public final class AbilityDefinition {
             return this;
         }
 
+        public Builder healthThreshold(float fraction) {
+            this.healthThreshold = fraction;
+            return this;
+        }
+
         public Builder addAction(IPowerComponent action) {
             this.actions.add(action);
             return this;
@@ -196,7 +221,8 @@ public final class AbilityDefinition {
         }
 
         public AbilityDefinition build() {
-            return new AbilityDefinition(id, powerId, nameKey, descriptionKey, category, trigger, cooldownTicks, actions, functional);
+            return new AbilityDefinition(id, powerId, nameKey, descriptionKey, category, trigger,
+                    cooldownTicks, healthThreshold, actions, functional);
         }
     }
 }

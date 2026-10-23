@@ -23,6 +23,9 @@ import br.com.ascendant.power.component.PhaseComponent;
 import br.com.ascendant.power.component.SummonEntityComponent;
 import br.com.ascendant.power.component.VortexActionComponent;
 import br.com.ascendant.power.component.HealActionComponent;
+import br.com.ascendant.power.component.AttributeModifierComponent;
+import br.com.ascendant.power.component.FireWardComponent;
+import br.com.ascendant.power.component.NightVisionComponent;
 import br.com.ascendant.power.component.ShieldActionComponent;
 import br.com.ascendant.power.runtime.PowerRuntimeEngine;
 import br.com.ascendant.powers.IPlayerPowerData;
@@ -38,6 +41,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Wolf;
@@ -94,6 +98,7 @@ public final class FrameworkGameTests {
         PowerDefinition template = PowerRegistry.get(new ResourceLocation("ascendant", "orbital_ascent"));
         var activeAbility = AbilityRegistry.get(new ResourceLocation("ascendant", "thunder_punch"));
         var passiveAbility = AbilityRegistry.get(new ResourceLocation("ascendant", "night_vision_passive"));
+        var toggleAbility = AbilityRegistry.get(new ResourceLocation("ascendant", "infrared_sweep"));
 
         helper.assertTrue(CatalogInteraction.matches("REFRACTIVE camouflage",
                         active.getId().toString(), active.getNameKey(), active.getCategory().name()),
@@ -118,8 +123,10 @@ public final class FrameworkGameTests {
                 "Template powers must be visibly non-actionable");
         helper.assertTrue(CatalogInteraction.forAbility(activeAbility).type()
                         == CatalogInteraction.ActionType.ACTIVATE_ABILITY
-                        && CatalogInteraction.forAbility(passiveAbility).type() == CatalogInteraction.ActionType.NONE,
-                "Only functional key-triggered abilities map to manual activation");
+                && CatalogInteraction.forAbility(passiveAbility).type() == CatalogInteraction.ActionType.NONE
+                && CatalogInteraction.forAbility(toggleAbility).type()
+                == CatalogInteraction.ActionType.TOGGLE_ABILITY,
+        "Manual and toggle abilities map to their distinct actions; automatic triggers remain non-manual");
         helper.assertTrue(CatalogInteraction.radialSector(0.0D, -100.0D, 8, 12.0D) == 0
                         && CatalogInteraction.radialSector(100.0D, 0.0D, 8, 12.0D) == 2
                         && CatalogInteraction.radialSector(0.0D, 0.0D, 8, 12.0D) == -1
@@ -379,6 +386,192 @@ public final class FrameworkGameTests {
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void abilityTriggerAuthorizationAndSuitGrant(GameTestHelper helper) {
+        TestServerPlayer testPlayer = createServerPlayer(helper);
+        ServerPlayer serverPlayer = testPlayer.player();
+        ResourceLocation punchId = new ResourceLocation("ascendant", "first_aid_touch");
+        ResourceLocation passiveId = new ResourceLocation("ascendant", "night_vision_passive");
+        ResourceLocation templateId = new ResourceLocation("ascendant", "offensive_tech_11");
+        ResourceLocation suitId = new ResourceLocation("ascendant", "gametest_ability_grant");
+
+        helper.assertTrue(PowerRuntimeEngine.activateAbilityWithResult(serverPlayer, punchId)
+                        == PowerRuntimeEngine.AbilityResult.NOT_AUTHORIZED,
+                "An ability must not execute without its power or a direct suit grant");
+        helper.assertTrue(PowerRuntimeEngine.activateAbilityWithResult(serverPlayer, passiveId)
+                        == PowerRuntimeEngine.AbilityResult.WRONG_TRIGGER,
+                "Passive abilities cannot be manually activated");
+        helper.assertTrue(PowerRuntimeEngine.activateAbilityWithResult(serverPlayer, templateId)
+                        == PowerRuntimeEngine.AbilityResult.NOT_FUNCTIONAL,
+                "Templates must be rejected before trying to execute their actions");
+
+        SuitRegistry.register(SuitDefinition.builder(suitId).addAbility(punchId).build());
+        helper.assertTrue(SuitManager.equipSuit(serverPlayer, suitId)
+                        && !PowerRuntimeEngine.hasPowerAccess(serverPlayer,
+                        new ResourceLocation("ascendant", "healing_touch"))
+                        && PowerRuntimeEngine.hasAbilityAccess(serverPlayer, AbilityRegistry.get(punchId)),
+                "A suit may grant an ability directly without implicitly granting its associated power");
+        serverPlayer.setHealth(4.0F);
+        helper.assertTrue(PowerRuntimeEngine.activateAbilityWithResult(serverPlayer, punchId)
+                        == PowerRuntimeEngine.AbilityResult.ACTIVATED
+                        && PowerRuntimeEngine.isOnCooldown(serverPlayer, punchId),
+                "A directly suit-granted ability should execute and set its own cooldown");
+        helper.assertTrue(SuitManager.unequipSuit(serverPlayer)
+                        && !PowerRuntimeEngine.hasAbilityAccess(serverPlayer, AbilityRegistry.get(punchId))
+                        && !PowerRuntimeEngine.isOnCooldown(serverPlayer, punchId),
+                "Losing the final suit grant should revoke the ability and clear its cooldown");
+
+        ResourceLocation visionSuitId = new ResourceLocation("ascendant", "gametest_vision_grant");
+        ResourceLocation visionAbilityId = new ResourceLocation("ascendant", "infrared_sweep");
+        SuitRegistry.register(SuitDefinition.builder(visionSuitId).addAbility(visionAbilityId).build());
+        serverPlayer.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 200, 0));
+        helper.assertTrue(SuitManager.equipSuit(serverPlayer, visionSuitId)
+                        && PowerRuntimeEngine.toggleAbility(serverPlayer, visionAbilityId, true)
+                        == PowerRuntimeEngine.AbilityResult.ENABLED
+                        && SuitManager.unequipSuit(serverPlayer)
+                        && serverPlayer.hasEffect(MobEffects.NIGHT_VISION),
+                "Disabling a suit-granted toggle must preserve an effect that was already supplied externally");
+        serverPlayer.removeEffect(MobEffects.NIGHT_VISION);
+        helper.assertTrue(SuitManager.equipSuit(serverPlayer, visionSuitId)
+                        && PowerRuntimeEngine.toggleAbility(serverPlayer, visionAbilityId, true)
+                        == PowerRuntimeEngine.AbilityResult.ENABLED
+                        && SuitManager.unequipSuit(serverPlayer)
+                        && !serverPlayer.hasEffect(MobEffects.NIGHT_VISION),
+                "Disabling a suit-granted toggle must clean its own managed effect");
+        removeServerPlayer(testPlayer);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void abilityTickHurtAndAttackTriggersExecute(GameTestHelper helper) {
+        TestServerPlayer testPlayer = createServerPlayer(helper);
+        ServerPlayer serverPlayer = testPlayer.player();
+        ResourceLocation tickPower = new ResourceLocation("ascendant", "sonar_pulse");
+        ResourceLocation tickAbilityId = new ResourceLocation("ascendant", "gametest_tick_ability");
+        ResourceLocation attackAbilityId = new ResourceLocation("ascendant", "gametest_attack_ability");
+        ResourceLocation lowHealthPower = new ResourceLocation("ascendant", "emergency_teleport");
+        IPlayerPowerData data = serverPlayer.getCapability(PlayerPowerDataProvider.CAPABILITY)
+                .orElseThrow(() -> new AssertionError("Power capability missing"));
+        data.unlockPower(tickPower);
+        data.unlockPower(lowHealthPower);
+        data.unlockPower(new ResourceLocation("ascendant", "fire_immunity"));
+        AbilityRegistry.register(AbilityDefinition.builder(tickAbilityId).powerId(tickPower)
+                .category(AbilityCategory.PERCEPTION).trigger(AbilityTrigger.TICK)
+                .addAction(new NightVisionComponent(100)).functional(true).build());
+        AbilityRegistry.register(AbilityDefinition.builder(attackAbilityId)
+                .powerId(new ResourceLocation("ascendant", "titan_strength"))
+                .category(AbilityCategory.OFFENSIVE).trigger(AbilityTrigger.ATTACK_HIT)
+                .cooldown(5).addAction(new HealActionComponent(4.0F, true)).functional(true).build());
+        data.unlockPower(new ResourceLocation("ascendant", "titan_strength"));
+
+        try {
+            PowerRuntimeEngine.tickAbilities(serverPlayer);
+            helper.assertTrue(serverPlayer.hasEffect(MobEffects.NIGHT_VISION),
+                    "Eligible TICK abilities must execute through the server tick dispatcher");
+
+            LivingHurtEvent ordinaryDamage = new LivingHurtEvent(serverPlayer,
+                    serverPlayer.damageSources().generic(), 1.0F);
+            serverPlayer.setHealth(serverPlayer.getMaxHealth());
+            PowerRuntimeEngine.onLivingHurt(ordinaryDamage);
+            helper.assertTrue(!PowerRuntimeEngine.isOnCooldown(serverPlayer,
+                            new ResourceLocation("ascendant", "low_hp_emergency_warp")),
+                    "Low-health reactions must not execute above their configured threshold");
+
+            serverPlayer.setHealth(4.0F);
+            Vec3 before = serverPlayer.position();
+            LivingHurtEvent lowHealthDamage = new LivingHurtEvent(serverPlayer,
+                    serverPlayer.damageSources().generic(), 1.0F);
+            PowerRuntimeEngine.onLivingHurt(lowHealthDamage);
+            helper.assertTrue(PowerRuntimeEngine.isOnCooldown(serverPlayer,
+                            new ResourceLocation("ascendant", "low_hp_emergency_warp"))
+                            && serverPlayer.position().distanceToSqr(before) > 1.0D,
+                    "A qualifying low-health hurt event should execute and cool down the emergency warp");
+
+            Mob target = EntityType.ZOMBIE.create(serverPlayer.serverLevel());
+            helper.assertTrue(target != null, "Attack target must be a registered entity");
+            serverPlayer.setHealth(4.0F);
+            LivingHurtEvent attack = new LivingHurtEvent(target,
+                    serverPlayer.damageSources().playerAttack(serverPlayer), 1.0F);
+            PowerRuntimeEngine.onLivingHurt(attack);
+            helper.assertTrue(serverPlayer.getHealth() > 4.0F
+                            && PowerRuntimeEngine.isOnCooldown(serverPlayer, attackAbilityId),
+                    "ATTACK_HIT abilities should execute once for their owning player");
+
+            LivingHurtEvent fireDamage = new LivingHurtEvent(serverPlayer,
+                    serverPlayer.damageSources().onFire(), 2.0F);
+            PowerRuntimeEngine.onLivingHurt(fireDamage);
+            helper.assertTrue(fireDamage.isCanceled(),
+                    "HURT_EVENT abilities should dispatch their registered mitigation callback");
+        } finally {
+            AbilityRegistry.unregister(tickAbilityId);
+            AbilityRegistry.unregister(attackAbilityId);
+            removeServerPlayer(testPlayer);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void toggleLifecycleAndAttributeModifierIdentity(GameTestHelper helper) {
+        TestServerPlayer testPlayer = createServerPlayer(helper);
+        ServerPlayer serverPlayer = testPlayer.player();
+        ResourceLocation massPowerId = new ResourceLocation("ascendant", "titan_mass_form");
+        ResourceLocation growthAbilityId = new ResourceLocation("ascendant", "titan_growth_boost");
+        IPlayerPowerData data = serverPlayer.getCapability(PlayerPowerDataProvider.CAPABILITY)
+                .orElseThrow(() -> new AssertionError("Power capability missing"));
+        data.unlockPower(massPowerId);
+        double baseDamage = serverPlayer.getAttributeValue(Attributes.ATTACK_DAMAGE);
+
+        helper.assertTrue(PowerRegistry.get(massPowerId).getType()
+                        == br.com.ascendant.core.PowerType.TOGGLE
+                        && PowerRuntimeEngine.togglePower(serverPlayer, massPowerId, true),
+                "Titan mass form must use the toggle callback path");
+        helper.assertTrue(PowerRuntimeEngine.toggleAbility(serverPlayer, growthAbilityId, true)
+                        == PowerRuntimeEngine.AbilityResult.ENABLED,
+                "Titan growth boost must be an authorized toggle ability");
+        AttributeModifierComponent powerModifier = (AttributeModifierComponent)
+                PowerRegistry.get(massPowerId).getComponents().get(0);
+        AttributeModifierComponent abilityModifier = (AttributeModifierComponent)
+                AbilityRegistry.get(growthAbilityId).getActions().get(0);
+        helper.assertTrue(!powerModifier.getModifierId().equals(abilityModifier.getModifierId())
+                        && serverPlayer.getAttributeValue(Attributes.ATTACK_DAMAGE) >= baseDamage + 19.9D,
+                "Distinct power and ability modifiers must stack without UUID collisions");
+
+        helper.assertTrue(PowerRuntimeEngine.togglePower(serverPlayer, massPowerId, false)
+                        && !PowerRuntimeEngine.isPowerToggled(serverPlayer, massPowerId)
+                        && PowerRuntimeEngine.isOnCooldown(serverPlayer, massPowerId)
+                        && serverPlayer.getAttributeValue(Attributes.ATTACK_DAMAGE) >= baseDamage + 9.9D,
+                "A toggle must always turn off during cooldown and remove only its own modifier");
+        PowerRuntimeEngine.clearActiveToggles(serverPlayer);
+        helper.assertTrue(!PowerRuntimeEngine.isAbilityToggled(serverPlayer, growthAbilityId)
+                        && Math.abs(serverPlayer.getAttributeValue(Attributes.ATTACK_DAMAGE) - baseDamage) < 1.0E-6D,
+                "Lifecycle cleanup must be idempotent and remove remaining toggle-owned modifiers");
+        removeServerPlayer(testPlayer);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void fireWardUsesFiniteOwnedEffectAndSuitCleanup(GameTestHelper helper) {
+        TestServerPlayer testPlayer = createServerPlayer(helper);
+        ServerPlayer serverPlayer = testPlayer.player();
+        ResourceLocation abilityId = new ResourceLocation("ascendant", "fire_ward");
+        ResourceLocation suitId = new ResourceLocation("ascendant", "gametest_fire_ward_grant");
+        SuitRegistry.register(SuitDefinition.builder(suitId).addAbility(abilityId).build());
+        helper.assertTrue(SuitManager.equipSuit(serverPlayer, suitId)
+                        && PowerRuntimeEngine.activateAbilityWithResult(serverPlayer, abilityId)
+                        == PowerRuntimeEngine.AbilityResult.ACTIVATED,
+                "Fire Ward should activate when a suit directly grants the ability");
+        helper.assertTrue(serverPlayer.getEffect(MobEffects.FIRE_RESISTANCE) != null
+                        && serverPlayer.getEffect(MobEffects.FIRE_RESISTANCE).getDuration() == 100
+                        && ComponentRegistry.deserialize(AbilityRegistry.get(abilityId).getActions().get(0).toJson())
+                        instanceof FireWardComponent,
+                "Fire Ward must apply its finite configured effect through its registered executor");
+        helper.assertTrue(SuitManager.unequipSuit(serverPlayer)
+                        && !serverPlayer.hasEffect(MobEffects.FIRE_RESISTANCE),
+                "Revoking the last suit grant should remove the effect owned by Fire Ward");
+        removeServerPlayer(testPlayer);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
     public static void suitEquipGrantsAssociatedPowers(GameTestHelper helper) {
         Player player = helper.makeMockPlayer();
         if (!(player instanceof ServerPlayer serverPlayer)) {
@@ -543,6 +736,7 @@ public final class FrameworkGameTests {
     public static void automaticAbilityTriggersDispatchAndRespectCooldown(GameTestHelper helper) {
         TestServerPlayer testPlayer = createServerPlayer(helper);
         ResourceLocation tickId = new ResourceLocation("ascendant", "gametest_tick_dispatch");
+        ResourceLocation zeroTickId = new ResourceLocation("ascendant", "gametest_zero_tick_dispatch");
         ResourceLocation passiveId = new ResourceLocation("ascendant", "gametest_passive_dispatch");
         ResourceLocation toggleId = new ResourceLocation("ascendant", "gametest_toggle_dispatch");
         ResourceLocation hurtId = new ResourceLocation("ascendant", "gametest_hurt_dispatch");
@@ -568,6 +762,15 @@ public final class FrameworkGameTests {
                     "TICK abilities must not execute again while on cooldown");
             helper.assertTrue(tickAction.ticks == 2,
                     "TICK maintenance must keep running while on cooldown");
+
+            CountingAction zeroTickAction = new CountingAction();
+            registerTestAbility(zeroTickId, parentPower, AbilityTrigger.TICK, 0, zeroTickAction);
+            PowerRuntimeEngine.dispatchTickAbilities(player);
+            PowerRuntimeEngine.dispatchTickAbilities(player);
+            helper.assertTrue(zeroTickAction.executions == 2,
+                    "TICK abilities without a cooldown must execute every tick");
+            helper.assertTrue(zeroTickAction.ticks == 2,
+                    "TICK abilities without a cooldown must also receive maintenance");
 
             CountingAction passiveAction = new CountingAction();
             registerTestAbility(passiveId, parentPower, AbilityTrigger.PASSIVE, 0, passiveAction);
@@ -622,6 +825,7 @@ public final class FrameworkGameTests {
                     "ATTACK_HIT abilities must react once per cooldown window");
         } finally {
             AbilityRegistry.unregister(tickId);
+            AbilityRegistry.unregister(zeroTickId);
             AbilityRegistry.unregister(passiveId);
             AbilityRegistry.unregister(toggleId);
             AbilityRegistry.unregister(hurtId);

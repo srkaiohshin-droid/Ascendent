@@ -2,7 +2,6 @@ package br.com.ascendant.power.component;
 
 import com.google.gson.JsonObject;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 
 /**
@@ -11,9 +10,10 @@ import net.minecraft.world.effect.MobEffects;
 public final class NightVisionComponent implements IPowerComponent {
     public static final String TYPE = "ascendant:night_vision";
     private final int durationTicks;
+    private final ManagedEffectLease effectLease = new ManagedEffectLease(MobEffects.NIGHT_VISION);
 
     public NightVisionComponent(int durationTicks) {
-        this.durationTicks = durationTicks;
+        this.durationTicks = Math.max(1, durationTicks);
     }
 
     public NightVisionComponent() {
@@ -32,22 +32,20 @@ public final class NightVisionComponent implements IPowerComponent {
 
     @Override
     public boolean execute(ComponentContext context) {
-        ServerPlayer player = context.getPlayer();
-        player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, durationTicks, 0, false, false, true));
-        return true;
+        return effectLease.apply(context.getPlayer(), durationTicks);
     }
 
     @Override
     public void onPlayerTick(ServerPlayer player) {
-        player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 220, 0, false, false, false));
+        effectLease.apply(player, 220);
     }
 
     @Override
     public void onToggle(ServerPlayer player, boolean enabled) {
         if (!enabled) {
-            player.removeEffect(MobEffects.NIGHT_VISION);
+            effectLease.remove(player);
         } else {
-            player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 300, 0, false, false, false));
+            effectLease.apply(player, durationTicks);
         }
     }
 

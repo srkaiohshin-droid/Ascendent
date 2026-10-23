@@ -3,6 +3,7 @@ package br.com.ascendant.power;
 import br.com.ascendant.core.PowerCategory;
 import br.com.ascendant.core.PowerType;
 import br.com.ascendant.power.component.ComponentRegistry;
+import br.com.ascendant.power.component.AttributeModifierComponent;
 import br.com.ascendant.power.component.IPowerComponent;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -38,7 +39,15 @@ public final class PowerDefinition {
         this.category = Objects.requireNonNull(category, "category");
         this.type = Objects.requireNonNull(type, "type");
         this.cooldownTicks = Math.max(0, cooldownTicks);
-        this.components = List.copyOf(components);
+        List<IPowerComponent> ownedComponents = new ArrayList<>(components.size());
+        for (int index = 0; index < components.size(); index++) {
+            IPowerComponent component = components.get(index);
+            if (component instanceof AttributeModifierComponent modifier) {
+                component = modifier.withIdentity(id + ":component:" + index);
+            }
+            ownedComponents.add(component);
+        }
+        this.components = List.copyOf(ownedComponents);
         this.abilities = List.copyOf(abilities);
         this.functional = functional;
     }

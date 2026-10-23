@@ -749,7 +749,7 @@ public final class PowerCatalogData {
 
     // 38. BODY TRANSFORMATION (12)
     private static void registerBodyTransformationPowers() {
-        regFunc("titan_mass_form", PowerCategory.BODY_TRANSFORMATION, PowerType.ACTIVE, 100,
+        regFunc("titan_mass_form", PowerCategory.BODY_TRANSFORMATION, PowerType.TOGGLE, 100,
                 new AttributeModifierComponent("attack_damage", 10.0D, AttributeModifier.Operation.ADDITION), List.of());
         regFunc("graphene_hardening", PowerCategory.BODY_TRANSFORMATION, PowerType.PASSIVE, 0,
                 new AttributeModifierComponent("armor", 12.0D, AttributeModifier.Operation.ADDITION), List.of());

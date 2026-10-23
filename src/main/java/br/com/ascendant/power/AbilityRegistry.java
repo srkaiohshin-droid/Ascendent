@@ -12,18 +12,27 @@ import java.util.stream.Collectors;
  */
 public final class AbilityRegistry {
     private static final Map<ResourceLocation, AbilityDefinition> ABILITIES = new ConcurrentHashMap<>();
+    private static final Map<ResourceLocation, List<AbilityDefinition>> BY_POWER = new ConcurrentHashMap<>();
+    private static volatile List<AbilityDefinition> UNIVERSAL_ABILITIES = List.of();
 
     private AbilityRegistry() {
     }
 
     public static synchronized void register(AbilityDefinition ability) {
         Objects.requireNonNull(ability, "ability");
-        ABILITIES.put(ability.getId(), ability);
+        AbilityDefinition previous = ABILITIES.put(ability.getId(), ability);
+        if (previous != null) {
+            removeFromPowerIndex(previous);
+        }
+        addToPowerIndex(ability);
     }
 
-    /** Removes a dynamically registered definition (used by tests and pack reloads). */
-    public static synchronized boolean unregister(ResourceLocation id) {
-        return id != null && ABILITIES.remove(id) != null;
+    public static synchronized AbilityDefinition unregister(ResourceLocation id) {
+        AbilityDefinition removed = ABILITIES.remove(id);
+        if (removed != null) {
+            removeFromPowerIndex(removed);
+        }
+        return removed;
     }
 
     public static AbilityDefinition get(ResourceLocation id) {
@@ -39,9 +48,7 @@ public final class AbilityRegistry {
     }
 
     public static List<AbilityDefinition> getByPower(ResourceLocation powerId) {
-        return ABILITIES.values().stream()
-                .filter(a -> Objects.equals(a.getPowerId(), powerId))
-                .collect(Collectors.toList());
+        return powerId == null ? UNIVERSAL_ABILITIES : BY_POWER.getOrDefault(powerId, List.of());
     }
 
     public static List<AbilityDefinition> getByCategory(AbilityCategory category) {
@@ -66,5 +73,38 @@ public final class AbilityRegistry {
 
     public static synchronized void clear() {
         ABILITIES.clear();
+        BY_POWER.clear();
+        UNIVERSAL_ABILITIES = List.of();
+    }
+
+    private static void addToPowerIndex(AbilityDefinition ability) {
+        ResourceLocation powerId = ability.getPowerId();
+        if (powerId == null) {
+            List<AbilityDefinition> updated = new ArrayList<>(UNIVERSAL_ABILITIES);
+            updated.add(ability);
+            UNIVERSAL_ABILITIES = List.copyOf(updated);
+            return;
+        }
+        BY_POWER.compute(powerId, (ignored, current) -> {
+            List<AbilityDefinition> updated = current == null ? new ArrayList<>() : new ArrayList<>(current);
+            updated.add(ability);
+            return List.copyOf(updated);
+        });
+    }
+
+    private static void removeFromPowerIndex(AbilityDefinition ability) {
+        ResourceLocation powerId = ability.getPowerId();
+        if (powerId == null) {
+            UNIVERSAL_ABILITIES = UNIVERSAL_ABILITIES.stream()
+                    .filter(registered -> !registered.getId().equals(ability.getId()))
+                    .toList();
+            return;
+        }
+        BY_POWER.computeIfPresent(powerId, (ignored, current) -> {
+            List<AbilityDefinition> updated = current.stream()
+                    .filter(registered -> !registered.getId().equals(ability.getId()))
+                    .toList();
+            return updated.isEmpty() ? null : updated;
+        });
     }
 }

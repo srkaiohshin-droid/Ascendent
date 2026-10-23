@@ -225,3 +225,83 @@ Esta seção registra o estado após a recuperação das regressões introduzida
 ### Pendência de homologação
 - Revisão visual humana em cliente gráfico: tela Heróis/Packs, navegação, seleção de trajes,
   catálogo de habilidades, voo e controles de supervelocidade.
+
+---
+
+## 9. Integracao do runtime de habilidades e catalogo Hero/Pack - ASC-012 (2026-10-22)
+
+Esta secao registra a integracao do lote interrompido do worktree
+`srkaiohshin-droid-glowing-fortnight` sobre a base publicada `ee2fa9d`, sem apagar
+o historico anterior.
+
+### Runtime de habilidades
+- `PowerRuntimeEngine` mantem as APIs anteriores e adiciona `AbilityResult`,
+  `activateAbilityWithResult`, `toggleAbility(id, enable)`, `getAccessibleAbilities`
+  e `tickAbilities`.
+- Autorizacao considera poder pai, habilidade universal e concessao direta por traje.
+- Gatilhos KEY_PRESS, SNEAK_KEY, TOGGLE, PASSIVE, TICK, HURT_EVENT e ATTACK_HIT
+  possuem caminhos explicitos. Templates e habilidades sem acao executavel sao
+  rejeitados com feedback.
+- PASSIVE aplica uma vez e permanece por tick; TICK executa sob cooldown;
+  HURT_EVENT e ATTACK_HIT sao despachados por eventos; TOGGLE exige alternancia
+  explicita.
+- Limpeza de runtime cobre logout, respawn, troca de dimensao e perda da ultima
+  fonte de acesso, sem remover efeitos de fontes externas.
+
+### Efeitos e atributos
+- `ManagedEffectLease` registra a origem e a expiracao dos efeitos gerenciados.
+- `FireWardComponent` executa resistencia ao fogo real e finita.
+- Identidades de modificadores sao estaveis e distintas para poder e habilidade;
+  `titan_mass_form` e `titan_growth_boost` sao TOGGLE.
+
+### Packs e interface
+- `PackManager` rastreia packs carregados e a origem de poderes, habilidades e trajes.
+- `PowerCatalogScreen` abre em HEROES e tem abas persistentes POWERS, ABILITIES e
+  SUITS. A lista usa `CatalogClientState` autoritativo para ownership, cooldown e
+  toggles.
+- Catalogo e menu radial compartilham `CatalogInteraction` como fonte unica de
+  classificacao de acoes.
+- A aba HEROES filtra corretamente `suits` e `packs`; o filtro de origem fica
+  oculto quando nao se aplica.
+- `HeroPackScreen` continua sendo a entrada F6 de Herois/Packs e lista somente
+  packs realmente instalados, com metadados reais. O manifesto nao fornece
+  retratos/perfis de personagens, portanto a UI nao inventa esses dados.
+
+### Estado dos catalogos
+- 500 poderes: 113 funcionais e 387 templates.
+- 500 habilidades: 111 funcionais e 389 templates.
+- 6 trajes integrados.
+
+### Validacao confirmada em 2026-10-22 (Java 17 / Gradle 8.8)
+- `.\gradlew.bat compileJava --no-daemon --console=plain`: BUILD SUCCESSFUL.
+- `.\gradlew.bat runGameTestServer --no-daemon --console=plain`: 59/59 required
+  tests passed; resultado real "All 59 required tests passed".
+- `.\gradlew.bat build --no-daemon --console=plain`: BUILD SUCCESSFUL.
+- `git diff HEAD --check`: sem erros de conteudo; apenas aviso LF/CRLF em
+  `PowerRuntimeEngine.java`.
+- `.\gradlew.bat runClient --no-daemon --console=plain`: iniciou sem crash,
+  carregou mixins, atlas, audio e conectou ao servidor integrado; permaneceu
+  estavel ate o ambiente encerrar a janela (execucao final de ~49s; uma execucao
+  anterior passou de 2 minutos).
+
+### Limitacao de homologacao
+- Nao houve inspecao visual interativa humana do catalogo, busca, filtros,
+  botoes, feedback ou menu radial. A validacao automatizada nao prova a
+  aparencia, a usabilidade nem o comportamento de teclado/mouse.
+- Aviso LF/CRLF em `PowerRuntimeEngine.java` nao representa erro de conteudo.
+
+### Ajustes finais de auditoria
+- TICK sem cooldown executa a cada tick; o GameTest existente ganhou uma
+  assercao para esse caso.
+- O cliente calcula o cooldown restante a partir do game time local, evitando
+  botoes permanentemente desabilitados entre sincronizacoes.
+- Toggles ativos podem ser desligados durante o cooldown no catalogo e no menu
+  radial; apenas a ativacao exige cooldown zerado.
+- Habilidade removida do registro limpa toggles, passives e cooldown sem NPE.
+- Os botoes de acao do catalogo foram redimensionados para caber em telas
+  estreitas.
+
+### Publicacao
+- Pendente: revisar diff/staging, commitar somente este lote, publicar com push
+  normal para `srkaiohshin-droid-ascendant-gameplay-ui` e confirmar que o SHA
+  remoto corresponde ao commit local.

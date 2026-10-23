@@ -53,3 +53,29 @@
 - [x] Fazer os botões Poderes e Habilidades abrirem as abas corretas do catálogo.
 - [x] Validar `compileJava`, `runGameTestServer` (55/55), `build` e `git diff --check`.
 - [ ] Revisão visual humana da UI e dos controles de supervelocidade no cliente gráfico. O `runClient` iniciou sem crash e ficou estável por 120s em 2026-10-22, mas não houve inspeção visual neste ambiente automatizado.
+
+## Integracao do lote interrompido ASC-012 (2026-10-22)
+- [x] Integrar o runtime de habilidades do clone interrompido sobre a base publicada `ee2fa9d`, preservando as APIs anteriores.
+- [x] Adicionar `AbilityResult`, `activateAbilityWithResult`, `toggleAbility(id, enable)`, `getAccessibleAbilities` e `tickAbilities`.
+- [x] Autorizar habilidades por poder pai, habilidade universal e concessao direta de traje.
+- [x] Implementar caminhos explicitos para KEY_PRESS, SNEAK_KEY, TOGGLE, PASSIVE, TICK, HURT_EVENT e ATTACK_HIT.
+- [x] Bloquear ativacao de templates e habilidades sem acao executavel.
+- [x] Tornar `titan_mass_form` e `titan_growth_boost` TOGGLE com identidades de modificador distintas.
+- [x] Usar leases gerenciados para efeitos e preservar efeitos de fontes externas na limpeza.
+- [x] Implementar `FireWardComponent` como resistencia ao fogo real e finita.
+- [x] Limpar estado em logout, respawn, troca de dimensao e perda da ultima fonte de acesso.
+- [x] Rastrear packs carregados e origem de poderes/habilidades/trajes no `PackManager`.
+- [x] Fazer `PowerCatalogScreen` abrir em HEROES com abas persistentes POWERS, ABILITIES e SUITS.
+- [x] Compartilhar `CatalogInteraction` entre catalogo e menu radial.
+- [x] Corrigir o filtro da aba HEROES para `suits` e `packs` e ocultar o filtro de origem quando nao se aplica.
+- [x] Validar `compileJava`: BUILD SUCCESSFUL.
+- [x] Validar `runGameTestServer`: 59/59 required tests passed.
+- [x] Validar `build`: BUILD SUCCESSFUL.
+- [x] Validar `git diff --check`: sem erros de conteudo (apenas aviso LF/CRLF em `PowerRuntimeEngine.java`).
+- [x] Tentar `runClient`: iniciou sem crash e permaneceu estavel ate o ambiente encerrar a janela (execucao final de ~49s; uma execucao anterior passou de 2 minutos).
+- [x] Fazer TICK sem cooldown executar a cada tick e cobrir o caso com assercao no GameTest.
+- [x] Contar cooldown no cliente por game time e permitir desligar toggles ativos durante o cooldown.
+- [x] Limpar toggles/passives/cooldown de habilidade removida do registro sem NPE.
+- [x] Ajustar os botoes do catalogo para telas estreitas.
+- [ ] Inspecao visual humana do catalogo, busca, filtros, botoes, feedback e menu radial em cliente grafico.
+- [ ] Commitar somente este lote, publicar com push normal e confirmar SHA local igual ao remoto.

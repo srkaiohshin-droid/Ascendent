@@ -17,6 +17,7 @@ public final class CatalogInteraction {
         ACTIVATE_POWER,
         TOGGLE_POWER,
         ACTIVATE_ABILITY,
+        TOGGLE_ABILITY,
         EQUIP_SUIT,
         NONE
     }
@@ -65,12 +66,11 @@ public final class CatalogInteraction {
             return new Action(ActionType.NONE,
                     ability == null ? new ResourceLocation("ascendant", "missing") : ability.getId());
         }
-        AbilityTrigger trigger = ability.getTrigger();
-        if (trigger != AbilityTrigger.KEY_PRESS && trigger != AbilityTrigger.SNEAK_KEY
-                && trigger != AbilityTrigger.TOGGLE) {
-            return new Action(ActionType.NONE, ability.getId());
-        }
-        return new Action(ActionType.ACTIVATE_ABILITY, ability.getId());
+        return switch (ability.getTrigger()) {
+            case KEY_PRESS, SNEAK_KEY -> new Action(ActionType.ACTIVATE_ABILITY, ability.getId());
+            case TOGGLE -> new Action(ActionType.TOGGLE_ABILITY, ability.getId());
+            default -> new Action(ActionType.NONE, ability.getId());
+        };
     }
 
     public static Action forSuit(ResourceLocation suitId) {

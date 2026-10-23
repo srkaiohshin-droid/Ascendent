@@ -77,14 +77,14 @@ public final class SuitManager {
         return suit != null && suit.getGrantedPowers().contains(powerId);
     }
 
-    public static List<ResourceLocation> getEquippedSuitGrantedPowers(ServerPlayer player) {
-        SuitDefinition suit = getEquippedSuit(player);
-        return suit != null ? suit.getGrantedPowers() : Collections.emptyList();
-    }
-
     public static boolean grantsAbility(ServerPlayer player, ResourceLocation abilityId) {
         SuitDefinition suit = getEquippedSuit(player);
         return suit != null && suit.getGrantedAbilities().contains(abilityId);
+    }
+
+    public static List<ResourceLocation> getEquippedSuitGrantedPowers(ServerPlayer player) {
+        SuitDefinition suit = getEquippedSuit(player);
+        return suit != null ? suit.getGrantedPowers() : Collections.emptyList();
     }
 
     public static List<ResourceLocation> getEquippedSuitGrantedAbilities(ServerPlayer player) {

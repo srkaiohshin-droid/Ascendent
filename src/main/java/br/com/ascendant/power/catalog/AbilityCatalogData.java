@@ -41,12 +41,18 @@ public final class AbilityCatalogData {
     }
 
     private static void regFunc(String path, String powerId, AbilityCategory cat, AbilityTrigger trigger, int cd, IPowerComponent action) {
+        regFunc(path, powerId, cat, trigger, cd, action, 1.0F);
+    }
+
+    private static void regFunc(String path, String powerId, AbilityCategory cat, AbilityTrigger trigger,
+                                int cd, IPowerComponent action, float healthThreshold) {
         ResourceLocation pId = powerId != null ? id(powerId) : null;
         AbilityRegistry.register(AbilityDefinition.builder(id(path))
                 .powerId(pId)
                 .category(cat)
                 .trigger(trigger)
                 .cooldown(cd)
+                .healthThreshold(healthThreshold)
                 .addAction(action)
                 .functional(true)
                 .build());
@@ -86,7 +92,8 @@ public final class AbilityCatalogData {
     private static void registerDefensiveAbilities() {
         regFunc("kinetic_barrier_deploy", "kinetic_barrier", AbilityCategory.DEFENSIVE, AbilityTrigger.KEY_PRESS, 60, new ShieldActionComponent(8.0F, 160));
         regFunc("diamond_guard", "diamond_skin", AbilityCategory.DEFENSIVE, AbilityTrigger.KEY_PRESS, 80, new ShieldActionComponent(12.0F, 200));
-        regFunc("fire_ward", "fire_immunity", AbilityCategory.DEFENSIVE, AbilityTrigger.KEY_PRESS, 40, new DamageMitigationComponent(1.0F, "fire"));
+        regFunc("fire_ward", "fire_immunity", AbilityCategory.DEFENSIVE, AbilityTrigger.KEY_PRESS, 40,
+                new FireWardComponent(100));
         regFunc("repulsion_wave", "energy_aegis", AbilityCategory.DEFENSIVE, AbilityTrigger.KEY_PRESS, 50, new KnockbackActionComponent(7.0D, 1.8D));
         regFunc("flash_parry_stance", "reactive_shield", AbilityCategory.DEFENSIVE, AbilityTrigger.KEY_PRESS, 35, new ShieldActionComponent(6.0F, 80));
         regFunc("emergency_blink", "emergency_teleport", AbilityCategory.DEFENSIVE, AbilityTrigger.KEY_PRESS, 70, new BlinkComponent(14.0D));
@@ -244,7 +251,7 @@ public final class AbilityCatalogData {
     private static void registerTransformationAbilities() {
         regFunc("beast_lunge", "beast_leap", AbilityCategory.TRANSFORMATION, AbilityTrigger.KEY_PRESS, 40, new LeapComponent(1.5D, 1.4D));
         regFunc("feral_claw_slash", "feral_swipe", AbilityCategory.TRANSFORMATION, AbilityTrigger.KEY_PRESS, 30, new DamageActionComponent(9.0F, 4.0D, "physical"));
-        regFunc("titan_growth_boost", "titan_mass_form", AbilityCategory.TRANSFORMATION, AbilityTrigger.KEY_PRESS, 80,
+        regFunc("titan_growth_boost", "titan_mass_form", AbilityCategory.TRANSFORMATION, AbilityTrigger.TOGGLE, 80,
                 new AttributeModifierComponent("attack_damage", 10.0D));
         regFunc("graphene_coat", "graphene_hardening", AbilityCategory.TRANSFORMATION, AbilityTrigger.PASSIVE, 0,
                 new AttributeModifierComponent("armor", 12.0D));
@@ -259,11 +266,13 @@ public final class AbilityCatalogData {
     // 12. CONDITIONAL (35)
     private static void registerConditionalAbilities() {
         regFunc("retaliation_blast", "reactive_shield", AbilityCategory.CONDITIONAL, AbilityTrigger.HURT_EVENT, 50, new KnockbackActionComponent(6.0D, 1.8D));
-        regFunc("low_hp_emergency_warp", "emergency_teleport", AbilityCategory.CONDITIONAL, AbilityTrigger.HURT_EVENT, 120, new BlinkComponent(16.0D));
+        regFunc("low_hp_emergency_warp", "emergency_teleport", AbilityCategory.CONDITIONAL,
+                AbilityTrigger.HURT_EVENT, 120, new BlinkComponent(16.0D), 0.25F);
         regFunc("water_speed_surge", "aquatic_respiration", AbilityCategory.CONDITIONAL, AbilityTrigger.TICK, 0, new WaterAdaptationComponent(true, true));
         regFunc("fire_contact_absorb", "fire_immunity", AbilityCategory.CONDITIONAL, AbilityTrigger.HURT_EVENT, 0, new DamageMitigationComponent(1.0F, "fire"));
         regFunc("fall_impact_absorb", "feather_fall_passive", AbilityCategory.CONDITIONAL, AbilityTrigger.HURT_EVENT, 0, new DamageMitigationComponent(1.0F, "fall"));
-        regFunc("low_hp_shield", "kinetic_barrier", AbilityCategory.CONDITIONAL, AbilityTrigger.HURT_EVENT, 140, new ShieldActionComponent(12.0F, 180));
+        regFunc("low_hp_shield", "kinetic_barrier", AbilityCategory.CONDITIONAL,
+                AbilityTrigger.HURT_EVENT, 140, new ShieldActionComponent(12.0F, 180), 0.25F);
 
         for (int i = 7; i <= 35; i++) {
             regTempl("conditional_trigger_" + i, null, AbilityCategory.CONDITIONAL, AbilityTrigger.HURT_EVENT, 60 + i, "trigger_condition_" + i, Map.of("conditionType", "reactive_" + i));

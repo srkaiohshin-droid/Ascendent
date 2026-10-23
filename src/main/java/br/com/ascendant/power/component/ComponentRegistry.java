@@ -26,6 +26,7 @@ public final class ComponentRegistry {
         register(ShieldActionComponent.TYPE, ShieldActionComponent::fromJson);
         register(AttributeModifierComponent.TYPE, AttributeModifierComponent::fromJson);
         register(DamageMitigationComponent.TYPE, DamageMitigationComponent::fromJson);
+        register(FireWardComponent.TYPE, FireWardComponent::fromJson);
         register(WaterAdaptationComponent.TYPE, WaterAdaptationComponent::fromJson);
         register(NightVisionComponent.TYPE, NightVisionComponent::fromJson);
         register(ThermalVisionComponent.TYPE, ThermalVisionComponent::fromJson);

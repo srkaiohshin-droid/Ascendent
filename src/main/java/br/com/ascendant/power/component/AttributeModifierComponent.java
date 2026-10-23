@@ -20,17 +20,33 @@ public final class AttributeModifierComponent implements IPowerComponent {
     private final String attributeKey;
     private final double amount;
     private final AttributeModifier.Operation operation;
+    private final String identity;
     private final UUID modifierId;
 
     public AttributeModifierComponent(String attributeKey, double amount, AttributeModifier.Operation operation) {
+        this(attributeKey, amount, operation, attributeKey + ":" + amount + ":" + operation.name());
+    }
+
+    private AttributeModifierComponent(String attributeKey, double amount,
+                                       AttributeModifier.Operation operation, String identity) {
         this.attributeKey = attributeKey;
         this.amount = amount;
         this.operation = operation;
-        this.modifierId = UUID.nameUUIDFromBytes(("ascendant:" + attributeKey + ":" + operation.name()).getBytes(StandardCharsets.UTF_8));
+        this.identity = identity;
+        this.modifierId = UUID.nameUUIDFromBytes(("ascendant:attribute_modifier:" + identity
+                + ":" + attributeKey.toLowerCase() + ":" + operation.name()).getBytes(StandardCharsets.UTF_8));
     }
 
     public AttributeModifierComponent(String attributeKey, double amount) {
         this(attributeKey, amount, AttributeModifier.Operation.ADDITION);
+    }
+
+    public AttributeModifierComponent withIdentity(String identity) {
+        return new AttributeModifierComponent(attributeKey, amount, operation, identity);
+    }
+
+    public UUID getModifierId() {
+        return modifierId;
     }
 
     @Override

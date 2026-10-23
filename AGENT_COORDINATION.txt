@@ -167,7 +167,7 @@ Criterios:
 Nenhuma tarefa esta concluida apenas por existir nesta fila.
 
 LOTE 2026-10-22 - RECUPERACAO DE REGRESSOES DO COMMIT a88f1cb
-Status: REVIEW (implementacao e validacao automatizada concluidas; inspecao visual manual pendente)
+Status: DONE (integrado ao lote ASC-012; publicacao pendente)
 Branch: srkaiohshin-droid-ascendant-gameplay-ui
 Commit de referencia: a88f1cbfd02e2e2ad960af4372d06766d1f3a6f2 (pai: 7f554042b68c62d601fd7bd0ee2d351e4cbfd5f4)
 Referencia de seguranca: tag backup-before-a88f1cb-recovery
@@ -198,3 +198,61 @@ Validacao confirmada:
 Pendencias:
 - Revisao humana da UI e controles em cliente grafico.
 - Commit e push normal (sem force) com confirmacao do SHA remoto.
+
+ASC-012 — AUDITORIA DE HABILIDADES E CATÁLOGO HERO/PACK
+Titulo: Corrigir caminhos de habilidade funcional e reorganizar a descoberta de conteúdo
+Status: DONE (implementacao, testes automatizados e build concluidos; inspecao visual humana pendente)
+Prioridade: ALTA
+Origem: worktree `srkaiohshin-droid-glowing-fortnight`, branch
+  `srkaiohshin-droid-ascendant-gameplay-ui`, HEAD 7f55404 com alteracoes nao commitadas.
+Destino: worktree principal `C:\Users\srkai\Documents\Ascendant`, branch
+  `srkaiohshin-droid-ascendant-gameplay-ui`, base publicada ee2fa9d.
+Arquivos integrados: `PowerRuntimeEngine`, `AbilityRegistry`, `AbilityDefinition`,
+  `PowerDefinition`, `SuitManager`, `AbilityCatalogData`, `PowerCatalogData`,
+  `AttributeModifierComponent`, `ComponentRegistry`, `InvisibilityComponent`,
+  `NightVisionComponent`, `WaterAdaptationComponent`, `CatalogInteraction`,
+  `PackManager`, `AscendantNetwork`, `PowerCatalogScreen`, `RadialMenuScreen`,
+  `CatalogClientState`, `FireWardComponent`, `ManagedEffectLease`,
+  `FrameworkGameTests`, traduções e documentos de continuidade.
+Diagnóstico inicial confirmado: `activateAbility` não exigia `isFunctional()` nem
+  restringia o tipo de gatilho; o runtime não despachava gatilhos automáticos;
+  `SuitDefinition.grantedAbilities` não participava da autorização;
+  `titan_mass_form` estava ACTIVE embora seu modificador só respondesse a
+  tick/toggle; UUIDs de modificadores colidiam entre fontes com o mesmo
+  atributo/operação; a tela começava em Poderes e não apresentava packs/loadouts.
+Integração realizada:
+- Runtime passou a expor `AbilityResult`, `activateAbilityWithResult` e
+  `toggleAbility(id, enable)`, mantendo os entry points anteriores usados por
+  testes e rede.
+- Autorização considera poder pai, poder universal e `SuitManager.grantedAbilities`.
+- Gatilhos KEY_PRESS, SNEAK_KEY, TOGGLE, PASSIVE, TICK, HURT_EVENT e ATTACK_HIT
+  têm caminhos explícitos; templates e habilidades sem ação executável não ativam.
+- `titan_mass_form` e `titan_growth_boost` são TOGGLE com identidades de
+  modificador distintas.
+- Efeitos gerenciados usam leases por fonte; `FireWardComponent` executa uma
+  janela real de resistência ao fogo; limpeza em logout/respawn/dimensão e perda
+  de acesso não remove efeitos de fontes externas.
+- `PackManager` rastreia packs carregados e origem de poderes/habilidades/trajes.
+- Catálogo e radial compartilham `CatalogInteraction`; o catálogo tem abas
+  Heróis, Poderes, Habilidades e Trajes, abre em Heróis e usa o estado autoritativo
+  do servidor para ownership, cooldown e toggles.
+- `HeroPackScreen` continua sendo a entrada F6 de Heróis/Packs e lista somente
+  packs realmente instalados, sem inventar personagens, retratos ou modelos.
+- Ajustes finais: TICK sem cooldown executa a cada tick (com assercao no
+  GameTest), cooldown do cliente conta por game time, toggles ativos podem ser
+  desligados durante cooldown no catalogo/radial, habilidade removida do
+  registro limpa toggles/passives/cooldown e botoes do catalogo cabem em telas
+  estreitas.
+Validacao confirmada nesta integracao:
+- compileJava: BUILD SUCCESSFUL
+- runGameTestServer: 59/59 required tests passed ("All 59 required tests passed")
+- build: BUILD SUCCESSFUL
+- git diff --check: sem erros (apenas aviso LF/CRLF em PowerRuntimeEngine.java)
+- runClient: iniciou sem crash, carregou mixins/atlas/audio, conectou ao servidor integrado e
+  permaneceu estavel ate o ambiente encerrar a janela (execucao final de ~49s; uma execucao
+  anterior passou de 2 minutos). Nao houve inspecao visual interativa humana das telas.
+Pendencias:
+- Inspecao visual humana em cliente grafico: HeroPackScreen, abas do catalogo, busca, filtros,
+  botoes, feedback e menu radial.
+- Revisar diff/staging, commitar somente este lote e publicar com push normal.
+- Confirmar SHA local igual ao remoto antes de declarar sincronização.

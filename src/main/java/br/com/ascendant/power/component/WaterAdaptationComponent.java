@@ -12,6 +12,8 @@ public final class WaterAdaptationComponent implements IPowerComponent {
     public static final String TYPE = "ascendant:water_adaptation";
     private final boolean grantConduitPower;
     private final boolean grantDolphinGrace;
+    private final ManagedEffectLease conduitEffect = new ManagedEffectLease(MobEffects.CONDUIT_POWER);
+    private final ManagedEffectLease dolphinEffect = new ManagedEffectLease(MobEffects.DOLPHINS_GRACE);
 
     public WaterAdaptationComponent(boolean grantConduitPower, boolean grantDolphinGrace) {
         this.grantConduitPower = grantConduitPower;
@@ -37,11 +39,19 @@ public final class WaterAdaptationComponent implements IPowerComponent {
         if (player.isInWaterOrRain() || player.isEyeInFluidType(net.minecraftforge.common.ForgeMod.WATER_TYPE.get())) {
             player.setAirSupply(player.getMaxAirSupply());
             if (grantConduitPower) {
-                player.addEffect(new MobEffectInstance(MobEffects.CONDUIT_POWER, 40, 0, false, false, false));
+                conduitEffect.apply(player, 40);
             }
             if (grantDolphinGrace) {
-                player.addEffect(new MobEffectInstance(MobEffects.DOLPHINS_GRACE, 40, 0, false, false, false));
+                dolphinEffect.apply(player, 40);
             }
+        }
+    }
+
+    @Override
+    public void onToggle(ServerPlayer player, boolean enabled) {
+        if (!enabled) {
+            conduitEffect.remove(player);
+            dolphinEffect.remove(player);
         }
     }
 

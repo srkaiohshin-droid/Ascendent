@@ -91,3 +91,35 @@ ATUALIZACAO DE ESTADO EM 2026-10-22 (RECUPERACAO DO COMMIT a88f1cb)
   "All 55 required tests passed"; build BUILD SUCCESSFUL; git diff --check sem erros.
 - runClient iniciou sem crash e permaneceu estavel por 120s, mas a inspecao visual interativa da UI
   nao foi realizada neste ambiente automatizado.
+
+ATUALIZACAO DE ESTADO EM 2026-10-22 (INTEGRACAO DO LOTE INTERROMPIDO ASC-012)
+- Base publicada: ee2fa9d41b64170cbff44685941e842946dc0811, branch
+  srkaiohshin-droid-ascendant-gameplay-ui.
+- Lote de origem: clone srkaiohshin-droid-glowing-fortnight, HEAD 7f55404 com
+  alteracoes nao commitadas. O lote foi aplicado em tres vias sobre ee2fa9d,
+  com resolucao manual de conflitos e preservacao do trabalho de recuperacao.
+- Runtime: AbilityResult, activateAbilityWithResult, toggleAbility(id, enable),
+  getAccessibleAbilities e tickAbilities foram integrados sem remover as APIs
+  anteriores. Autorizacao inclui poder pai, habilidade universal e concessao
+  direta de traje. Gatilhos manuais, automaticos e TOGGLE tem caminhos distintos.
+- Ciclo de vida: PASSIVE aplica uma vez e mantem por tick; TICK executa sob
+  cooldown; HURT_EVENT e ATTACK_HIT sao despachados por eventos; TOGGLE exige
+  alternancia explicita; templates sem executor nao ativam. Limpeza cobre
+  logout, respawn, mudanca de dimensao e perda da ultima fonte de acesso.
+- Ajustes finais: TICK sem cooldown executa a cada tick; o cliente conta o
+  cooldown por game time; toggles ativos podem ser desligados durante o cooldown;
+  habilidade removida do registro limpa toggles/passives/cooldown.
+- Efeitos e atributos: ManagedEffectLease impede remover efeito de fonte externa;
+  FireWardComponent executa resistencia ao fogo real; identidades de modificador
+  sao estaveis e distintas para poder e habilidade.
+- Packs e UI: PackManager rastreia packs carregados e origem de conteudo.
+  PowerCatalogScreen abre em HEROES e tem abas persistentes POWERS, ABILITIES e
+  SUITS, com estado autoritativo de ownership, cooldown e toggles. HeroPackScreen
+  continua sendo a entrada F6 de Herois/Packs e lista somente packs instalados.
+  Catalogo e radial usam CatalogInteraction como fonte unica de classificacao.
+- Validacao confirmada: compileJava BUILD SUCCESSFUL; runGameTestServer com
+  "All 59 required tests passed"; build BUILD SUCCESSFUL; git diff --check sem
+  erros (apenas aviso LF/CRLF); runClient iniciou sem crash e ficou estavel na
+  execucao final por ~49s (uma execucao anterior passou de 2 minutos), sem inspecao visual humana.
+- Pendencias: inspecao visual humana da UI/radial; commit e push normal deste
+  lote com confirmacao do SHA remoto igual ao local.

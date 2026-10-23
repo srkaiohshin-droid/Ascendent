@@ -32,11 +32,13 @@ public final class RadialMenuScreen extends Screen {
     private final List<Option> options = new ArrayList<>();
     private int page;
     private int selectedSlot = -1;
+    private String feedback = "";
 
     public RadialMenuScreen(Screen parent) {
         super(Component.translatable("gui.ascendant.radial.title"));
         this.parent = parent;
         collectOptions();
+        AscendantNetwork.requestCatalogState();
     }
 
     private void collectOptions() {
@@ -47,7 +49,9 @@ public final class RadialMenuScreen extends Screen {
                         displayName(power.getNameKey(), power.getId()), power.getType().name())));
         AbilityRegistry.getAll().stream()
                 .filter(ability -> CatalogInteraction.forAbility(ability).type()
-                        == CatalogInteraction.ActionType.ACTIVATE_ABILITY)
+                        == CatalogInteraction.ActionType.ACTIVATE_ABILITY
+                        || CatalogInteraction.forAbility(ability).type()
+                        == CatalogInteraction.ActionType.TOGGLE_ABILITY)
                 .sorted(Comparator.comparing(ability -> ability.getId().toString()))
                 .forEach(ability -> options.add(new Option(CatalogInteraction.forAbility(ability),
                         displayName(ability.getNameKey(), ability.getId()), ability.getTrigger().name())));
@@ -77,7 +81,13 @@ public final class RadialMenuScreen extends Screen {
         int index = page * SLOTS_PER_PAGE + selectedSlot;
         if (index < 0 || index >= options.size()) return;
         CatalogInteraction.Action action = options.get(index).action();
-        if (toggleOnly != null && toggleOnly != (action.type() == CatalogInteraction.ActionType.TOGGLE_POWER)) return;
+        boolean isToggle = action.type() == CatalogInteraction.ActionType.TOGGLE_POWER
+                || action.type() == CatalogInteraction.ActionType.TOGGLE_ABILITY;
+        if (toggleOnly != null && toggleOnly != isToggle) return;
+        if (!isAuthorizedAndReady(action)) {
+            feedback = runtimeStatus(action);
+            return;
+        }
         dispatch(action);
         Minecraft.getInstance().setScreen(parent);
     }
@@ -87,10 +97,59 @@ public final class RadialMenuScreen extends Screen {
             case ACTIVATE_POWER -> AscendantNetwork.sendActivatePower(action.id());
             case TOGGLE_POWER -> AscendantNetwork.sendTogglePowerRequest(action.id());
             case ACTIVATE_ABILITY -> AscendantNetwork.sendActivateAbility(action.id());
+            case TOGGLE_ABILITY -> AscendantNetwork.sendToggleAbilityRequest(action.id());
             default -> {
                 // The radial model only collects executable powers and key-triggered abilities.
             }
         }
+    }
+
+    private boolean isAuthorizedAndReady(CatalogInteraction.Action action) {
+        if (!CatalogClientState.isInitialized()) {
+            return false;
+        }
+        boolean authorized = action.type() == CatalogInteraction.ActionType.ACTIVATE_POWER
+                || action.type() == CatalogInteraction.ActionType.TOGGLE_POWER
+                ? CatalogClientState.hasPower(action.id())
+                : CatalogClientState.hasAbility(action.id());
+        if (!authorized) {
+            return false;
+        }
+        if (isToggle(action.type()) && isToggled(action)) {
+            return true;
+        }
+        return CatalogClientState.getCooldown(action.id()) == 0;
+    }
+
+    private static boolean isToggle(CatalogInteraction.ActionType type) {
+        return type == CatalogInteraction.ActionType.TOGGLE_POWER
+                || type == CatalogInteraction.ActionType.TOGGLE_ABILITY;
+    }
+
+    private static boolean isToggled(CatalogInteraction.Action action) {
+        return action.type() == CatalogInteraction.ActionType.TOGGLE_POWER
+                ? CatalogClientState.isPowerToggled(action.id())
+                : action.type() == CatalogInteraction.ActionType.TOGGLE_ABILITY
+                && CatalogClientState.isAbilityToggled(action.id());
+    }
+
+    private String runtimeStatus(CatalogInteraction.Action action) {
+        if (!CatalogClientState.isInitialized()) {
+            return net.minecraft.client.resources.language.I18n.get("gui.ascendant.catalog.loading_state");
+        }
+        boolean authorized = action.type() == CatalogInteraction.ActionType.ACTIVATE_POWER
+                || action.type() == CatalogInteraction.ActionType.TOGGLE_POWER
+                ? CatalogClientState.hasPower(action.id())
+                : CatalogClientState.hasAbility(action.id());
+        if (!authorized) {
+            return net.minecraft.client.resources.language.I18n.get("gui.ascendant.catalog.not_owned");
+        }
+        int cooldown = CatalogClientState.getCooldown(action.id());
+        if (cooldown > 0) {
+            return net.minecraft.client.resources.language.I18n.get("gui.ascendant.catalog.cooldown_remaining")
+                    .formatted(cooldown);
+        }
+        return net.minecraft.client.resources.language.I18n.get("gui.ascendant.catalog.ready");
     }
 
     private int pageCount() {
@@ -116,6 +175,9 @@ public final class RadialMenuScreen extends Screen {
         graphics.drawCenteredString(font,
                 Component.translatable("gui.ascendant.radial.page", page + 1, pageCount()),
                 width / 2, height - 26, 0xFFCCCCCC);
+        if (!feedback.isEmpty()) {
+            graphics.drawCenteredString(font, Component.literal(feedback), width / 2, height - 40, 0xFFFFC060);
+        }
 
         graphics.fill((int) centerX - 40, (int) centerY - 24, (int) centerX + 40, (int) centerY + 24,
                 0xE0282838);
@@ -141,16 +203,20 @@ public final class RadialMenuScreen extends Screen {
 
             Option option = options.get(optionIndex);
             boolean highlighted = slot == selectedSlot;
+            boolean usable = isAuthorizedAndReady(option.action());
             int boxWidth = 104;
             int boxHeight = 32;
             graphics.fill(x - boxWidth / 2, y - boxHeight / 2, x + boxWidth / 2, y + boxHeight / 2,
-                    highlighted ? 0xF06088B0 : 0xD0303848);
+                    !usable ? 0xD0382830 : highlighted ? 0xF06088B0 : 0xD0303848);
             graphics.renderOutline(x - boxWidth / 2, y - boxHeight / 2, boxWidth, boxHeight,
-                    highlighted ? 0xFFFFFF80 : 0xFF8090B0);
+                    !usable ? 0xFFFF8060 : highlighted ? 0xFFFFFF80 : 0xFF8090B0);
             graphics.drawCenteredString(font, font.plainSubstrByWidth(option.label(), boxWidth - 8),
                     x, y - 7, 0xFFFFFFFF);
-            graphics.drawCenteredString(font, option.kind(), x, y + 4,
-                    option.action().type() == CatalogInteraction.ActionType.TOGGLE_POWER
+            String state = runtimeStatus(option.action());
+            graphics.drawCenteredString(font, font.plainSubstrByWidth(state, boxWidth - 8), x, y + 4,
+                    !usable ? 0xFFFFA080
+                            : option.action().type() == CatalogInteraction.ActionType.TOGGLE_POWER
+                            || option.action().type() == CatalogInteraction.ActionType.TOGGLE_ABILITY
                             ? 0xFF80D0FF : 0xFFA0E0A0);
         }
 

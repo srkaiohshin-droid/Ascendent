@@ -99,3 +99,19 @@
 - `HeroPackScreen` agora lista packs realmente instalados via `PackManager.getInstalledPacks()`, documenta a limitação do manifesto (sem previews de personagem) e abre Poderes/Habilidades nas abas corretas; trajes permanecem na `SuitScreen`.
 - Restaurados os componentes de gameplay Invisibility, Levitation, Phase, SummonEntity e VortexAction e as cinco entradas funcionais correspondentes no catálogo.
 - Validação confirmada: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` com 55/55 testes obrigatórios aprovados; `build` BUILD SUCCESSFUL; `git diff --check` sem erros; `runClient` iniciou sem crash e permaneceu estável por 120s (inspeção visual humana pendente).
+
+## 0.1.0 - Integracao do runtime de habilidades e catalogo Hero/Pack (2026-10-22)
+- Integrado o lote interrompido do worktree `srkaiohshin-droid-glowing-fortnight` sobre a base publicada `ee2fa9d`, com resolucao manual de conflitos e preservacao da recuperacao anterior.
+- `PowerRuntimeEngine` agora expoe `AbilityResult`, `activateAbilityWithResult`, `toggleAbility(id, enable)`, `getAccessibleAbilities` e `tickAbilities`, mantendo os entry points usados por testes e rede.
+- Autorizacao de habilidades considera poder pai, habilidade universal e concessao direta por traje.
+- Gatilhos KEY_PRESS, SNEAK_KEY, TOGGLE, PASSIVE, TICK, HURT_EVENT e ATTACK_HIT possuem caminhos explicitos; templates e habilidades sem executor nao ativam.
+- `titan_mass_form` e `titan_growth_boost` passaram a TOGGLE com identidades de modificador distintas e estaveis.
+- Efeitos gerenciados usam `ManagedEffectLease`; `FireWardComponent` executa uma janela real de resistencia ao fogo e a limpeza preserva efeitos de fontes externas.
+- Limpeza de estado cobre logout, respawn, troca de dimensao e perda da ultima fonte de acesso.
+- `PackManager` rastreia packs carregados e a origem de poderes, habilidades e trajes.
+- `PowerCatalogScreen` abre em HEROES e mantem abas persistentes POWERS, ABILITIES e SUITS, usando `CatalogClientState` autoritativo para ownership, cooldown e toggles.
+- Catalogo e menu radial compartilham `CatalogInteraction`; a aba HEROES filtra corretamente `suits` e `packs`.
+- `HeroPackScreen` continua sendo a entrada F6 de Herois/Packs e lista somente packs instalados, sem inventar personagens, retratos ou modelos.
+- Novos arquivos: `FireWardComponent.java`, `ManagedEffectLease.java` e `CatalogClientState.java`.
+- Ajustes finais de auditoria: TICK sem cooldown executa a cada tick (com assercao no GameTest), o cooldown do cliente conta por game time, toggles ativos podem ser desligados durante o cooldown no catalogo e no radial, habilidade removida do registro limpa toggles/passives/cooldown, e os botoes do catalogo cabem em telas estreitas.
+- Validacao confirmada: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` com "All 59 required tests passed"; `build` BUILD SUCCESSFUL; `git diff --check` sem erros de conteudo; `runClient` iniciou sem crash e permaneceu estavel ate o ambiente encerrar a janela (execucao final de ~49s; uma execucao anterior passou de 2 minutos), sem inspecao visual humana.

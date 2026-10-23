@@ -9,6 +9,8 @@ import net.minecraft.world.effect.MobEffects;
 public final class InvisibilityComponent implements IPowerComponent {
     public static final String TYPE = "ascendant:invisibility";
     private final int durationTicks;
+    private final ManagedEffectLease effectLease =
+            new ManagedEffectLease(MobEffects.INVISIBILITY, true, true);
 
     public InvisibilityComponent(int durationTicks) {
         this.durationTicks = Math.max(1, durationTicks);
@@ -26,12 +28,14 @@ public final class InvisibilityComponent implements IPowerComponent {
 
     @Override
     public boolean execute(ComponentContext context) {
-        ServerPlayer player = context.getPlayer();
-        if (player.hasEffect(MobEffects.INVISIBILITY)) {
-            return false;
+        return effectLease.apply(context.getPlayer(), durationTicks);
+    }
+
+    @Override
+    public void onToggle(ServerPlayer player, boolean enabled) {
+        if (!enabled) {
+            effectLease.remove(player);
         }
-        player.addEffect(new MobEffectInstance(MobEffects.INVISIBILITY, durationTicks, 0, false, true, true));
-        return player.hasEffect(MobEffects.INVISIBILITY);
     }
 
     @Override

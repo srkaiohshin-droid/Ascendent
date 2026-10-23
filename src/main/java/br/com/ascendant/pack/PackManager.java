@@ -15,6 +15,7 @@ import com.google.gson.JsonParseException;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -26,6 +27,13 @@ public final class PackManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static Path packsDir;
     private static LocalPackCatalogProvider localCatalog;
+    private static final Set<String> LOADED_PACKS = ConcurrentHashMap.newKeySet();
+    private static final Map<net.minecraft.resources.ResourceLocation, String> POWER_SOURCES =
+            new ConcurrentHashMap<>();
+    private static final Map<net.minecraft.resources.ResourceLocation, String> ABILITY_SOURCES =
+            new ConcurrentHashMap<>();
+    private static final Map<net.minecraft.resources.ResourceLocation, String> SUIT_SOURCES =
+            new ConcurrentHashMap<>();
 
     private PackManager() {
     }
@@ -55,6 +63,22 @@ public final class PackManager {
             return List.of();
         }
         return List.copyOf(catalog.listAvailablePacks());
+    }
+
+    public static Set<String> getLoadedPackIds() {
+        return Set.copyOf(LOADED_PACKS);
+    }
+
+    public static String getPowerSource(net.minecraft.resources.ResourceLocation id) {
+        return POWER_SOURCES.get(id);
+    }
+
+    public static String getAbilitySource(net.minecraft.resources.ResourceLocation id) {
+        return ABILITY_SOURCES.get(id);
+    }
+
+    public static String getSuitSource(net.minecraft.resources.ResourceLocation id) {
+        return SUIT_SOURCES.get(id);
     }
 
     public static synchronized boolean importPack(Path zipFilePath) {
@@ -263,8 +287,14 @@ public final class PackManager {
             return;
         }
 
+        LOADED_PACKS.clear();
+        POWER_SOURCES.clear();
+        ABILITY_SOURCES.clear();
+        SUIT_SOURCES.clear();
         try (var stream = Files.list(packsDir)) {
-            stream.filter(Files::isDirectory).forEach(PackManager::loadSinglePackFolder);
+            stream.filter(Files::isDirectory)
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .forEach(PackManager::loadSinglePackFolder);
         } catch (Exception e) {
             Ascendant.LOGGER.error("[ASC] Error reading packs directory", e);
         }
@@ -276,7 +306,14 @@ public final class PackManager {
             return;
         }
 
+        String packId;
         try {
+            try (var reader = Files.newBufferedReader(manifestPath)) {
+                PackManifest manifest = PackManifest.fromJson(GSON.fromJson(reader, JsonObject.class));
+                packId = manifest.getId();
+            }
+            LOADED_PACKS.add(packId);
+
             Path powersDir = packFolder.resolve("powers");
             if (Files.isDirectory(powersDir)) {
                 try (var pStream = Files.list(powersDir)) {
@@ -285,6 +322,7 @@ public final class PackManager {
                             JsonObject json = GSON.fromJson(reader, JsonObject.class);
                             PowerDefinition power = PowerDefinition.fromJson(json);
                             PowerRegistry.register(power);
+                            POWER_SOURCES.put(power.getId(), packId);
                         } catch (Exception ex) {
                             Ascendant.LOGGER.warn("[ASC] Failed to load power file: {}", p, ex);
                         }
@@ -300,6 +338,7 @@ public final class PackManager {
                             JsonObject json = GSON.fromJson(reader, JsonObject.class);
                             AbilityDefinition ability = AbilityDefinition.fromJson(json);
                             AbilityRegistry.register(ability);
+                            ABILITY_SOURCES.put(ability.getId(), packId);
                         } catch (Exception ex) {
                             Ascendant.LOGGER.warn("[ASC] Failed to load ability file: {}", p, ex);
                         }
@@ -315,6 +354,7 @@ public final class PackManager {
                             JsonObject json = GSON.fromJson(reader, JsonObject.class);
                             SuitDefinition suit = SuitDefinition.fromJson(json);
                             SuitRegistry.register(suit);
+                            SUIT_SOURCES.put(suit.getId(), packId);
                         } catch (Exception ex) {
                             Ascendant.LOGGER.warn("[ASC] Failed to load suit file: {}", p, ex);
                         }
