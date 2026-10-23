@@ -98,4 +98,5 @@
 - [x] Adicionar/atualizar GameTests de manobra, tema e voo por traje.
 - [x] Validar `compileJava`, `runGameTestServer` (62/62), `build` e `git diff --check`.
 - [ ] Homologacao visual humana em cliente grafico (telas, poses, camera e manobra).
-- [ ] Confirmar SHA remoto apos o push normal deste lote (codigo/assets em `b2e1c97`).
+- [x] Confirmar SHA remoto apos o push normal deste lote (codigo/assets em `b2e1c97`,
+  teste/documentacao em `5d9f22e`; `git ls-remote` conferido).

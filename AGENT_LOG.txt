@@ -514,8 +514,9 @@ LOTE DE OVERHAUL DE GAMEPLAY, CATALOGO E ANIMACOES (2026-10-23)
 - Publicacao:
   - Commit de codigo e assets `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f` na branch
     `srkaiohshin-droid-ascendant-gameplay-ui`.
-  - Documentacao e teste de ciclo de vida no commit imediatamente seguinte; o SHA
-    remoto final sera conferido com `git ls-remote` e constara no relatorio da sessao.
+  - Teste de ciclo de vida e documentacao no commit `5d9f22ee55fa11699156781c8c6c1e6b1a4d1c47`.
+  - Ambos publicados com push normal; `git ls-remote` confirmou `5d9f22e` como SHA remoto
+    antes deste commit de confirmacao.
 - Pendencias:
   - Homologacao visual humana em cliente grafico (pendente; o smoke test nao a substitui).
   - Reconciliar o lote de animacao/camera preservado neste workspace com o agente de

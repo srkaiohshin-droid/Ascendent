@@ -144,5 +144,6 @@
 - Validacao: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` "All 62 required tests passed";
   `build` BUILD SUCCESSFUL; `git diff --check` sem erros (avisos LF/CRLF).
 - Publicacao: codigo e assets em `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f`; teste de
-  ciclo de vida e documentacao em commit seguinte na mesma branch.
+  ciclo de vida e documentacao em `5d9f22ee55fa11699156781c8c6c1e6b1a4d1c47`; ambos
+  publicados, com SHA remoto conferido por `git ls-remote`.
 - Pendente: homologacao visual humana em cliente grafico (telas, poses, camera e manobra).

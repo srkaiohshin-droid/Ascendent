@@ -285,4 +285,5 @@ Criterios:
   aceitou os canais ascendant:main (1) e ascendant:flight (2) e nao crashou; nao houve
   inspecao visual humana.
 - Publicacao: codigo e assets em `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f`; teste de
-  ciclo de vida e documentacao em commit seguinte na mesma branch.
+  ciclo de vida e documentacao em `5d9f22ee55fa11699156781c8c6c1e6b1a4d1c47`; ambos
+  publicados na mesma branch, com SHA remoto conferido por `git ls-remote`.
