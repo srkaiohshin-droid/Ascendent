@@ -61,6 +61,14 @@ public interface IPowerComponent {
     }
 
     /**
+     * Validates a requested toggle state before the runtime records it. Returning false
+     * refuses the request so the player receives a real failure instead of a silent no-op.
+     */
+    default boolean canToggle(ServerPlayer player, boolean enable) {
+        return true;
+    }
+
+    /**
      * Serializes this component into JSON for content pack exports or data-driven saving.
      */
     JsonObject toJson();

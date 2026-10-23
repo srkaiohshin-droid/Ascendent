@@ -62,3 +62,22 @@ with credit to it's authors.
 
 Forge Mod Loader downloads components from the Minecraft Coder Pack
 (http://mcp.ocean-labs.de/index.php/Main_Page) with kind permission from the MCP team.
+
+=========================================================================
+
+Ascendant UI artwork
+
+The catalog and radial backgrounds are derived from a public-domain comic page:
+
+  Race for the Moon #2, "Island in the Sky", Harvey Comics, September 1958.
+  Pencils: Jack Kirby. Inks: Al Williamson.
+  Source: https://commons.wikimedia.org/wiki/File:Race_for_the_Moon_02_page_22.jpg
+  Original file: https://upload.wikimedia.org/wikipedia/commons/7/7b/Race_for_the_Moon_02_page_22.jpg
+  License: public domain in the United States (published before 1964,
+  copyright not renewed).
+
+The shipped textures are cropped, resized, colour-graded and darkened for UI
+legibility. The halftone overlay is procedurally generated for Ascendant. See
+docs/ASSETS.md for the exact derivations, rejected candidates and fallback
+behaviour. This credit does not imply endorsement by the original creators or
+Harvey Comics.

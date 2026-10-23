@@ -21,6 +21,12 @@ public final class FlightClientInput {
     private static final KeyMapping BRAKE = new KeyMapping(
             "key.ascendant.flight_brake", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_X,
             "key.categories.ascendant.flight");
+    private static final KeyMapping MANEUVER_LEFT = new KeyMapping(
+            "key.ascendant.flight_maneuver_left", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_C,
+            "key.categories.ascendant.flight");
+    private static final KeyMapping MANEUVER_RIGHT = new KeyMapping(
+            "key.ascendant.flight_maneuver_right", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V,
+            "key.categories.ascendant.flight");
 
     private static boolean requestPending;
     private static int lastSentInput = -1;
@@ -33,6 +39,8 @@ public final class FlightClientInput {
     public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(TOGGLE_FLIGHT);
         event.register(BRAKE);
+        event.register(MANEUVER_LEFT);
+        event.register(MANEUVER_RIGHT);
         MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onClientTick);
         MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onPlayerTick);
     }
@@ -46,6 +54,7 @@ public final class FlightClientInput {
         if (player == null || minecraft.level == null) {
             requestPending = false;
             lastSentInput = -1;
+            drainManeuverClicks();
             return;
         }
 
@@ -64,7 +73,19 @@ public final class FlightClientInput {
         FlightState state = FlightController.getState(player);
         if (state == null || !state.isActive()) {
             lastSentInput = -1;
+            drainManeuverClicks();
             return;
+        }
+
+        if (minecraft.screen == null) {
+            while (MANEUVER_LEFT.consumeClick()) {
+                FlightNetwork.requestManeuver(-1);
+            }
+            while (MANEUVER_RIGHT.consumeClick()) {
+                FlightNetwork.requestManeuver(1);
+            }
+        } else {
+            drainManeuverClicks();
         }
 
         int input = minecraft.screen == null ? readInput(minecraft) : 0;
@@ -76,6 +97,11 @@ public final class FlightClientInput {
             lastSentInput = input;
             lastSentTick = tick;
         }
+    }
+
+    private static void drainManeuverClicks() {
+        while (MANEUVER_LEFT.consumeClick()) { }
+        while (MANEUVER_RIGHT.consumeClick()) { }
     }
 
     private static int readInput(Minecraft minecraft) {

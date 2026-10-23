@@ -1,6 +1,7 @@
 package br.com.ascendant.mixin;
 
 import br.com.ascendant.flight.client.FlightPoseRenderer;
+import br.com.ascendant.flight.client.LocomotionPoseController;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
@@ -27,6 +28,8 @@ public abstract class PlayerRendererMixin {
     private void ascendant$applyFlightBody(AbstractClientPlayer player, PoseStack poseStack,
                                            float ageInTicks, float rotationYaw, float partialTick,
                                            CallbackInfo callback) {
-        FlightPoseRenderer.applyBody(poseStack, player, partialTick);
+        if (!FlightPoseRenderer.applyBody(poseStack, player, partialTick)) {
+            LocomotionPoseController.applyBody(poseStack, player, partialTick);
+        }
     }
 }

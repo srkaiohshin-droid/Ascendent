@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import br.com.ascendant.animation.AnimationCatalogData;
 import br.com.ascendant.animation.AnimationCoverageValidator;
 import br.com.ascendant.command.CommandEvents;
+import br.com.ascendant.flight.FlightClientTuning;
 import br.com.ascendant.flight.FlightEvents;
 import br.com.ascendant.flight.FlightGameTests;
 import br.com.ascendant.flight.FlightNetwork;
@@ -50,6 +51,8 @@ public final class Ascendant {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, FlightTuning.SPEC);
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SpeedsterTuning.SPEC,
                 "ascendant-speedster.toml");
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, FlightClientTuning.SPEC,
+                "ascendant-client.toml");
 
         // Core Event Handlers
         MinecraftForge.EVENT_BUS.register(PlayerPowerDataEvents.class);

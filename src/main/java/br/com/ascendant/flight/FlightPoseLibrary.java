@@ -17,6 +17,8 @@ public final class FlightPoseLibrary {
     public static final int TAKEOFF_TICKS = 10;
     /** Ticks used to return to vanilla when flight stops. */
     public static final int EXIT_TICKS = 8;
+    /** Ticks in one full 360-degree aerial roll. */
+    public static final int MANEUVER_TICKS = 14;
 
     public static final float HOVER_SPEED = 0.07F;
     public static final float CRUISE_SPEED = 0.45F;
@@ -37,8 +39,19 @@ public final class FlightPoseLibrary {
                                                    float speed, float verticalSpeed,
                                                    float viewPitch, boolean braking,
                                                    float turnDegrees) {
+        return selectState(active, activeTicks, speed, verticalSpeed, viewPitch, braking,
+                turnDegrees, false);
+    }
+
+    public static FlightAnimationState selectState(boolean active, int activeTicks,
+                                                   float speed, float verticalSpeed,
+                                                   float viewPitch, boolean braking,
+                                                   float turnDegrees, boolean maneuvering) {
         if (!active) {
             return FlightAnimationState.EXIT;
+        }
+        if (maneuvering) {
+            return FlightAnimationState.MANEUVER;
         }
         if (activeTicks < TAKEOFF_TICKS) {
             return FlightAnimationState.TAKEOFF;
@@ -77,9 +90,23 @@ public final class FlightPoseLibrary {
             case CLIMB -> climb(verticalSpeed, viewPitch, turnDegrees);
             case TURNING -> turning(speed, viewPitch, turnDegrees);
             case CRUISE -> cruise(speed, viewPitch, turnDegrees);
-            case HEROIC_FLIGHT -> heroic(speed, viewPitch, turnDegrees);
+            case HEROIC_FLIGHT, MANEUVER -> heroic(speed, viewPitch, turnDegrees);
             case EXIT -> FlightPose.VANILLA;
         };
+    }
+
+    /**
+     * Full 360-degree roll offset for an aerial maneuver. Progress is derived
+     * from the server-synced ticks remaining, so every client sees the same
+     * rotation without any client-side authority over the maneuver.
+     */
+    public static float maneuverRoll(int direction, int ticksRemaining) {
+        if (direction != -1 && direction != 1) {
+            return 0.0F;
+        }
+        float progress = 1.0F - clamp(ticksRemaining / (float) MANEUVER_TICKS, 0.0F, 1.0F);
+        float eased = smoothstep(progress);
+        return direction * 360.0F * eased;
     }
 
     private static FlightPose hover(float turnDegrees) {

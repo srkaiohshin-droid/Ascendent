@@ -1,7 +1,6 @@
 package br.com.ascendant.flight;
 
-import br.com.ascendant.powers.IPlayerPowerData;
-import br.com.ascendant.powers.PlayerPowerDataProvider;
+import br.com.ascendant.power.runtime.PowerRuntimeEngine;
 import br.com.ascendant.speedster.SpeedsterController;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -10,6 +9,7 @@ import net.minecraft.world.phys.Vec3;
 
 public final class FlightController {
     public static final ResourceLocation FLIGHT_POWER = new ResourceLocation("ascendant", "flight");
+    public static final int MANEUVER_COOLDOWN_TICKS = 24;
     private static final long INPUT_TIMEOUT_TICKS = 20L;
     private static final double SAFE_TRANSITION_MAX_HORIZONTAL = 0.28D;
 
@@ -49,8 +49,8 @@ public final class FlightController {
                 || player.isInLava() || player.getAbilities().mayfly || player.level().isClientSide) {
             return false;
         }
-        return player.getCapability(PlayerPowerDataProvider.CAPABILITY)
-                .map((IPlayerPowerData data) -> data.hasPower(FLIGHT_POWER)).orElse(false);
+        // Suit-granted flight must work exactly like intrinsically unlocked flight.
+        return PowerRuntimeEngine.hasPowerAccess(player, FLIGHT_POWER);
     }
 
     public static void acceptInput(ServerPlayer player, int inputMask) {
@@ -63,6 +63,26 @@ public final class FlightController {
             return;
         }
         state.acceptInput(inputMask, player.level().getGameTime());
+    }
+
+    /**
+     * Requests a server-authorised full-body roll. The maneuver changes only the
+     * rendered pose; position, velocity and collision remain untouched.
+     */
+    public static boolean requestManeuver(ServerPlayer player, int direction) {
+        if (direction != -1 && direction != 1) {
+            return false;
+        }
+        FlightState state = getState(player);
+        if (state == null || !state.isActive() || !canMaintainFlight(player)) {
+            return false;
+        }
+        if (!state.startManeuver(direction, FlightPoseLibrary.MANEUVER_TICKS)) {
+            return false;
+        }
+        state.setManeuverCooldownTicks(MANEUVER_COOLDOWN_TICKS);
+        FlightNetwork.syncState(player);
+        return true;
     }
 
     public static void tickServer(Player player) {
@@ -83,6 +103,14 @@ public final class FlightController {
             player.setNoGravity(true);
         }
         player.resetFallDistance();
+
+        // The maneuver is visual-only, but the server owns its progress and
+        // broadcasts the remaining ticks so every client stays in sync.
+        boolean maneuverWasActive = state.getManeuverTicksRemaining() > 0;
+        state.tickManeuver();
+        if (maneuverWasActive) {
+            FlightNetwork.syncState(serverPlayer);
+        }
 
         if (state.getLastInputGameTick() == Long.MIN_VALUE
                 || player.level().getGameTime() - state.getLastInputGameTick() > INPUT_TIMEOUT_TICKS) {
@@ -143,8 +171,7 @@ public final class FlightController {
         return player.isAlive() && !player.isSpectator() && !player.isPassenger()
                 && !player.isSleeping() && !player.isInWater() && !player.isInLava()
                 && !player.getAbilities().mayfly
-                && player.getCapability(PlayerPowerDataProvider.CAPABILITY)
-                .map(data -> data.hasPower(FLIGHT_POWER)).orElse(false);
+                && PowerRuntimeEngine.hasPowerAccess(player, FLIGHT_POWER);
     }
 
     private static Vec3 nextVelocity(Player player, int inputMask) {

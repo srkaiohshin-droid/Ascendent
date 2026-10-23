@@ -91,7 +91,7 @@ public final class FlightPose {
         }
         return new FlightPose(
                 lerp(from.bodyPitchDegrees, to.bodyPitchDegrees, delta),
-                lerp(from.bodyRollDegrees, to.bodyRollDegrees, delta),
+                lerpAngle(from.bodyRollDegrees, to.bodyRollDegrees, delta),
                 lerp(from.bodyLift, to.bodyLift, delta),
                 lerp(from.headXRotDegrees, to.headXRotDegrees, delta),
                 lerp(from.rightArmXRot, to.rightArmXRot, delta),
@@ -110,5 +110,20 @@ public final class FlightPose {
 
     private static float lerp(float from, float to, float delta) {
         return from + (to - from) * delta;
+    }
+
+    /**
+     * Interpolates a whole-body roll along the shortest arc. This keeps a
+     * 360-degree maneuver from unwinding backwards when it ends and the target
+     * returns to the ordinary bank angle.
+     */
+    private static float lerpAngle(float from, float to, float delta) {
+        float difference = (to - from) % 360.0F;
+        if (difference > 180.0F) {
+            difference -= 360.0F;
+        } else if (difference < -180.0F) {
+            difference += 360.0F;
+        }
+        return from + difference * delta;
     }
 }

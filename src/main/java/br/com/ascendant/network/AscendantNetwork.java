@@ -133,6 +133,36 @@ public final class AscendantNetwork {
                 new SpeedsterStatePacket(targetEntityId, active, level));
     }
 
+    /** Re-sends the authoritative catalog snapshot, for example after an automatic mode stop. */
+    public static void syncCatalogState(ServerPlayer player) {
+        sendCatalogState(player);
+    }
+
+    private static void sendAbilityResult(ServerPlayer player, PowerRuntimeEngine.AbilityResult result,
+                                          ResourceLocation abilityId) {
+        if (result == PowerRuntimeEngine.AbilityResult.COOLDOWN) {
+            long remaining = PowerRuntimeEngine.getCooldownRemainingTicks(player, abilityId);
+            player.displayClientMessage(Component.translatable(
+                    "message.ascendant.ability.cooldown_ticks", abilityId.toString(), remaining), true);
+            return;
+        }
+        player.displayClientMessage(Component.translatable(result.translationKey(), abilityId.toString()), true);
+    }
+
+    private static void sendTogglePowerResult(ServerPlayer player, ResourceLocation powerId, boolean enable) {
+        String failure = PowerRuntimeEngine.getPowerToggleFailureReason(player, powerId, enable);
+        if (failure != null) {
+            player.displayClientMessage(Component.translatable(failure, powerId.toString()), true);
+            return;
+        }
+        boolean toggled = PowerRuntimeEngine.togglePower(player, powerId, enable);
+        player.displayClientMessage(Component.translatable(
+                toggled ? enable ? "message.ascendant.power.toggle_enabled"
+                        : "message.ascendant.power.toggle_disabled"
+                        : "message.ascendant.power.toggle_failed",
+                powerId.toString()), true);
+    }
+
     private static void sendCatalogState(ServerPlayer player) {
         Set<ResourceLocation> powers = PowerRuntimeEngine.getAllActiveAndEquippedPowers(player);
         Set<ResourceLocation> abilities = new HashSet<>();
@@ -362,7 +392,7 @@ public final class AscendantNetwork {
                 if (player != null) {
                     PowerRuntimeEngine.AbilityResult result =
                             PowerRuntimeEngine.activateAbilityWithResult(player, msg.abilityId());
-                    player.sendSystemMessage(Component.translatable(result.translationKey(), msg.abilityId().toString()));
+                    sendAbilityResult(player, result, msg.abilityId());
                     sendCatalogState(player);
                 }
             });
@@ -385,12 +415,7 @@ public final class AscendantNetwork {
             ctx.enqueueWork(() -> {
                 ServerPlayer player = ctx.getSender();
                 if (player != null) {
-                    boolean toggled = PowerRuntimeEngine.togglePower(player, msg.powerId(), msg.enable());
-                    player.sendSystemMessage(Component.translatable(
-                            toggled ? msg.enable() ? "message.ascendant.power.toggle_enabled"
-                                    : "message.ascendant.power.toggle_disabled"
-                                    : "message.ascendant.power.toggle_failed",
-                            msg.powerId().toString()));
+                    sendTogglePowerResult(player, msg.powerId(), msg.enable());
                     sendCatalogState(player);
                 }
             });
@@ -413,12 +438,7 @@ public final class AscendantNetwork {
                 ServerPlayer player = ctx.getSender();
                 if (player != null) {
                     boolean enable = !PowerRuntimeEngine.isPowerToggled(player, msg.powerId());
-                    boolean toggled = PowerRuntimeEngine.togglePower(player, msg.powerId(), enable);
-                    player.sendSystemMessage(Component.translatable(
-                            toggled ? enable ? "message.ascendant.power.toggle_enabled"
-                                    : "message.ascendant.power.toggle_disabled"
-                                    : "message.ascendant.power.toggle_failed",
-                            msg.powerId().toString()));
+                    sendTogglePowerResult(player, msg.powerId(), enable);
                     sendCatalogState(player);
                 }
             });
@@ -476,7 +496,7 @@ public final class AscendantNetwork {
                     boolean enable = !PowerRuntimeEngine.isAbilityToggled(player, msg.abilityId());
                     PowerRuntimeEngine.AbilityResult result =
                             PowerRuntimeEngine.toggleAbility(player, msg.abilityId(), enable);
-                    player.sendSystemMessage(Component.translatable(result.translationKey(), msg.abilityId().toString()));
+                    sendAbilityResult(player, result, msg.abilityId());
                     sendCatalogState(player);
                 }
             });

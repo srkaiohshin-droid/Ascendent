@@ -3,9 +3,9 @@ package br.com.ascendant.ui.client;
 import br.com.ascendant.catalog.CatalogInteraction;
 import br.com.ascendant.core.AbilityCategory;
 import br.com.ascendant.core.PowerCategory;
+import br.com.ascendant.network.AscendantNetwork;
 import br.com.ascendant.pack.PackManager;
 import br.com.ascendant.pack.PackManifest;
-import br.com.ascendant.network.AscendantNetwork;
 import br.com.ascendant.power.AbilityDefinition;
 import br.com.ascendant.power.AbilityRegistry;
 import br.com.ascendant.power.PowerDefinition;
@@ -13,15 +13,14 @@ import br.com.ascendant.power.PowerRegistry;
 import br.com.ascendant.suit.SuitDefinition;
 import br.com.ascendant.suit.SuitRegistry;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
@@ -32,20 +31,31 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import static br.com.ascendant.ui.client.ComicUi.withAlpha;
+
+/**
+ * Main catalog browser. The visual layer is comic-print themed and driven by content
+ * metadata; every control still maps to the same server-authoritative actions.
+ */
 @OnlyIn(Dist.CLIENT)
-public final class PowerCatalogScreen extends Screen {
+public class PowerCatalogScreen extends Screen {
     enum Tab {
-        HEROES,
-        POWERS,
-        ABILITIES,
-        SUITS
+        HEROES("gui.ascendant.catalog.heroes", "Heroes / Packs"),
+        POWERS("gui.ascendant.catalog.powers", "Powers"),
+        ABILITIES("gui.ascendant.catalog.abilities", "Abilities"),
+        SUITS("gui.ascendant.catalog.suits", "Suits");
+
+        private final String key;
+        private final String fallback;
+
+        Tab(String key, String fallback) {
+            this.key = key;
+            this.fallback = fallback;
+        }
     }
 
     private enum EntryType {
-        POWER,
-        ABILITY,
-        SUIT,
-        PACK
+        POWER, ABILITY, SUIT, PACK
     }
 
     private record Entry(EntryType type, ResourceLocation id, String name, String description,
@@ -53,21 +63,32 @@ public final class PowerCatalogScreen extends Screen {
                          String metadata, CatalogInteraction.Action action, String packId) {
     }
 
+    private static final int MARGIN = 12;
+    private static final int TAB_Y = 45;
+    private static final int TAB_HEIGHT = 18;
+    private static final int SEARCH_Y = 70;
+    private static final int CHIP_Y = 92;
+    private static final int CHIP_HEIGHT = 16;
+    private static final int LIST_TOP = 114;
+    private static final int CARD_HEIGHT = 46;
+    private static final int CARD_GAP = 4;
+    private static final int BOTTOM_RESERVED = 38;
+
     private final Screen parent;
     private final List<Entry> entries = new ArrayList<>();
+    private final Map<String, PackManifest> packsById = new LinkedHashMap<>();
     private List<Entry> visibleEntries = List.of();
     private Tab tab = Tab.HEROES;
     private String categoryFilter = "all";
     private String sourceFilter = "all";
     private String searchQuery = "";
     private String feedback = "";
+    private int feedbackColor = 0xFFB9F4FF;
     private boolean filterDirty;
     private int selectedIndex;
     private int scrollOffset;
 
     private EditBox searchBox;
-    private Button categoryButton;
-    private Button sourceButton;
     private Button executeButton;
     private Button unequipButton;
 
@@ -84,61 +105,38 @@ public final class PowerCatalogScreen extends Screen {
     @Override
     protected void init() {
         int listWidth = listWidth();
-        int tabWidth = Math.max(50, (width - 64) / 4);
-        int tabY = 25;
-        addRenderableWidget(Button.builder(label("gui.ascendant.catalog.heroes", "Heroes"), button -> changeTab(Tab.HEROES))
-                .bounds(12, tabY, tabWidth, 20).build());
-        addRenderableWidget(Button.builder(label("gui.ascendant.catalog.powers", "Powers"), button -> changeTab(Tab.POWERS))
-                .bounds(16 + tabWidth, tabY, tabWidth, 20).build());
-        addRenderableWidget(Button.builder(label("gui.ascendant.catalog.abilities", "Abilities"), button -> changeTab(Tab.ABILITIES))
-                .bounds(20 + tabWidth * 2, tabY, tabWidth, 20).build());
-        addRenderableWidget(Button.builder(label("gui.ascendant.catalog.suits", "Suits"), button -> changeTab(Tab.SUITS))
-                .bounds(24 + tabWidth * 3, tabY, tabWidth, 20).build());
-
-        searchBox = new EditBox(font, 12, 51, listWidth, 20,
-                label("gui.ascendant.catalog.search", "Search by name, ID or category"));
+        searchBox = new EditBox(font, MARGIN + 6, SEARCH_Y + 2, listWidth - 12, 14,
+                label("gui.ascendant.catalog.search", "Search name, ID or category"));
         searchBox.setMaxLength(96);
+        searchBox.setBordered(false);
         searchBox.setValue(searchQuery);
+        searchBox.setTextColor(0xFFFFFFFF);
         searchBox.setResponder(value -> {
             searchQuery = value;
             filterDirty = true;
         });
         addRenderableWidget(searchBox);
 
-        categoryButton = Button.builder(categoryLabel(), button -> cycleCategory())
-                .bounds(12, 76, listWidth, 20).build();
-        addRenderableWidget(categoryButton);
-        sourceButton = Button.builder(sourceLabel(), button -> cycleSource())
-                .bounds(12, 100, listWidth, 20).build();
-        addRenderableWidget(sourceButton);
-
-        int detailX = 24 + listWidth;
-        int detailWidth = Math.max(60, width - detailX - 12);
+        int detailX = MARGIN + listWidth + 8;
+        int detailWidth = Math.max(60, width - detailX - MARGIN);
         int actionGap = 6;
-        int actionWidth = Math.max(40, (detailWidth - actionGap) / 2);
+        int actionWidth = Math.max(44, (detailWidth - actionGap) / 2);
         executeButton = Button.builder(label("gui.ascendant.catalog.execute", "Use selection"),
                         button -> executeSelected(null))
-                .bounds(detailX, height - 28, actionWidth, 20).build();
+                .bounds(detailX, height - 30, actionWidth, 20).build();
         addRenderableWidget(executeButton);
         unequipButton = Button.builder(label("gui.ascendant.catalog.unequip", "Unequip suit"),
                         button -> unequipSuit())
-                .bounds(detailX + actionWidth + actionGap, height - 28,
-                        Math.max(40, detailWidth - actionWidth - actionGap), 20).build();
+                .bounds(detailX + actionWidth + actionGap, height - 30,
+                        Math.max(44, detailWidth - actionWidth - actionGap), 20).build();
         addRenderableWidget(unequipButton);
         addRenderableWidget(Button.builder(label("gui.ascendant.catalog.close", "Close"), button -> onClose())
-                .bounds(width - 82, 5, 70, 18).build());
+                .bounds(width - 76, 6, 64, 16).build());
 
         rebuildEntries();
         applyFilter();
-        updateFilterVisibility();
         updateActionButtons();
         AscendantNetwork.requestCatalogState();
-    }
-
-    private void updateFilterVisibility() {
-        if (sourceButton != null) {
-            sourceButton.visible = tab == Tab.POWERS || tab == Tab.ABILITIES;
-        }
     }
 
     private void changeTab(Tab next) {
@@ -153,20 +151,16 @@ public final class PowerCatalogScreen extends Screen {
         feedback = "";
         rebuildEntries();
         applyFilter();
-        categoryButton.setMessage(categoryLabel());
-        sourceButton.setMessage(sourceLabel());
-        updateFilterVisibility();
         updateActionButtons();
     }
 
     private void cycleCategory() {
         List<String> categories = categoriesForTab();
-        int current = categories.indexOf(categoryFilter);
+        int current = Math.max(0, categories.indexOf(categoryFilter));
         categoryFilter = categories.get((current + 1) % categories.size());
         selectedIndex = 0;
         scrollOffset = 0;
         filterDirty = true;
-        categoryButton.setMessage(categoryLabel());
     }
 
     private List<String> categoriesForTab() {
@@ -183,22 +177,19 @@ public final class PowerCatalogScreen extends Screen {
             case ABILITIES -> {
                 for (AbilityCategory value : AbilityCategory.values()) values.add(value.name());
             }
-            case SUITS -> {
-                SuitRegistry.getAll().stream().map(suit -> suit.getRarity().name())
-                        .distinct().sorted().forEach(values::add);
-            }
+            case SUITS -> SuitRegistry.getAll().stream().map(suit -> suit.getRarity().name())
+                    .distinct().sorted().forEach(values::add);
         }
         return values;
     }
 
     private void cycleSource() {
         List<String> sources = sourceFilters();
-        int current = sources.indexOf(sourceFilter);
+        int current = Math.max(0, sources.indexOf(sourceFilter));
         sourceFilter = sources.get((current + 1) % sources.size());
         selectedIndex = 0;
         scrollOffset = 0;
         filterDirty = true;
-        sourceButton.setMessage(sourceLabel());
     }
 
     private List<String> sourceFilters() {
@@ -230,40 +221,43 @@ public final class PowerCatalogScreen extends Screen {
     }
 
     private Component categoryLabel() {
-        String value = categoryFilter.equals("all") ? "gui.ascendant.catalog.all_categories" : null;
-        String fallback = categoryFilter.equals("all") ? "All categories" : categoryFilter;
-        if (value == null && tab == Tab.HEROES) {
+        if (categoryFilter.equals("all")) {
+            return label("gui.ascendant.catalog.all_categories", "All categories");
+        }
+        if (tab == Tab.HEROES) {
             return categoryFilter.equals("suits")
                     ? label("gui.ascendant.catalog.suits_category", "Suit loadouts")
                     : label("gui.ascendant.catalog.packs_category", "Content packs");
         }
-        if (value == null && tab == Tab.POWERS) {
+        if (tab == Tab.POWERS) {
             try {
                 PowerCategory category = PowerCategory.valueOf(categoryFilter);
                 return Component.literal(localized(category.getTranslationKey(), category.getDisplayName()));
             } catch (IllegalArgumentException ignored) {
-                // Suit rarity has no power category translation key.
+                // Fall through to the raw identifier.
             }
         }
-        if (value == null && tab == Tab.ABILITIES) {
+        if (tab == Tab.ABILITIES) {
             try {
                 AbilityCategory category = AbilityCategory.valueOf(categoryFilter);
                 return Component.literal(localized(category.getTranslationKey(), category.getDisplayName()));
             } catch (IllegalArgumentException ignored) {
-                // Invalid filters fall back to their identifier instead of breaking the screen.
+                // Fall through to the raw identifier.
             }
         }
-        return value == null ? Component.literal(fallback) : label(value, fallback);
+        return Component.literal(categoryFilter);
     }
 
     private void rebuildEntries() {
         entries.clear();
+        packsById.clear();
+        availablePacks().forEach(pack -> packsById.put(pack.getId(), pack));
         switch (tab) {
             case HEROES -> {
                 SuitRegistry.getAll().stream()
                         .sorted(Comparator.comparing(suit -> suit.getId().toString()))
                         .map(this::entryFor).forEach(entries::add);
-                availablePacks().stream()
+                packsById.values().stream()
                         .map(this::entryFor).forEach(entries::add);
             }
             case POWERS -> PowerRegistry.getAll().stream()
@@ -329,7 +323,8 @@ public final class PowerCatalogScreen extends Screen {
 
     private void applyFilter() {
         visibleEntries = entries.stream()
-                .filter(entry -> CatalogInteraction.matches(searchQuery, entry.id().toString(), entry.name(), entry.category()))
+                .filter(entry -> CatalogInteraction.matches(searchQuery, entry.id().toString(),
+                        entry.name() + " " + entry.description(), entry.category()))
                 .filter(this::matchesCategoryFilter)
                 .filter(this::matchesSourceFilter)
                 .toList();
@@ -457,20 +452,21 @@ public final class PowerCatalogScreen extends Screen {
         if (filterDirty) applyFilter();
         Entry selected = selectedEntry();
         if (selected == null) {
-            feedback = text("gui.ascendant.catalog.no_selection", "Select an entry first.");
+            setFeedback(text("gui.ascendant.catalog.no_selection", "Select an entry first."), 0xFFFFC060);
             return;
         }
         CatalogInteraction.Action action = selected.action();
         boolean isToggle = isToggle(action.type());
         if (toggleOnly != null && toggleOnly != isToggle) {
-            feedback = toggleOnly
+            setFeedback(toggleOnly
                     ? text("gui.ascendant.catalog.not_toggle", "The selection is not a toggle.")
-                    : text("gui.ascendant.catalog.use_toggle_key", "Use the toggle key for this power.");
+                    : text("gui.ascendant.catalog.use_toggle_key", "Use the toggle key for this power."),
+                    0xFFFFC060);
             return;
         }
         if (action.type() != CatalogInteraction.ActionType.EQUIP_SUIT
                 && !isAuthorizedAndReady(selected)) {
-            feedback = unavailableReason(selected);
+            setFeedback(unavailableReason(selected), 0xFFFFA080);
             return;
         }
         switch (action.type()) {
@@ -480,24 +476,29 @@ public final class PowerCatalogScreen extends Screen {
             case TOGGLE_ABILITY -> AscendantNetwork.sendToggleAbilityRequest(action.id());
             case EQUIP_SUIT -> AscendantNetwork.sendEquipSuit(action.id(), true);
             case NONE -> {
-                feedback = unavailableReason(selected);
+                setFeedback(unavailableReason(selected), 0xFFFFA080);
                 return;
             }
         }
-        feedback = text("gui.ascendant.catalog.server_validation",
-                "Request sent; the server validates ownership, cooldown and conditions.");
+        setFeedback(text("gui.ascendant.catalog.server_validation",
+                "Request sent; the server validates ownership, cooldown and conditions."), 0xFFB9F4FF);
     }
 
     private void unequipSuit() {
         if (tab != Tab.SUITS && tab != Tab.HEROES) return;
         ResourceLocation equippedSuit = CatalogClientState.getEquippedSuit();
         if (equippedSuit == null) {
-            feedback = text("gui.ascendant.catalog.no_equipped_suit", "No suit is currently equipped.");
+            setFeedback(text("gui.ascendant.catalog.no_equipped_suit", "No suit is currently equipped."), 0xFFFFC060);
             return;
         }
         AscendantNetwork.sendUnequipSuit();
-        feedback = text("gui.ascendant.catalog.server_validation",
-                "Request sent; the server validates ownership, cooldown and conditions.");
+        setFeedback(text("gui.ascendant.catalog.server_validation",
+                "Request sent; the server validates ownership, cooldown and conditions."), 0xFFB9F4FF);
+    }
+
+    private void setFeedback(String value, int color) {
+        feedback = value;
+        feedbackColor = color;
     }
 
     private String unavailableReason(Entry entry) {
@@ -512,14 +513,16 @@ public final class PowerCatalogScreen extends Screen {
         }
         if ((entry.type() == EntryType.POWER && !CatalogClientState.hasPower(entry.id()))
                 || (entry.type() == EntryType.ABILITY && !CatalogClientState.hasAbility(entry.id()))) {
-            return text("gui.ascendant.catalog.not_owned", "Not available from current powers or equipped suit.");
+            return text("gui.ascendant.catalog.not_owned",
+                    "Not available from current powers or equipped suit.");
         }
         int cooldown = CatalogClientState.getCooldown(entry.id());
         if (cooldown > 0) {
             return text("gui.ascendant.catalog.cooldown_remaining", "On cooldown: %s ticks").formatted(cooldown);
         }
         if (entry.type() == EntryType.POWER) {
-            return text("gui.ascendant.catalog.power_type_reason", "This power type is passive or not manually supported.");
+            return text("gui.ascendant.catalog.power_type_reason",
+                    "This power type is passive or not manually supported.");
         }
         if (entry.type() == EntryType.ABILITY) {
             return text("gui.ascendant.catalog.ability_trigger_reason", "This ability uses an automatic trigger.");
@@ -528,7 +531,32 @@ public final class PowerCatalogScreen extends Screen {
     }
 
     private Entry selectedEntry() {
-        return selectedIndex >= 0 && selectedIndex < visibleEntries.size() ? visibleEntries.get(selectedIndex) : null;
+        return selectedIndex >= 0 && selectedIndex < visibleEntries.size()
+                ? visibleEntries.get(selectedIndex) : null;
+    }
+
+    /**
+     * The selected entry drives the presentation: a suit supplies its universe identity and
+     * a pack supplies its optional {@code theme} metadata. Without a selection the equipped
+     * suit (or the neutral cosmic fallback) is used, so nothing is hardcoded per hero.
+     */
+    private CatalogTheme themeFor(Entry entry) {
+        if (entry == null) {
+            return CatalogTheme.current();
+        }
+        if (entry.type() == EntryType.SUIT) {
+            SuitDefinition suit = SuitRegistry.get(entry.id());
+            if (suit != null) {
+                return CatalogTheme.forSuit(suit);
+            }
+        }
+        if (entry.packId() != null) {
+            PackManifest pack = packsById.get(entry.packId());
+            if (pack != null) {
+                return CatalogTheme.forPack(pack);
+            }
+        }
+        return CatalogTheme.current();
     }
 
     private void ensureSelectionVisible() {
@@ -539,147 +567,427 @@ public final class PowerCatalogScreen extends Screen {
     }
 
     private int listWidth() {
-        return Math.max(90, Math.min((int) (width * 0.43D), width - 160));
+        return Math.max(170, Math.min((int) (width * 0.40D), width - 190));
     }
 
     private int visibleRowCount() {
-        return Math.max(1, (height - 176) / 22);
+        return Math.max(1, (height - BOTTOM_RESERVED - LIST_TOP) / (CARD_HEIGHT + CARD_GAP));
+    }
+
+    private int detailX() {
+        return MARGIN + listWidth() + 8;
+    }
+
+    private int detailWidth() {
+        return width - detailX() - MARGIN;
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (filterDirty) applyFilter();
         updateActionButtons();
-        renderBackground(graphics);
-        super.render(graphics, mouseX, mouseY, partialTick);
-        int listWidth = listWidth();
-        int listTop = 125;
-        int listBottom = height - 35;
-        int detailX = 24 + listWidth;
-        int detailWidth = width - detailX - 12;
-        graphics.drawCenteredString(font, title, width / 2, 7, 0xFFFFFF);
+        CatalogTheme theme = themeFor(selectedEntry());
 
-        graphics.fill(12, listTop, 12 + listWidth, listBottom, 0xA0202020);
-        int rowCount = visibleRowCount();
-        for (int row = 0; row < rowCount; row++) {
+        ComicUi.backdrop(graphics, theme, width, height);
+        renderHeader(graphics, theme, mouseX, mouseY);
+        renderSearchAndFilters(graphics, theme, mouseX, mouseY);
+        renderList(graphics, theme, mouseX, mouseY);
+        renderDetail(graphics, theme);
+        super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    private void renderHeader(GuiGraphics graphics, CatalogTheme theme, int mouseX, int mouseY) {
+        graphics.drawString(font, text("gui.ascendant.catalog.brand", "ASCENDANT"),
+                MARGIN, 8, theme.accentBright(), false);
+        graphics.drawString(font, text("gui.ascendant.catalog.title", "Ascendant Catalog"),
+                MARGIN, 19, theme.ink(), false);
+        String subtitle = text("gui.ascendant.catalog.subtitle",
+                "Server-authoritative powers, abilities and suits");
+        graphics.drawString(font, ComicUi.fit(font, subtitle, width - 240), MARGIN, 31, theme.muted(), false);
+
+        String themeLabel = localized(theme.labelKey(), theme.id());
+        ComicUi.badge(graphics, font, themeLabel, width - 190, 27, withAlpha(theme.accent(), 0x44), theme.accentBright());
+
+        int tabsX = MARGIN;
+        int available = width - MARGIN * 2 - 84;
+        int tabWidth = Math.max(48, (available - (Tab.values().length - 1) * 4) / Tab.values().length);
+        int x = tabsX;
+        for (Tab value : Tab.values()) {
+            boolean selected = value == tab;
+            boolean hovered = mouseX >= x && mouseX < x + tabWidth && mouseY >= TAB_Y && mouseY < TAB_Y + TAB_HEIGHT;
+            int fill = selected ? withAlpha(theme.accent(), 0x55)
+                    : hovered ? withAlpha(theme.accent(), 0x28) : 0x66101620;
+            graphics.fill(x, TAB_Y, x + tabWidth, TAB_Y + TAB_HEIGHT, fill);
+            graphics.renderOutline(x, TAB_Y, tabWidth, TAB_HEIGHT,
+                    selected ? theme.accent() : withAlpha(theme.muted(), 0x66));
+            if (selected) {
+                graphics.fill(x, TAB_Y + TAB_HEIGHT - 2, x + tabWidth, TAB_Y + TAB_HEIGHT, theme.accentBright());
+            }
+            graphics.drawCenteredString(font, localized(value.key, value.fallback),
+                    x + tabWidth / 2, TAB_Y + 5, selected ? theme.ink() : theme.muted());
+            x += tabWidth + 4;
+        }
+    }
+
+    private void renderSearchAndFilters(GuiGraphics graphics, CatalogTheme theme, int mouseX, int mouseY) {
+        int listWidth = listWidth();
+        ComicUi.panel(graphics, MARGIN, SEARCH_Y, listWidth, 20, theme, false);
+        if (searchBox != null && searchQuery.isEmpty() && !searchBox.isFocused()) {
+            graphics.drawString(font, text("gui.ascendant.catalog.search", "Search name, ID or category"),
+                    MARGIN + 8, SEARCH_Y + 6, theme.muted(), false);
+        }
+
+        int x = MARGIN;
+        x = drawChip(graphics, theme, x, CHIP_Y, categoryLabel().getString(), mouseX, mouseY);
+        if (tab == Tab.POWERS || tab == Tab.ABILITIES) {
+            x = drawChip(graphics, theme, x, CHIP_Y, sourceLabel().getString(), mouseX, mouseY);
+        }
+        if (filtersActive()) {
+            drawChip(graphics, theme, x, CHIP_Y, text("gui.ascendant.catalog.reset_filters", "Reset"), mouseX, mouseY);
+        }
+
+        String count = text("gui.ascendant.catalog.result_count", "%s entries").formatted(visibleEntries.size());
+        graphics.drawString(font, count, MARGIN + listWidth - font.width(count), CHIP_Y + 4, theme.muted(), false);
+    }
+
+    private int drawChip(GuiGraphics graphics, CatalogTheme theme, int x, int y, String label,
+                         int mouseX, int mouseY) {
+        int chipWidth = Math.min(font.width(label) + 16, Math.max(60, listWidth() - (x - MARGIN)));
+        boolean hovered = mouseX >= x && mouseX < x + chipWidth && mouseY >= y && mouseY < y + CHIP_HEIGHT;
+        graphics.fill(x, y, x + chipWidth, y + CHIP_HEIGHT,
+                hovered ? withAlpha(theme.accent(), 0x44) : 0x88101620);
+        graphics.renderOutline(x, y, chipWidth, CHIP_HEIGHT, withAlpha(theme.accent(), 0x77));
+        graphics.drawString(font, ComicUi.fit(font, label, chipWidth - 12), x + 6, y + 4,
+                hovered ? theme.accentBright() : theme.ink(), false);
+        return x + chipWidth + 5;
+    }
+
+    private boolean filtersActive() {
+        return !searchQuery.isBlank() || !categoryFilter.equals("all") || !sourceFilter.equals("all");
+    }
+
+    private void renderList(GuiGraphics graphics, CatalogTheme theme, int mouseX, int mouseY) {
+        int listWidth = listWidth();
+        int listBottom = height - BOTTOM_RESERVED;
+        ComicUi.panel(graphics, MARGIN, LIST_TOP, listWidth, listBottom - LIST_TOP, theme, false);
+        graphics.enableScissor(MARGIN + 4, LIST_TOP + 2, MARGIN + listWidth - 4, listBottom - 2);
+        int rows = visibleRowCount();
+        for (int row = 0; row < rows; row++) {
             int index = scrollOffset + row;
             if (index >= visibleEntries.size()) break;
-            int top = listTop + row * 22;
-            Entry entry = visibleEntries.get(index);
-            boolean selected = index == selectedIndex;
-            graphics.fill(14, top, 10 + listWidth, top + 21, selected ? 0xC06088B0 : 0x60303030);
-            int color = entry.functional() ? 0xFFFFFF : 0xFFAAAAAA;
-            graphics.drawString(font, font.plainSubstrByWidth(entry.name(), listWidth - 70), 19, top + 3, color);
-            String state = entry.functional()
-                    ? text("gui.ascendant.catalog.functional_short", "Functional")
-                    : text("gui.ascendant.catalog.template_short", "Template");
-            graphics.drawString(font, font.plainSubstrByWidth(state, 62), 19, top + 12,
-                    entry.functional() ? 0xFF80E080 : 0xFFFFC060);
+            int top = LIST_TOP + 3 + row * (CARD_HEIGHT + CARD_GAP);
+            renderCard(graphics, theme, visibleEntries.get(index), index, top, listWidth, mouseX, mouseY);
         }
+        graphics.disableScissor();
+
         if (visibleEntries.isEmpty()) {
             graphics.drawString(font, text("gui.ascendant.catalog.no_results", "No matching entries."),
-                    20, listTop + 8, 0xFFFFC060);
+                    MARGIN + 10, LIST_TOP + 10, 0xFFFFC060, false);
+            graphics.drawString(font, text("gui.ascendant.catalog.no_results_hint",
+                            "Adjust the search or use Reset."),
+                    MARGIN + 10, LIST_TOP + 24, theme.muted(), false);
         }
-        if (visibleEntries.size() > rowCount) {
-            String pageText = (scrollOffset + 1) + "-" + Math.min(scrollOffset + rowCount, visibleEntries.size())
+        if (visibleEntries.size() > rows) {
+            String pageText = (scrollOffset + 1) + "-" + Math.min(scrollOffset + rows, visibleEntries.size())
                     + " / " + visibleEntries.size();
-            graphics.drawString(font, pageText, 16, listBottom - 11, 0xFFCCCCCC);
+            graphics.drawString(font, pageText, MARGIN + 8, listBottom - 12, theme.muted(), false);
         }
-
-        graphics.fill(detailX, 51, width - 12, height - 35, 0xA0202020);
-        renderDetails(graphics, detailX + 8, 57, detailWidth - 16);
     }
 
-    private void renderDetails(GuiGraphics graphics, int x, int y, int detailWidth) {
+    private void renderCard(GuiGraphics graphics, CatalogTheme theme, Entry entry, int index, int top,
+                            int listWidth, int mouseX, int mouseY) {
+        boolean selected = index == selectedIndex;
+        boolean hovered = mouseX >= MARGIN && mouseX < MARGIN + listWidth
+                && mouseY >= top && mouseY < top + CARD_HEIGHT;
+        int fill = selected ? withAlpha(theme.accent(), 0x3C)
+                : hovered ? withAlpha(theme.accent(), 0x20) : 0x8C10151E;
+        int accent = categoryAccent(entry, theme);
+        graphics.fill(MARGIN + 4, top, MARGIN + listWidth - 4, top + CARD_HEIGHT, fill);
+        graphics.renderOutline(MARGIN + 4, top, listWidth - 8, CARD_HEIGHT,
+                selected ? theme.accent() : withAlpha(theme.muted(), 0x55));
+        graphics.fill(MARGIN + 4, top, MARGIN + 8, top + CARD_HEIGHT, accent);
+
+        int textX = MARGIN + 14;
+        graphics.drawString(font, ComicUi.fit(font, entry.name(), listWidth - 100),
+                textX, top + 5, selected ? theme.ink() : 0xFFE8EEF6, false);
+        String meta = categoryLabel(entry) + "  ·  " + typeLabel(entry);
+        graphics.drawString(font, ComicUi.fit(font, meta, listWidth - 100), textX, top + 18,
+                theme.muted(), false);
+        graphics.drawString(font, ComicUi.fit(font, activationHint(entry, false), listWidth - 100),
+                textX, top + 30, withAlpha(accent, 0xDD), false);
+
+        int stateColor = stateColor(entry, theme);
+        String state = shortState(entry);
+        int badgeWidth = font.width(state) + 12;
+        int badgeX = MARGIN + listWidth - badgeWidth - 8;
+        graphics.fill(badgeX, top + 6, badgeX + badgeWidth, top + 17, withAlpha(stateColor, 0x33));
+        graphics.renderOutline(badgeX, top + 6, badgeWidth, 11, withAlpha(stateColor, 0x88));
+        graphics.drawString(font, state, badgeX + 6, top + 8, stateColor, false);
+    }
+
+    private void renderDetail(GuiGraphics graphics, CatalogTheme theme) {
+        int x = detailX();
+        int y = SEARCH_Y;
+        int width = detailWidth();
+        int bottom = height - BOTTOM_RESERVED;
+        ComicUi.panel(graphics, x, y, width, bottom - y, theme, true);
+        int contentX = x + 12;
+        int contentWidth = width - 24;
+        int cursor = y + 10;
+
         Entry entry = selectedEntry();
         if (entry == null) {
-            graphics.drawString(font, text("gui.ascendant.catalog.select_prompt", "Select an entry to see details."),
-                    x, y, 0xFFFFFFFF);
-            drawFeedback(graphics, x, height - 48, detailWidth);
+            graphics.drawString(font, text("gui.ascendant.catalog.select_prompt",
+                    "Select an entry to see its details."), contentX, cursor, theme.ink(), false);
+            renderFeedback(graphics, theme, contentX, bottom - 34, contentWidth);
             return;
         }
-        int lineY = y;
-        graphics.drawString(font, font.plainSubstrByWidth(entry.name(), detailWidth), x, lineY, 0xFFFFFFFF);
-        lineY += 16;
-        drawDetailLine(graphics, x, lineY, detailWidth, text("gui.ascendant.catalog.id", "ID") + ": " + entry.id());
-        lineY += 13;
-        String categoryLabel = entry.categoryKey() == null ? entry.category()
-                : localized(entry.categoryKey(), categoryFallback(entry));
-        drawDetailLine(graphics, x, lineY, detailWidth,
-                text("gui.ascendant.catalog.category", "Category") + ": " + categoryLabel);
-        lineY += 13;
-        drawDetailLine(graphics, x, lineY, detailWidth,
-                text("gui.ascendant.catalog.status", "Status") + ": "
-                        + (entry.functional() ? text("gui.ascendant.catalog.functional", "Functional")
-                        : text("gui.ascendant.catalog.template", "Template — not executable")));
-        lineY += 13;
-        drawDetailLine(graphics, x, lineY, detailWidth,
-                text("gui.ascendant.catalog.runtime_state", "Runtime") + ": " + runtimeStatus(entry));
-        lineY += 13;
-        drawDetailLine(graphics, x, lineY, detailWidth,
-                text("gui.ascendant.catalog.type", "Type") + ": " + entry.metadata());
-        lineY += 13;
+
+        ComicUi.headerBand(graphics, contentX, cursor, contentWidth, 30, theme);
+        graphics.drawString(font, ComicUi.fit(font, entry.name(), contentWidth - 16),
+                contentX + 9, cursor + 5, theme.ink(), false);
+        graphics.drawString(font, ComicUi.fit(font, entry.id().toString(), contentWidth - 16),
+                contentX + 9, cursor + 18, theme.muted(), false);
+        cursor += 38;
+
+        int badgeX = contentX;
+        badgeX = detailBadge(graphics, theme, badgeX, cursor, typeLabel(entry), theme.accent());
+        badgeX = detailBadge(graphics, theme, badgeX, cursor, categoryLabel(entry), 0xFF9AD8A0);
         if (entry.cooldown() > 0) {
-            drawDetailLine(graphics, x, lineY, detailWidth,
-                    text("gui.ascendant.catalog.cooldown", "Cooldown") + ": " + entry.cooldown() + " ticks");
-            lineY += 13;
+            detailBadge(graphics, theme, badgeX, cursor,
+                    text("gui.ascendant.catalog.cooldown_short", "%ss cd")
+                            .formatted(String.format(Locale.ROOT, "%.1f", entry.cooldown() / 20.0F)),
+                    0xFFFFC060);
         }
-        drawDetailLine(graphics, x, lineY, detailWidth, entry.description());
-        lineY += 35;
+        cursor += 18;
+
+        cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
+                text("gui.ascendant.catalog.mechanics", "Mechanics"), mechanicsText(entry));
+        cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
+                text("gui.ascendant.catalog.activation", "Activation"), activationHint(entry, true));
+        cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
+                text("gui.ascendant.catalog.requirements", "Requirements"), requirementsText(entry));
+        cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
+                text("gui.ascendant.catalog.runtime_state", "Runtime state"), runtimeStatus(entry));
+
         if (entry.type() == EntryType.SUIT) {
-            SuitDefinition suit = SuitRegistry.get(entry.id());
-            if (suit != null) {
-                drawDetailLine(graphics, x, lineY, detailWidth,
-                        text("gui.ascendant.catalog.pack_source", "Pack source") + ": "
-                                + (entry.packId() == null ? text("gui.ascendant.catalog.builtin", "Built-in") : entry.packId()));
-                lineY += 13;
-                drawDetailLine(graphics, x, lineY, detailWidth,
-                        text("gui.ascendant.catalog.granted_powers", "Granted powers") + ": "
-                                + suit.getGrantedPowers().size());
-                lineY += 13;
-                for (ResourceLocation powerId : suit.getGrantedPowers()) {
-                    if (lineY > height - 75) break;
-                    drawDetailLine(graphics, x, lineY, detailWidth, powerId.toString());
-                    lineY += 11;
-                }
-                drawDetailLine(graphics, x, lineY, detailWidth,
-                        text("gui.ascendant.catalog.granted_abilities", "Granted abilities") + ": "
-                                + suit.getGrantedAbilities().size());
-                lineY += 13;
-                for (ResourceLocation abilityId : suit.getGrantedAbilities()) {
-                    if (lineY > height - 75) break;
-                    drawDetailLine(graphics, x, lineY, detailWidth, abilityId.toString());
-                    lineY += 11;
-                }
-            }
+            cursor = renderSuitDetails(graphics, theme, entry, contentX, cursor, contentWidth, bottom);
+        } else if (entry.type() == EntryType.PACK) {
+            cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
+                    text("gui.ascendant.catalog.pack_status", "Pack status"), packStatus(entry));
+        } else {
+            cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
+                    text("gui.ascendant.catalog.source", "Source"), sourceText(entry));
         }
-        if (entry.type() == EntryType.PACK) {
-            drawDetailLine(graphics, x, lineY, detailWidth,
-                    text("gui.ascendant.catalog.pack_status", "Pack status") + ": " + runtimeStatus(entry));
-            lineY += 13;
-            drawDetailLine(graphics, x, lineY, detailWidth,
-                    text("gui.ascendant.catalog.pack_limits",
-                            "No character profiles are inferred from pack metadata."));
-            lineY += 13;
-        }
+
         if (entry.action().type() == CatalogInteraction.ActionType.NONE) {
-            drawWrapped(graphics, unavailableReason(entry), x, Math.min(lineY, height - 74), detailWidth, 12, 0xFFFFC060);
-        } else if (entry.type() != EntryType.SUIT) {
-            drawWrapped(graphics, text("gui.ascendant.catalog.ownership_note",
-                    "Use may require server ownership; the server decides."), x,
-                    Math.min(lineY, height - 74), detailWidth, 12, 0xFFB0D0FF);
+            ComicUi.wrapped(graphics, font, unavailableReason(entry), contentX,
+                    Math.min(cursor, bottom - 44), contentWidth, 3, 11, 0xFFFFC060);
         }
-        drawFeedback(graphics, x, height - 48, detailWidth);
+        renderFeedback(graphics, theme, contentX, bottom - 34, contentWidth);
     }
 
-    private String categoryFallback(Entry entry) {
+    private int renderSuitDetails(GuiGraphics graphics, CatalogTheme theme, Entry entry, int x, int y,
+                                  int width, int bottom) {
+        SuitDefinition suit = SuitRegistry.get(entry.id());
+        if (suit == null) {
+            return y;
+        }
+        y = detailSection(graphics, theme, x, y, width,
+                text("gui.ascendant.catalog.granted_powers", "Granted powers"),
+                suit.getGrantedPowers().size() + " · " + joinIds(suit.getGrantedPowers(), 4));
+        y = detailSection(graphics, theme, x, y, width,
+                text("gui.ascendant.catalog.granted_abilities", "Granted abilities"),
+                suit.getGrantedAbilities().size() + " · " + joinIds(suit.getGrantedAbilities(), 4));
+        return detailSection(graphics, theme, x, y, width,
+                text("gui.ascendant.catalog.suit_identity", "Identity"),
+                suit.getUniverse() + " · " + suit.getRarity().name() + " · " + suit.getAuthor());
+    }
+
+    private int detailSection(GuiGraphics graphics, CatalogTheme theme, int x, int y, int width,
+                              String heading, String body) {
+        if (y > height - BOTTOM_RESERVED - 26) {
+            return y;
+        }
+        graphics.drawString(font, heading.toUpperCase(Locale.ROOT), x, y, theme.accent(), false);
+        y += 11;
+        ComicUi.wrapped(graphics, font, body == null ? "" : body, x, y, width, 4, 10, 0xFFD8E2EE);
+        int lines = Math.min(4, font.split(Component.literal(body == null ? "" : body), width).size());
+        return y + lines * 10 + 6;
+    }
+
+    private int detailBadge(GuiGraphics graphics, CatalogTheme theme, int x, int y, String label, int color) {
+        String fitted = ComicUi.fit(font, label, Math.max(40, detailWidth() / 3));
+        ComicUi.badge(graphics, font, fitted, x, y, withAlpha(color, 0x2A), color);
+        return x + font.width(fitted) + 13;
+    }
+
+    private void renderFeedback(GuiGraphics graphics, CatalogTheme theme, int x, int y, int width) {
+        if (!feedback.isEmpty()) {
+            ComicUi.wrapped(graphics, font, feedback, x, y, width, 2, 10, feedbackColor);
+        } else {
+            String hint = text("gui.ascendant.catalog.key_hint",
+                    "↑/↓ select · Enter use · V activate · B toggle · G radial");
+            graphics.drawString(font, ComicUi.fit(font, hint, width), x, y, theme.muted(), false);
+        }
+    }
+
+    private String mechanicsText(Entry entry) {
+        if (I18n.exists(descriptionKey(entry))) {
+            return I18n.get(descriptionKey(entry));
+        }
         if (entry.type() == EntryType.POWER) {
-            return PowerCategory.valueOf(entry.category()).getDisplayName();
+            return switch (entry.metadata()) {
+                case "TOGGLE", "SUSTAINED" -> entry.cooldown() > 0
+                        ? text("gui.ascendant.catalog.mechanics.toggle_cd",
+                        "Stays enabled until turned off; its components tick on the server. Reactivating starts a %s-tick cooldown.")
+                        .formatted(entry.cooldown())
+                        : text("gui.ascendant.catalog.mechanics.toggle",
+                        "Stays enabled until turned off; its components run every server tick while active.");
+                case "PASSIVE" -> text("gui.ascendant.catalog.mechanics.passive",
+                        "Always active while the power is owned; no manual activation.");
+                case "ACTIVE" -> entry.cooldown() > 0
+                        ? text("gui.ascendant.catalog.mechanics.active_cd",
+                        "Triggers the registered effect once, then starts a %s-tick cooldown.")
+                        .formatted(entry.cooldown())
+                        : text("gui.ascendant.catalog.mechanics.active",
+                        "Triggers the registered effect once when used.");
+                case "CHARGED" -> text("gui.ascendant.catalog.mechanics.charged",
+                        "Charge-based design. This build exposes it as a template, not a working manual action.");
+                default -> text("gui.ascendant.catalog.mechanics.generic",
+                        "This power is registered but has no manual runtime path in this build.");
+            };
         }
         if (entry.type() == EntryType.ABILITY) {
-            return AbilityCategory.valueOf(entry.category()).getDisplayName();
+            String trigger = entry.metadata().split(" \\|", 2)[0];
+            return switch (trigger) {
+                case "KEY_PRESS" -> text("gui.ascendant.catalog.mechanics.key",
+                        "Manual ability: use the catalog or radial while its parent power is owned.");
+                case "SNEAK_KEY" -> text("gui.ascendant.catalog.mechanics.sneak",
+                        "Manual ability: sneak and use it while its parent power is owned.");
+                case "TOGGLE" -> text("gui.ascendant.catalog.mechanics.toggle",
+                        "Stays enabled until turned off; its components run every server tick while active.");
+                case "PASSIVE" -> text("gui.ascendant.catalog.mechanics.passive_ability",
+                        "Passive ability: applied and maintained automatically while accessible.");
+                case "TICK" -> text("gui.ascendant.catalog.mechanics.tick",
+                        "Periodic ability: the server maintains it automatically.");
+                case "HURT_EVENT", "ATTACK_HIT" -> text("gui.ascendant.catalog.mechanics.reactive",
+                        "Reactive ability: triggered by combat events, never manually.");
+                default -> text("gui.ascendant.catalog.mechanics.generic",
+                        "This ability is registered but has no manual runtime path in this build.");
+            };
         }
-        return entry.category();
+        if (entry.type() == EntryType.SUIT) {
+            return text("gui.ascendant.catalog.mechanics.suit",
+                    "Loadout metadata only: equipping grants the listed powers and abilities. No character profile is inferred.");
+        }
+        return text("gui.ascendant.catalog.mechanics.pack",
+                "Content pack metadata: counts and origins only. Its powers, abilities and suits appear in their own tabs.");
+    }
+
+    private String descriptionKey(Entry entry) {
+        return switch (entry.type()) {
+            case POWER -> {
+                PowerDefinition power = PowerRegistry.get(entry.id());
+                yield power == null ? "" : power.getDescriptionKey();
+            }
+            case ABILITY -> {
+                AbilityDefinition ability = AbilityRegistry.get(entry.id());
+                yield ability == null ? "" : ability.getDescriptionKey();
+            }
+            case SUIT -> {
+                SuitDefinition suit = SuitRegistry.get(entry.id());
+                yield suit == null ? "" : suit.getDescriptionKey();
+            }
+            case PACK -> "";
+        };
+    }
+
+    private String activationHint(Entry entry, boolean detailed) {
+        if (!entry.functional()) {
+            return text("gui.ascendant.catalog.hint.template", "Template only — no runtime action");
+        }
+        return switch (entry.type()) {
+            case POWER -> switch (entry.metadata()) {
+                case "ACTIVE" -> detailed
+                        ? text("gui.ascendant.catalog.hint.active_long",
+                        "Use from the catalog (Enter/click) or press V. Server checks ownership and cooldown.")
+                        : text("gui.ascendant.catalog.hint.active", "V · use once");
+                case "TOGGLE", "SUSTAINED" -> entry.id().getPath().equals("kinetic_sprint") ? detailed
+                        ? text("gui.ascendant.catalog.hint.super_speed_long",
+                        "Toggle super-speed: catalog button, radial, or Z. While active, WASD drives the speedster mode; [ and ] change the level; Left Alt brakes.")
+                        : text("gui.ascendant.catalog.hint.super_speed", "B / Z · super-speed")
+                        : detailed
+                        ? text("gui.ascendant.catalog.hint.toggle_long",
+                        "Toggle from the catalog (Enter/click) or press B. Toggle off still works during cooldown.")
+                        : text("gui.ascendant.catalog.hint.toggle", "B · toggle");
+                case "PASSIVE" -> text("gui.ascendant.catalog.hint.passive", "Always on while owned");
+                default -> text("gui.ascendant.catalog.hint.automatic", "Automatic / not manually usable");
+            };
+            case ABILITY -> {
+                String trigger = entry.metadata().split(" \\|", 2)[0];
+                yield switch (trigger) {
+                    case "KEY_PRESS" -> detailed
+                            ? text("gui.ascendant.catalog.hint.key_long",
+                            "Select it in the catalog or radial and activate; the server validates access and cooldown.")
+                            : text("gui.ascendant.catalog.hint.key", "Use from catalog / radial");
+                    case "SNEAK_KEY" -> detailed
+                            ? text("gui.ascendant.catalog.hint.sneak_long",
+                            "Hold sneak while activating; otherwise the server refuses the request.")
+                            : text("gui.ascendant.catalog.hint.sneak", "Sneak + use");
+                    case "TOGGLE" -> detailed
+                            ? text("gui.ascendant.catalog.hint.toggle_long",
+                            "Toggle from the catalog or radial. Turning it off is always allowed.")
+                            : text("gui.ascendant.catalog.hint.toggle", "B · toggle");
+                    default -> text("gui.ascendant.catalog.hint.automatic", "Automatic trigger");
+                };
+            }
+            case SUIT -> detailed
+                    ? text("gui.ascendant.catalog.hint.suit_long",
+                    "Equip from this catalog. The server records the loadout and grants its powers while equipped.")
+                    : text("gui.ascendant.catalog.hint.suit", "Click · equip");
+            case PACK -> text("gui.ascendant.catalog.hint.pack", "Metadata only");
+        };
+    }
+
+    private String requirementsText(Entry entry) {
+        if (entry.type() == EntryType.POWER) {
+            boolean owned = CatalogClientState.hasPower(entry.id());
+            return owned
+                    ? text("gui.ascendant.catalog.req.owned",
+                    "Owned through unlocked powers or the equipped suit.")
+                    : text("gui.ascendant.catalog.req.not_owned",
+                    "Not owned. Unlock it or equip a suit that grants it.");
+        }
+        if (entry.type() == EntryType.ABILITY) {
+            String requirement = entry.metadata().contains("|")
+                    ? entry.metadata().substring(entry.metadata().indexOf('|') + 1).trim() : "";
+            boolean accessible = CatalogClientState.hasAbility(entry.id());
+            return (accessible ? text("gui.ascendant.catalog.req.available",
+                    "Accessible now.") : text("gui.ascendant.catalog.req.locked",
+                    "Not accessible now.")) + " " + requirement;
+        }
+        if (entry.type() == EntryType.SUIT) {
+            return CatalogClientState.getEquippedSuit() != null
+                    && CatalogClientState.getEquippedSuit().equals(entry.id())
+                    ? text("gui.ascendant.catalog.req.equipped", "This loadout is currently equipped.")
+                    : text("gui.ascendant.catalog.req.loadout",
+                    "No ownership gate is inferred from the loadout; equipping is server-validated.");
+        }
+        return packStatus(entry);
+    }
+
+    private String packStatus(Entry entry) {
+        return PackManager.getLoadedPackIds().contains(entry.packId())
+                ? text("gui.ascendant.catalog.pack_loaded", "Installed and loaded; item origins are tracked.")
+                : text("gui.ascendant.catalog.pack_unloaded", "Available locally; not loaded.");
+    }
+
+    private String sourceText(Entry entry) {
+        String origin = entry.packId() == null
+                ? text("gui.ascendant.catalog.builtin", "Built-in")
+                : text("gui.ascendant.catalog.source_pack", "Pack") + ": " + entry.packId();
+        return origin + " · " + entry.metadata();
     }
 
     private String runtimeStatus(Entry entry) {
@@ -687,9 +995,7 @@ public final class PowerCatalogScreen extends Screen {
             return text("gui.ascendant.catalog.loading_state", "Waiting for authoritative server state.");
         }
         if (entry.type() == EntryType.PACK) {
-            return PackManager.getLoadedPackIds().contains(entry.packId())
-                    ? text("gui.ascendant.catalog.pack_loaded", "Installed and loaded; item origins are tracked.")
-                    : text("gui.ascendant.catalog.pack_unloaded", "Available locally; not loaded.");
+            return packStatus(entry);
         }
         if (entry.type() == EntryType.SUIT) {
             return entry.id().equals(CatalogClientState.getEquippedSuit())
@@ -699,7 +1005,8 @@ public final class PowerCatalogScreen extends Screen {
         boolean accessible = entry.type() == EntryType.POWER
                 ? CatalogClientState.hasPower(entry.id()) : CatalogClientState.hasAbility(entry.id());
         if (!accessible) {
-            return text("gui.ascendant.catalog.not_owned", "Not available from current powers or equipped suit.");
+            return text("gui.ascendant.catalog.not_owned",
+                    "Not available from current powers or equipped suit.");
         }
         if (isToggled(entry)) {
             return text("gui.ascendant.catalog.active", "Active");
@@ -714,32 +1021,181 @@ public final class PowerCatalogScreen extends Screen {
         return text("gui.ascendant.catalog.ready", "Ready");
     }
 
-    private void drawFeedback(GuiGraphics graphics, int x, int y, int detailWidth) {
-        if (!feedback.isEmpty()) drawWrapped(graphics, feedback, x, y, detailWidth, 11, 0xFF80E0FF);
-    }
-
-    private void drawDetailLine(GuiGraphics graphics, int x, int y, int detailWidth, String value) {
-        graphics.drawString(font, font.plainSubstrByWidth(value, detailWidth), x, y, 0xFFCCCCCC);
-    }
-
-    private void drawWrapped(GuiGraphics graphics, String value, int x, int y, int maxWidth, int lineHeight, int color) {
-        List<net.minecraft.util.FormattedCharSequence> lines = font.split(Component.literal(value), maxWidth);
-        int maxLines = Math.max(1, (height - y - 58) / lineHeight);
-        for (int index = 0; index < Math.min(lines.size(), maxLines); index++) {
-            graphics.drawString(font, lines.get(index), x, y + index * lineHeight, color);
+    private String shortState(Entry entry) {
+        if (!entry.functional()) {
+            return text("gui.ascendant.catalog.template_short", "Template");
         }
+        if (entry.type() == EntryType.POWER && !CatalogClientState.isInitialized()) {
+            return text("gui.ascendant.catalog.loading_short", "Syncing");
+        }
+        if (isToggled(entry)) {
+            return text("gui.ascendant.catalog.active", "Active");
+        }
+        int cooldown = CatalogClientState.getCooldown(entry.id());
+        if (cooldown > 0) {
+            return cooldown + "t";
+        }
+        if (entry.action().type() == CatalogInteraction.ActionType.NONE) {
+            return text("gui.ascendant.catalog.passive_short", "Passive");
+        }
+        return text("gui.ascendant.catalog.ready_short", "Ready");
+    }
+
+    private int stateColor(Entry entry, CatalogTheme theme) {
+        if (!entry.functional()) {
+            return 0xFFFFA060;
+        }
+        if (isToggled(entry)) {
+            return theme.accentBright();
+        }
+        if (CatalogClientState.getCooldown(entry.id()) > 0) {
+            return 0xFFFFC060;
+        }
+        if (entry.action().type() == CatalogInteraction.ActionType.NONE) {
+            return 0xFF9AA8B8;
+        }
+        return 0xFF7CE38B;
+    }
+
+    private int categoryAccent(Entry entry, CatalogTheme theme) {
+        if (entry.type() == EntryType.SUIT) {
+            return 0xFFE8B84A;
+        }
+        if (entry.type() == EntryType.PACK) {
+            return 0xFFB58CFF;
+        }
+        if (entry.type() == EntryType.ABILITY) {
+            return 0xFF7CE3C0;
+        }
+        try {
+            PowerCategory category = PowerCategory.valueOf(entry.category());
+            return switch (category) {
+                case FLIGHT -> 0xFF74C7FF;
+                case SUPERSPEED -> 0xFFFFD24A;
+                case SUPERSTRENGTH -> 0xFFFF8C5A;
+                case ENERGY -> 0xFF9C8CFF;
+                case TELEPORTATION -> 0xFFDA8CFF;
+                default -> theme.accent();
+            };
+        } catch (IllegalArgumentException ignored) {
+            return theme.accent();
+        }
+    }
+
+    private String categoryLabel(Entry entry) {
+        if (entry.categoryKey() == null) {
+            return entry.category().equals("packs")
+                    ? text("gui.ascendant.catalog.packs_category", "Content packs") : entry.category();
+        }
+        return localized(entry.categoryKey(), categoryFallback(entry));
+    }
+
+    private String categoryFallback(Entry entry) {
+        if (entry.type() == EntryType.POWER) {
+            return PowerCategory.valueOf(entry.category()).getDisplayName();
+        }
+        if (entry.type() == EntryType.ABILITY) {
+            return AbilityCategory.valueOf(entry.category()).getDisplayName();
+        }
+        return entry.category();
+    }
+
+    private String typeLabel(Entry entry) {
+        return switch (entry.type()) {
+            case POWER -> text("gui.ascendant.catalog.type.power", "Power");
+            case ABILITY -> text("gui.ascendant.catalog.type.ability", "Ability");
+            case SUIT -> text("gui.ascendant.catalog.type.suit", "Suit");
+            case PACK -> text("gui.ascendant.catalog.type.pack", "Pack");
+        };
+    }
+
+    private String joinIds(List<ResourceLocation> ids, int limit) {
+        if (ids.isEmpty()) {
+            return text("gui.ascendant.catalog.none", "none");
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < Math.min(limit, ids.size()); index++) {
+            if (index > 0) builder.append(", ");
+            builder.append(ids.get(index).getPath());
+        }
+        if (ids.size() > limit) {
+            builder.append(" +").append(ids.size() - limit);
+        }
+        return builder.toString();
+    }
+
+    private int tabAt(double mouseX, double mouseY) {
+        if (mouseY < TAB_Y || mouseY >= TAB_Y + TAB_HEIGHT) {
+            return -1;
+        }
+        int available = width - MARGIN * 2 - 84;
+        int tabWidth = Math.max(48, (available - (Tab.values().length - 1) * 4) / Tab.values().length);
+        int x = MARGIN;
+        for (int index = 0; index < Tab.values().length; index++) {
+            if (mouseX >= x && mouseX < x + tabWidth) {
+                return index;
+            }
+            x += tabWidth + 4;
+        }
+        return -1;
+    }
+
+    private int filterChipAt(double mouseX, double mouseY) {
+        if (mouseY < CHIP_Y || mouseY >= CHIP_Y + CHIP_HEIGHT) {
+            return -1;
+        }
+        List<String> labels = new ArrayList<>();
+        labels.add(categoryLabel().getString());
+        if (tab == Tab.POWERS || tab == Tab.ABILITIES) {
+            labels.add(sourceLabel().getString());
+        }
+        if (filtersActive()) {
+            labels.add(text("gui.ascendant.catalog.reset_filters", "Reset"));
+        }
+        int x = MARGIN;
+        for (int index = 0; index < labels.size(); index++) {
+            int chipWidth = Math.min(font.width(labels.get(index)) + 16,
+                    Math.max(60, listWidth() - (x - MARGIN)));
+            if (mouseX >= x && mouseX < x + chipWidth) {
+                return index;
+            }
+            x += chipWidth + 5;
+        }
+        return -1;
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button)) return true;
+        if (button != 0) {
+            return false;
+        }
+        int tabIndex = tabAt(mouseX, mouseY);
+        if (tabIndex >= 0) {
+            changeTab(Tab.values()[tabIndex]);
+            return true;
+        }
+        int chip = filterChipAt(mouseX, mouseY);
+        if (chip == 0) {
+            cycleCategory();
+            return true;
+        }
+        if (chip == 1 && (tab == Tab.POWERS || tab == Tab.ABILITIES)) {
+            cycleSource();
+            return true;
+        }
+        if (chip > 0) {
+            resetFilters();
+            return true;
+        }
+
         int listWidth = listWidth();
-        int listTop = 125;
-        int listBottom = height - 35;
-        if (button == 0 && mouseX >= 12 && mouseX < 12 + listWidth && mouseY >= listTop && mouseY < listBottom) {
-            int row = (int) ((mouseY - listTop) / 22);
+        int listBottom = height - BOTTOM_RESERVED;
+        if (mouseX >= MARGIN && mouseX < MARGIN + listWidth
+                && mouseY >= LIST_TOP && mouseY < listBottom) {
+            int row = (int) ((mouseY - LIST_TOP - 3) / (CARD_HEIGHT + CARD_GAP));
             int index = scrollOffset + row;
-            if (index >= 0 && index < visibleEntries.size()) {
+            if (row >= 0 && row < visibleRowCount() && index >= 0 && index < visibleEntries.size()) {
                 selectedIndex = index;
                 updateActionButtons();
                 return true;
@@ -748,11 +1204,23 @@ public final class PowerCatalogScreen extends Screen {
         return false;
     }
 
+    private void resetFilters() {
+        searchQuery = "";
+        if (searchBox != null) {
+            searchBox.setValue("");
+        }
+        categoryFilter = "all";
+        sourceFilter = "all";
+        selectedIndex = 0;
+        scrollOffset = 0;
+        filterDirty = true;
+        setFeedback("", 0xFFB9F4FF);
+    }
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        int listWidth = listWidth();
         int maxOffset = Math.max(0, visibleEntries.size() - visibleRowCount());
-        if (mouseX < 12 + listWidth && maxOffset > 0) {
+        if (mouseX < MARGIN + listWidth() && maxOffset > 0) {
             scrollOffset = Mth.clamp(scrollOffset - (int) Math.signum(delta), 0, maxOffset);
             return true;
         }
@@ -794,16 +1262,14 @@ public final class PowerCatalogScreen extends Screen {
     }
 
     private String description(String key) {
-        if (net.minecraft.client.resources.language.I18n.exists(key)) {
-            return net.minecraft.client.resources.language.I18n.get(key);
+        if (I18n.exists(key)) {
+            return I18n.get(key);
         }
-        return text("gui.ascendant.catalog.description_missing", "No localized description is available.")
-                + " [" + key + "]";
+        return text("gui.ascendant.catalog.description_missing", "No localized description is available.");
     }
 
     private static String localized(String key, String fallback) {
-        return net.minecraft.client.resources.language.I18n.exists(key)
-                ? net.minecraft.client.resources.language.I18n.get(key) : fallback;
+        return I18n.exists(key) ? I18n.get(key) : fallback;
     }
 
     private static String humanize(String path) {
@@ -822,7 +1288,6 @@ public final class PowerCatalogScreen extends Screen {
     }
 
     private static String text(String key, String fallback) {
-        return net.minecraft.client.resources.language.I18n.get(key).equals(key)
-                ? fallback : net.minecraft.client.resources.language.I18n.get(key);
+        return I18n.exists(key) ? I18n.get(key) : fallback;
     }
 }

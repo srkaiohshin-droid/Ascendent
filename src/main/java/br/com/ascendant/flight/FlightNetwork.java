@@ -13,7 +13,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import java.util.function.Supplier;
 
 public final class FlightNetwork {
-    private static final String PROTOCOL = "1";
+    private static final String PROTOCOL = "2";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(Ascendant.MOD_ID, "flight"), () -> PROTOCOL,
             PROTOCOL::equals, PROTOCOL::equals);
@@ -31,6 +31,8 @@ public final class FlightNetwork {
                 ToggleRequest::handle, OptionalDirection.PLAY_TO_SERVER);
         CHANNEL.registerMessage(id++, InputUpdate.class, InputUpdate::encode, InputUpdate::decode,
                 InputUpdate::handle, OptionalDirection.PLAY_TO_SERVER);
+        CHANNEL.registerMessage(id++, ManeuverRequest.class, ManeuverRequest::encode,
+                ManeuverRequest::decode, ManeuverRequest::handle, OptionalDirection.PLAY_TO_SERVER);
         CHANNEL.registerMessage(id, FlightStateUpdate.class, FlightStateUpdate::encode,
                 FlightStateUpdate::decode, FlightStateUpdate::handle, OptionalDirection.PLAY_TO_CLIENT);
         registered = true;
@@ -44,17 +46,25 @@ public final class FlightNetwork {
         CHANNEL.sendToServer(new InputUpdate(inputMask));
     }
 
+    public static void requestManeuver(int direction) {
+        CHANNEL.sendToServer(new ManeuverRequest(direction));
+    }
+
     static void syncState(ServerPlayer player) {
         FlightState state = FlightController.getState(player);
         boolean active = state != null && state.isActive();
         CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player),
-                new FlightStateUpdate(player.getId(), active, player.isNoGravity()));
+                new FlightStateUpdate(player.getId(), active, player.isNoGravity(),
+                        state == null ? 0 : state.getManeuverDirection(),
+                        state == null ? 0 : state.getManeuverTicksRemaining()));
     }
 
     static void syncTrackedPlayer(ServerPlayer recipient, ServerPlayer target) {
         FlightState state = FlightController.getState(target);
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> recipient),
-                new FlightStateUpdate(target.getId(), state != null && state.isActive(), target.isNoGravity()));
+                new FlightStateUpdate(target.getId(), state != null && state.isActive(), target.isNoGravity(),
+                        state == null ? 0 : state.getManeuverDirection(),
+                        state == null ? 0 : state.getManeuverTicksRemaining()));
     }
 
     private static void handleToggle(ToggleRequest message, Supplier<NetworkEvent.Context> context) {
@@ -79,11 +89,23 @@ public final class FlightNetwork {
         ctx.setPacketHandled(true);
     }
 
+    private static void handleManeuver(ManeuverRequest message, Supplier<NetworkEvent.Context> context) {
+        NetworkEvent.Context ctx = context.get();
+        ctx.enqueueWork(() -> {
+            ServerPlayer sender = ctx.getSender();
+            if (sender != null) {
+                FlightController.requestManeuver(sender, message.direction());
+            }
+        });
+        ctx.setPacketHandled(true);
+    }
+
     private static void handleState(FlightStateUpdate message, Supplier<NetworkEvent.Context> context) {
         NetworkEvent.Context ctx = context.get();
         ctx.enqueueWork(() -> net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(
                 net.minecraftforge.api.distmarker.Dist.CLIENT,
-                () -> () -> FlightClientPackets.update(message.entityId(), message.active(), message.noGravity())));
+                () -> () -> FlightClientPackets.update(message.entityId(), message.active(), message.noGravity(),
+                        message.maneuverDirection(), message.maneuverTicksRemaining())));
         ctx.setPacketHandled(true);
     }
 
@@ -115,15 +137,33 @@ public final class FlightNetwork {
         }
     }
 
-    private record FlightStateUpdate(int entityId, boolean active, boolean noGravity) {
+    private record ManeuverRequest(int direction) {
+        private static void encode(ManeuverRequest message, FriendlyByteBuf buffer) {
+            buffer.writeByte(message.direction());
+        }
+
+        private static ManeuverRequest decode(FriendlyByteBuf buffer) {
+            return new ManeuverRequest(buffer.readByte());
+        }
+
+        private static void handle(ManeuverRequest message, Supplier<NetworkEvent.Context> context) {
+            FlightNetwork.handleManeuver(message, context);
+        }
+    }
+
+    private record FlightStateUpdate(int entityId, boolean active, boolean noGravity,
+                                     int maneuverDirection, int maneuverTicksRemaining) {
         private static void encode(FlightStateUpdate message, FriendlyByteBuf buffer) {
             buffer.writeVarInt(message.entityId());
             buffer.writeBoolean(message.active());
             buffer.writeBoolean(message.noGravity());
+            buffer.writeByte(message.maneuverDirection());
+            buffer.writeByte(message.maneuverTicksRemaining());
         }
 
         private static FlightStateUpdate decode(FriendlyByteBuf buffer) {
-            return new FlightStateUpdate(buffer.readVarInt(), buffer.readBoolean(), buffer.readBoolean());
+            return new FlightStateUpdate(buffer.readVarInt(), buffer.readBoolean(), buffer.readBoolean(),
+                    buffer.readByte(), buffer.readUnsignedByte());
         }
 
         private static void handle(FlightStateUpdate message, Supplier<NetworkEvent.Context> context) {

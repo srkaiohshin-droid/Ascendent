@@ -37,5 +37,29 @@ public interface FlightState {
 
     void setHadNoGravity(boolean hadNoGravity);
 
+    /** -1 for a left-hand roll, 1 for a right-hand roll, 0 when idle. */
+    int getManeuverDirection();
+
+    /** Ticks left in the current aerial maneuver; zero means no maneuver. */
+    int getManeuverTicksRemaining();
+
+    int getManeuverCooldownTicks();
+
+    void setManeuverCooldownTicks(int ticks);
+
+    /**
+     * Starts a full-body aerial roll. The server owns the duration and validates
+     * that no maneuver is already running and the cooldown has elapsed.
+     */
+    boolean startManeuver(int direction, int durationTicks);
+
+    /** Sets the synced maneuver state without applying cooldown or validation. */
+    void setManeuver(int direction, int ticksRemaining);
+
+    /** Advances the maneuver and cooldown by one tick. */
+    void tickManeuver();
+
+    void clearManeuver();
+
     void clear();
 }

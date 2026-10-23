@@ -33,22 +33,40 @@ public final class SpeedsterController {
                 && !isFlightActive(player);
     }
 
+    /**
+     * The dedicated speedster key and the catalog toggle both go through the power runtime,
+     * so the toggle state shown in the UI and the movement mode can never disagree.
+     */
     public static boolean toggle(ServerPlayer player) {
+        return PowerRuntimeEngine.togglePower(player, REQUIRED_POWER, !isModeActive(player));
+    }
+
+    public static boolean isModeActive(Player player) {
+        SpeedsterState state = getState(player);
+        return state != null && state.isActive();
+    }
+
+    /**
+     * Applies the already-authorised power toggle to the transient movement state.
+     * Called by {@code SpeedsterComponent.onToggle}; never calls back into the toggle engine.
+     */
+    public static void setModeEnabled(ServerPlayer player, boolean enabled) {
         SpeedsterState state = getState(player);
         if (state == null) {
-            return false;
+            return;
         }
-        if (state.isActive()) {
+        if (!enabled) {
             stop(player, state, true);
-            return true;
+            return;
         }
-        if (!canActivate(player)) {
-            return false;
+        if (state.isActive() || !canActivate(player)) {
+            return;
         }
+        state.setLevel(Math.max(SpeedsterState.MIN_LEVEL, state.getLevel()));
         state.setActive(true);
         syncState(player);
-        player.displayClientMessage(Component.translatable("message.ascendant.speedster.enabled", state.getLevel()), true);
-        return true;
+        player.displayClientMessage(Component.translatable(
+                "message.ascendant.speedster.enabled", state.getLevel()), true);
     }
 
     public static boolean handleControl(ServerPlayer player, int action) {
@@ -126,8 +144,13 @@ public final class SpeedsterController {
         }
         boolean wasActive = state.isActive();
         state.clear();
-        if (sync && wasActive && player instanceof ServerPlayer serverPlayer) {
-            syncState(serverPlayer);
+        if (player instanceof ServerPlayer serverPlayer) {
+            // Lifecycle events and the power runtime fire in unspecified order, so reconcile
+            // the toggle here instead of relying on runtime cleanup having run first.
+            PowerRuntimeEngine.setPowerToggleSilently(serverPlayer, REQUIRED_POWER, false);
+            if (sync && wasActive) {
+                syncState(serverPlayer);
+            }
         }
     }
 
@@ -176,9 +199,15 @@ public final class SpeedsterController {
     }
 
     private static void stop(ServerPlayer player, SpeedsterState state, boolean sync) {
-        state.setActive(false);
+        if (state.isActive()) {
+            state.setActive(false);
+            // The runtime may not know about a stop caused by a lifecycle/eligibility change;
+            // clear the toggle silently to avoid re-entering the component callback.
+            PowerRuntimeEngine.setPowerToggleSilently(player, REQUIRED_POWER, false);
+        }
         if (sync) {
             syncState(player);
+            AscendantNetwork.syncCatalogState(player);
             player.displayClientMessage(Component.translatable("message.ascendant.speedster.disabled"), true);
         }
     }

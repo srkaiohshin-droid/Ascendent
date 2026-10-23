@@ -123,6 +123,27 @@ public final class PackManagerGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void packThemeIsOptionalMetadataAndValidated(GameTestHelper helper) {
+        PackManifest plain = PackManifest.fromJson(baseManifest("plain-pack"));
+        helper.assertTrue(plain.getTheme() == null,
+                "A manifest without a theme must keep the derived presentation");
+
+        JsonObject themedJson = baseManifest("themed-pack");
+        themedJson.addProperty("theme", "retro");
+        PackManifest themed = PackManifest.fromJson(themedJson);
+        helper.assertTrue("retro".equals(themed.getTheme()),
+                "A valid theme identifier must round-trip through the manifest");
+        helper.assertTrue(themed.toJson().has("theme"),
+                "A declared theme must be preserved when the manifest is serialized");
+
+        JsonObject invalidTheme = baseManifest("invalid-theme-pack");
+        invalidTheme.addProperty("theme", "Retro Cover!");
+        helper.assertTrue(rejectsManifest(invalidTheme),
+                "Theme identifiers must stay lowercase and filesystem-safe");
+        helper.succeed();
+    }
+
     private static void createArchive(Path archive, String id, String contentPath, String content)
             throws IOException {
         JsonObject manifest = baseManifest(id);

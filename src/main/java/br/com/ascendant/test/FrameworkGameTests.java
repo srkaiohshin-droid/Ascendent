@@ -7,6 +7,7 @@ import br.com.ascendant.catalog.CatalogInteraction;
 import br.com.ascendant.core.AbilityCategory;
 import br.com.ascendant.core.AbilityTrigger;
 import br.com.ascendant.flight.FlightController;
+import br.com.ascendant.flight.FlightState;
 import br.com.ascendant.pack.PackManifest;
 import br.com.ascendant.pack.PackSecurity;
 import br.com.ascendant.power.AbilityDefinition;
@@ -94,7 +95,7 @@ public final class FrameworkGameTests {
     public static void catalogFilteringAndActionClassification(GameTestHelper helper) {
         PowerDefinition active = PowerRegistry.get(new ResourceLocation("ascendant", "refractive_invisibility"));
         PowerDefinition sustained = PowerRegistry.get(new ResourceLocation("ascendant", "telekinetic_levitate"));
-        PowerDefinition passive = PowerRegistry.get(new ResourceLocation("ascendant", "kinetic_sprint"));
+        PowerDefinition speedsterToggle = PowerRegistry.get(new ResourceLocation("ascendant", "kinetic_sprint"));
         PowerDefinition template = PowerRegistry.get(new ResourceLocation("ascendant", "orbital_ascent"));
         var activeAbility = AbilityRegistry.get(new ResourceLocation("ascendant", "thunder_punch"));
         var passiveAbility = AbilityRegistry.get(new ResourceLocation("ascendant", "night_vision_passive"));
@@ -117,8 +118,9 @@ public final class FrameworkGameTests {
                 "Functional ACTIVE powers map to the power activation path");
         helper.assertTrue(CatalogInteraction.forPower(sustained).type() == CatalogInteraction.ActionType.TOGGLE_POWER,
                 "Functional SUSTAINED powers map to a server-resolved toggle request");
-        helper.assertTrue(CatalogInteraction.forPower(passive).type() == CatalogInteraction.ActionType.NONE,
-                "Passive powers must not be manually activated from a catalog");
+        helper.assertTrue(CatalogInteraction.forPower(speedsterToggle).type()
+                        == CatalogInteraction.ActionType.TOGGLE_POWER,
+                "Super-speed must be exposed as a real toggle instead of a hidden passive");
         helper.assertTrue(CatalogInteraction.forPower(template).type() == CatalogInteraction.ActionType.NONE,
                 "Template powers must be visibly non-actionable");
         helper.assertTrue(CatalogInteraction.forAbility(activeAbility).type()
@@ -256,10 +258,13 @@ public final class FrameworkGameTests {
                 "Suit-granted toggle should activate");
         helper.assertTrue(serverPlayer.hasEffect(MobEffects.NIGHT_VISION),
                 "Activated toggle should apply its managed effect");
-        PowerRegistry.get(speedId).getComponents().get(0).onPlayerTick(serverPlayer);
+        helper.assertTrue(PowerRuntimeEngine.togglePower(serverPlayer, speedId, true),
+                "Suit-granted super-speed should toggle on");
         double boostedMovementSpeed = serverPlayer.getAttributeValue(Attributes.MOVEMENT_SPEED);
         helper.assertTrue(boostedMovementSpeed > baseMovementSpeed,
-                "Suit-granted passive should apply its attribute modifier");
+                "Toggled super-speed should apply its attribute modifier");
+        helper.assertTrue(br.com.ascendant.speedster.SpeedsterController.isModeActive(serverPlayer),
+                "Toggling super-speed must activate the movement controller");
         helper.assertTrue(SuitManager.unequipSuit(serverPlayer), "Test suit should unequip");
         helper.assertTrue(!PowerRuntimeEngine.isPowerToggled(serverPlayer, infraredId),
                 "Removing the final access source must clear the toggle");
@@ -269,9 +274,10 @@ public final class FrameworkGameTests {
                 "Removing the final access source must remove its transient attribute modifier");
 
         helper.assertTrue(SuitManager.equipSuit(serverPlayer, suitId), "Test suit should re-equip");
-        PowerRegistry.get(speedId).getComponents().get(0).onPlayerTick(serverPlayer);
+        helper.assertTrue(PowerRuntimeEngine.togglePower(serverPlayer, speedId, true),
+                "Super-speed should toggle on again after re-equipping");
         helper.assertTrue(Math.abs(serverPlayer.getAttributeValue(Attributes.MOVEMENT_SPEED) - boostedMovementSpeed) < 1.0E-6D,
-                "Re-equipping and ticking must not duplicate the attribute modifier");
+                "Re-toggling must not duplicate the attribute modifier");
         helper.assertTrue(SuitManager.unequipSuit(serverPlayer), "Test suit should unequip after re-equipping");
 
         IPlayerPowerData data = serverPlayer.getCapability(PlayerPowerDataProvider.CAPABILITY)
@@ -930,6 +936,36 @@ public final class FrameworkGameTests {
                 "Unequipped suit should revoke power grant");
         helper.assertTrue(!PowerRuntimeEngine.hasPowerAccess(serverPlayer, flightPower),
                 "hasPowerAccess should no longer reflect revoked suit power");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void suitGrantedFlightCanActivateAndMaintain(GameTestHelper helper) {
+        Player player = helper.makeMockPlayer();
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            helper.succeed();
+            return;
+        }
+        ResourceLocation suitId = new ResourceLocation("ascendant", "gametest_flight_suit");
+        ResourceLocation flightPower = new ResourceLocation("ascendant", "flight");
+        SuitRegistry.register(SuitDefinition.builder(suitId).addPower(flightPower).build());
+
+        helper.assertTrue(!FlightController.canActivate(serverPlayer),
+                "Flight must stay locked without the power or a granting suit");
+        helper.assertTrue(SuitManager.equipSuit(serverPlayer, suitId), "Flight suit should equip");
+        helper.assertTrue(FlightController.canActivate(serverPlayer),
+                "A suit-granted flight power must authorise flight activation");
+        helper.assertTrue(FlightController.canMaintainFlight(serverPlayer),
+                "A suit-granted flight power must authorise flight maintenance");
+        helper.assertTrue(FlightController.requestActive(serverPlayer, true),
+                "Suit-granted flight should actually start");
+        FlightController.requestActive(serverPlayer, false);
+        FlightState flightState = FlightController.getState(serverPlayer);
+        helper.assertTrue(flightState != null && !flightState.isActive(),
+                "Stopping suit-granted flight must clear the active state");
+        helper.assertTrue(SuitManager.unequipSuit(serverPlayer), "Flight suit should unequip");
+        helper.assertTrue(!FlightController.canActivate(serverPlayer),
+                "Revoking the suit must revoke flight activation");
         helper.succeed();
     }
 

@@ -118,6 +118,22 @@ public final class PowerRuntimeEngine {
         return toggles != null && toggles.contains(abilityId);
     }
 
+    /**
+     * Records a toggle state change without invoking component callbacks. Used when a
+     * controller has already applied the effect itself (for example an automatic
+     * speedster stop) and the runtime must stay consistent without recursive toggles.
+     */
+    public static void setPowerToggleSilently(ServerPlayer player, ResourceLocation powerId, boolean enabled) {
+        Set<ResourceLocation> toggles = ACTIVE_TOGGLES.computeIfAbsent(
+                player.getUUID(), ignored -> ConcurrentHashMap.newKeySet());
+        if (enabled) {
+            toggles.add(powerId);
+        } else {
+            toggles.remove(powerId);
+        }
+        removeEmptySet(ACTIVE_TOGGLES, player.getUUID(), toggles);
+    }
+
     public static boolean togglePower(ServerPlayer player, ResourceLocation powerId, boolean enable) {
         if (!hasPowerAccess(player, powerId)) {
             return false;
@@ -129,6 +145,11 @@ public final class PowerRuntimeEngine {
         }
         if (enable && !isPowerToggled(player, powerId) && isOnCooldown(player, powerId)) {
             return false;
+        }
+        for (IPowerComponent component : power.getComponents()) {
+            if (!component.canToggle(player, enable)) {
+                return false;
+            }
         }
 
         Set<ResourceLocation> toggles = ACTIVE_TOGGLES.computeIfAbsent(
@@ -144,6 +165,34 @@ public final class PowerRuntimeEngine {
             removeEmptySet(ACTIVE_TOGGLES, player.getUUID(), toggles);
         }
         return true;
+    }
+
+    /**
+     * Explains why a toggle request would fail, or returns null when it can proceed.
+     * Shared by the network layer so the client receives a precise refusal.
+     */
+    @Nullable
+    public static String getPowerToggleFailureReason(ServerPlayer player, ResourceLocation powerId,
+                                                     boolean enable) {
+        PowerDefinition power = PowerRegistry.get(powerId);
+        if (power == null || !power.isFunctional()) {
+            return "gui.ascendant.catalog.template_reason";
+        }
+        if (power.getType() != PowerType.TOGGLE && power.getType() != PowerType.SUSTAINED) {
+            return "gui.ascendant.catalog.power_type_reason";
+        }
+        if (!hasPowerAccess(player, powerId)) {
+            return "message.ascendant.ability.not_authorized";
+        }
+        if (enable && !isPowerToggled(player, powerId) && isOnCooldown(player, powerId)) {
+            return "message.ascendant.power.toggle_cooldown";
+        }
+        for (IPowerComponent component : power.getComponents()) {
+            if (!component.canToggle(player, enable)) {
+                return "message.ascendant.power.toggle_conditions";
+            }
+        }
+        return null;
     }
 
     public static boolean activatePower(ServerPlayer player, ResourceLocation powerId) {
@@ -342,13 +391,23 @@ public final class PowerRuntimeEngine {
     }
 
     public static boolean hasPowerAccess(ServerPlayer player, ResourceLocation powerId) {
+        return hasPowerAccess((net.minecraft.world.entity.player.Player) player, powerId);
+    }
+
+    /**
+     * Capability-based access check usable from both sides. Suit grants are server-only
+     * metadata, so they are considered whenever the entity is a {@link ServerPlayer}.
+     */
+    public static boolean hasPowerAccess(net.minecraft.world.entity.player.Player player,
+                                         ResourceLocation powerId) {
         if (powerId == null) {
             return true;
         }
         boolean hasBase = player.getCapability(PlayerPowerDataProvider.CAPABILITY)
                 .map(data -> data.hasPower(powerId))
                 .orElse(false);
-        return hasBase || SuitManager.grantsPower(player, powerId);
+        return hasBase || player instanceof ServerPlayer serverPlayer
+                && SuitManager.grantsPower(serverPlayer, powerId);
     }
 
     /**

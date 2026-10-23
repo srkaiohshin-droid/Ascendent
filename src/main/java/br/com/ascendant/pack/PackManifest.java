@@ -37,10 +37,19 @@ public final class PackManifest {
     private final int abilityCount;
     private final int suitCount;
     private final String sha256;
+    private final String theme;
 
     public PackManifest(String id, String name, String version, String author, String description,
                         String minMcVersion, String minForgeVersion, String minAscendantVersion,
                         List<String> dependencies, int powerCount, int abilityCount, int suitCount, String sha256) {
+        this(id, name, version, author, description, minMcVersion, minForgeVersion, minAscendantVersion,
+                dependencies, powerCount, abilityCount, suitCount, sha256, null);
+    }
+
+    public PackManifest(String id, String name, String version, String author, String description,
+                        String minMcVersion, String minForgeVersion, String minAscendantVersion,
+                        List<String> dependencies, int powerCount, int abilityCount, int suitCount,
+                        String sha256, String theme) {
         this.id = validatePackId(id);
         this.name = requireText(name, "name", MAX_NAME_LENGTH);
         this.version = requireText(version, "version", MAX_VERSION_LENGTH);
@@ -58,6 +67,10 @@ public final class PackManifest {
         this.abilityCount = abilityCount;
         this.suitCount = suitCount;
         this.sha256 = requireLength(Objects.requireNonNullElse(sha256, ""), "sha256", 64);
+        this.theme = optionalText(theme, "theme", 32);
+        if (this.theme != null && !this.theme.matches("[a-z0-9_-]+")) {
+            throw new IllegalArgumentException("Pack manifest field 'theme' must be a lowercase identifier.");
+        }
     }
 
     public String getId() {
@@ -112,6 +125,11 @@ public final class PackManifest {
         return sha256;
     }
 
+    /** Optional UI theme identifier declared by the pack; null means derive from the pack id. */
+    public String getTheme() {
+        return theme;
+    }
+
     public JsonObject toJson() {
         JsonObject json = new JsonObject();
         json.addProperty("id", id);
@@ -126,6 +144,9 @@ public final class PackManifest {
         json.addProperty("abilityCount", abilityCount);
         json.addProperty("suitCount", suitCount);
         json.addProperty("sha256", sha256);
+        if (theme != null) {
+            json.addProperty("theme", theme);
+        }
 
         JsonArray deps = new JsonArray();
         for (String dep : dependencies) {
@@ -152,6 +173,7 @@ public final class PackManifest {
         int abilities = readCount(json, "abilityCount");
         int suits = readCount(json, "suitCount");
         String sha = readString(json, "sha256", "");
+        String theme = readOptionalString(json, "theme");
 
         List<String> deps = new ArrayList<>();
         if (json.has("dependencies")) {
@@ -167,7 +189,8 @@ public final class PackManifest {
             }
         }
 
-        return new PackManifest(id, name, version, author, description, minMc, minForge, minAsc, deps, powers, abilities, suits, sha);
+        return new PackManifest(id, name, version, author, description, minMc, minForge, minAsc,
+                deps, powers, abilities, suits, sha, theme);
     }
 
     static String validatePackId(String id) {
@@ -208,6 +231,18 @@ public final class PackManifest {
                 throw new IllegalArgumentException("Pack manifest is missing required field '" + fieldName + "'.");
             }
             return fallback;
+        }
+
+        JsonElement value = json.get(fieldName);
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
+            throw new IllegalArgumentException("Pack manifest field '" + fieldName + "' must be a string.");
+        }
+        return value.getAsString();
+    }
+
+    private static String readOptionalString(JsonObject json, String fieldName) {
+        if (!json.has(fieldName) || json.get(fieldName).isJsonNull()) {
+            return null;
         }
 
         JsonElement value = json.get(fieldName);

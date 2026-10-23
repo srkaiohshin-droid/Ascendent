@@ -1,6 +1,7 @@
 package br.com.ascendant.mixin;
 
 import br.com.ascendant.flight.client.FlightPoseRenderer;
+import br.com.ascendant.flight.client.LocomotionPoseController;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -28,7 +29,10 @@ public abstract class HumanoidModelMixin {
                                            CallbackInfo callback) {
         if (entity instanceof Player player) {
             float partialTick = ageInTicks - player.tickCount;
-            FlightPoseRenderer.applyModel((HumanoidModel<?>) (Object) this, player, partialTick);
+            HumanoidModel<?> model = (HumanoidModel<?>) (Object) this;
+            if (!FlightPoseRenderer.applyModel(model, player, partialTick)) {
+                LocomotionPoseController.applyModel(model, player, partialTick);
+            }
         }
     }
 }

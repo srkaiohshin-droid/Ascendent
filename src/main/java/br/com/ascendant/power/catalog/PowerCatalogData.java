@@ -76,6 +76,16 @@ public final class PowerCatalogData {
                 .build());
     }
 
+    private static void regFunc(String path, PowerCategory cat, PowerType type, int cd,
+                                IPowerComponent primary, IPowerComponent secondary) {
+        PowerRegistry.register(PowerDefinition.builder(id(path))
+                .category(cat).type(type).cooldown(cd)
+                .addComponent(primary)
+                .addComponent(secondary)
+                .functional(true)
+                .build());
+    }
+
     private static void regTempl(String path, PowerCategory cat, PowerType type, int cd, String mechanic, Map<String, String> params) {
         PowerRegistry.register(PowerDefinition.builder(id(path))
                 .category(cat).type(type).cooldown(cd)
@@ -111,8 +121,11 @@ public final class PowerCatalogData {
 
     // 2. SUPERSPEED (13)
     private static void registerSuperspeedPowers() {
-        regFunc("kinetic_sprint", PowerCategory.SUPERSPEED, PowerType.PASSIVE, 0,
-                new AttributeModifierComponent("movement_speed", 0.15D, AttributeModifier.Operation.ADDITION), List.of());
+        // Super-speed is a real toggle mode, not a hidden passive: the same power drives the
+        // catalog toggle, the radial menu entry and the dedicated Z keybind.
+        regFunc("kinetic_sprint", PowerCategory.SUPERSPEED, PowerType.TOGGLE, 0,
+                new SpeedsterComponent(),
+                new AttributeModifierComponent("movement_speed", 0.15D, AttributeModifier.Operation.ADDITION));
         regFunc("mach_dash", PowerCategory.SUPERSPEED, PowerType.ACTIVE, 40, new DashComponent(2.2D, 0.05D), List.of());
         regFunc("hyper_leap", PowerCategory.SUPERSPEED, PowerType.ACTIVE, 80, new LeapComponent(1.6D, 1.2D), List.of());
         regFunc("kinetic_dampener", PowerCategory.SUPERSPEED, PowerType.PASSIVE, 0, new DamageMitigationComponent(1.0F, "fall"), List.of());

@@ -22,6 +22,8 @@ public enum FlightAnimationState {
     TURNING,
     /** Active deceleration with the arms flared back. */
     BRAKING,
+    /** Server-authorised 360-degree aerial roll layered over the flight pose. */
+    MANEUVER,
     /** Flight has ended; the controller blends the pose back to vanilla. */
     EXIT
 }

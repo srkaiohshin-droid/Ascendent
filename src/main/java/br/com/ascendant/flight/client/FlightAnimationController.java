@@ -119,10 +119,16 @@ public final class FlightAnimationController {
                 }
                 wasActive = true;
                 activeTicks++;
+                boolean maneuvering = state.getManeuverTicksRemaining() > 0
+                        && state.getManeuverDirection() != 0;
                 FlightAnimationState animation = FlightPoseLibrary.selectState(true, activeTicks,
-                        speed, verticalSpeed, player.getXRot(), braking, turnDegrees);
+                        speed, verticalSpeed, player.getXRot(), braking, turnDegrees, maneuvering);
                 target = FlightPoseLibrary.target(animation, activeTicks, speed, verticalSpeed,
                         player.getXRot(), turnDegrees);
+                if (maneuvering) {
+                    target = target.withRoll(target.bodyRollDegrees + FlightPoseLibrary.maneuverRoll(
+                            state.getManeuverDirection(), state.getManeuverTicksRemaining()));
+                }
                 previousWeight = weight;
                 weight = Math.min(1.0F, weight + WEIGHT_STEP);
             } else {

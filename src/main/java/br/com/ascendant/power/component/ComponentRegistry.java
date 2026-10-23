@@ -31,6 +31,7 @@ public final class ComponentRegistry {
         register(NightVisionComponent.TYPE, NightVisionComponent::fromJson);
         register(ThermalVisionComponent.TYPE, ThermalVisionComponent::fromJson);
         register(FlightActionComponent.TYPE, FlightActionComponent::fromJson);
+        register(SpeedsterComponent.TYPE, SpeedsterComponent::fromJson);
         register(SoundParticleComponent.TYPE, SoundParticleComponent::fromJson);
         register(InvisibilityComponent.TYPE, InvisibilityComponent::fromJson);
         register(LevitationComponent.TYPE, LevitationComponent::fromJson);

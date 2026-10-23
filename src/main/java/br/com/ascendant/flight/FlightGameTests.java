@@ -463,6 +463,43 @@ public final class FlightGameTests {
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void aerialManeuverMakesOneFullTurnAndHonoursCooldown(GameTestHelper helper) {
+        helper.assertTrue(FlightPoseLibrary.maneuverRoll(1, FlightPoseLibrary.MANEUVER_TICKS) == 0.0F,
+                "A maneuver must start at the neutral roll");
+        helper.assertTrue(FlightPoseLibrary.maneuverRoll(1, 0) == 360.0F,
+                "A right-hand maneuver must complete one full clockwise turn");
+        helper.assertTrue(FlightPoseLibrary.maneuverRoll(-1, 0) == -360.0F,
+                "A left-hand maneuver must complete one full counter-clockwise turn");
+        helper.assertTrue(FlightPoseLibrary.maneuverRoll(1, FlightPoseLibrary.MANEUVER_TICKS / 2) > 90.0F,
+                "The maneuver must progress through a visible mid-roll");
+        helper.assertTrue(FlightPoseLibrary.maneuverRoll(0, 3) == 0.0F,
+                "An invalid direction must never rotate the body");
+
+        PlayerFlightState state = new PlayerFlightState();
+        state.setActive(true);
+        helper.assertTrue(!state.startManeuver(0, FlightPoseLibrary.MANEUVER_TICKS),
+                "Invalid maneuver directions must be rejected");
+        helper.assertTrue(state.startManeuver(1, FlightPoseLibrary.MANEUVER_TICKS),
+                "A valid maneuver must start while flight is active");
+        helper.assertTrue(!state.startManeuver(-1, FlightPoseLibrary.MANEUVER_TICKS),
+                "A second maneuver must not interrupt the first");
+        state.setManeuverCooldownTicks(FlightController.MANEUVER_COOLDOWN_TICKS);
+        for (int tick = 0; tick < FlightPoseLibrary.MANEUVER_TICKS; tick++) {
+            state.tickManeuver();
+        }
+        helper.assertTrue(state.getManeuverTicksRemaining() == 0 && state.getManeuverDirection() == 0,
+                "The maneuver must finish and release the direction");
+        helper.assertTrue(!state.startManeuver(-1, FlightPoseLibrary.MANEUVER_TICKS),
+                "The cooldown must prevent immediate chaining");
+        for (int tick = 0; tick < FlightController.MANEUVER_COOLDOWN_TICKS; tick++) {
+            state.tickManeuver();
+        }
+        helper.assertTrue(state.startManeuver(-1, FlightPoseLibrary.MANEUVER_TICKS),
+                "The maneuver must be available again after the cooldown");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
     public static void exitTargetReleasesThePoseBackToVanilla(GameTestHelper helper) {
         FlightPose exit = FlightPoseLibrary.target(FlightAnimationState.EXIT, 20,
                 0.50F, 0.0F, 0.0F, 0.0F);

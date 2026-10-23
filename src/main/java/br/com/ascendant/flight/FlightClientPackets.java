@@ -8,15 +8,20 @@ final class FlightClientPackets {
     private FlightClientPackets() {
     }
 
-    static void update(int entityId, boolean active, boolean noGravity) {
+    static void update(int entityId, boolean active, boolean noGravity,
+                       int maneuverDirection, int maneuverTicksRemaining) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
             return;
         }
         Entity entity = minecraft.level.getEntity(entityId);
         if (entity instanceof Player player) {
-            player.getCapability(FlightStateProvider.CAPABILITY)
-                    .ifPresent(state -> state.setActive(active));
+            player.getCapability(FlightStateProvider.CAPABILITY).ifPresent(state -> {
+                state.setActive(active);
+                if (active) {
+                    state.setManeuver(maneuverDirection, maneuverTicksRemaining);
+                }
+            });
         }
         if (minecraft.player != null && minecraft.player.getId() == entityId) {
             minecraft.player.setNoGravity(noGravity);

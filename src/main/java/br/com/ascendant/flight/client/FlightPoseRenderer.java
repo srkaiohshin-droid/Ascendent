@@ -26,17 +26,17 @@ public final class FlightPoseRenderer {
     }
 
     /** Rotates the whole model towards the requested body orientation. */
-    public static void applyBody(PoseStack poseStack, Player player, float partialTick) {
+    public static boolean applyBody(PoseStack poseStack, Player player, float partialTick) {
         if (!isPoseVisible(player)) {
-            return;
+            return false;
         }
         FlightPoseSample sample = FlightAnimationController.sample(player, partialTick);
         if (sample == null) {
-            return;
+            return false;
         }
         float weight = sample.weight();
         if (weight <= 1.0E-4F) {
-            return;
+            return false;
         }
         FlightPose pose = sample.pose();
 
@@ -49,20 +49,21 @@ public final class FlightPoseRenderer {
         poseStack.mulPose(Axis.XP.rotationDegrees(pose.bodyPitchDegrees * weight));
         poseStack.mulPose(Axis.YP.rotationDegrees(pose.bodyRollDegrees * weight));
         poseStack.translate(0.0F, -FlightPoseLibrary.BODY_PIVOT_Y, 0.0F);
+        return true;
     }
 
     /** Blends the flight joints over the vanilla pose that setupAnim just produced. */
-    public static void applyModel(HumanoidModel<?> model, Player player, float partialTick) {
+    public static boolean applyModel(HumanoidModel<?> model, Player player, float partialTick) {
         if (!isPoseVisible(player)) {
-            return;
+            return false;
         }
         FlightPoseSample sample = FlightAnimationController.sample(player, partialTick);
         if (sample == null) {
-            return;
+            return false;
         }
         float weight = sample.weight();
         if (weight <= 1.0E-4F) {
-            return;
+            return false;
         }
         FlightPose pose = sample.pose();
 
@@ -88,6 +89,7 @@ public final class FlightPoseRenderer {
         model.head.z = lerp(model.head.z, -2.5F * neckExtension, weight);
         model.head.y = lerp(model.head.y, -1.0F * neckExtension, weight);
         model.hat.copyFrom(model.head);
+        return true;
     }
 
     private static boolean isPoseVisible(Player player) {
