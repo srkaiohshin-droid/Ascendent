@@ -78,4 +78,4 @@
 - [x] Limpar toggles/passives/cooldown de habilidade removida do registro sem NPE.
 - [x] Ajustar os botoes do catalogo para telas estreitas.
 - [ ] Inspecao visual humana do catalogo, busca, filtros, botoes, feedback e menu radial em cliente grafico.
-- [ ] Commitar somente este lote, publicar com push normal e confirmar SHA local igual ao remoto.
+- [x] Commitar somente este lote, publicar com push normal e confirmar SHA local igual ao remoto (`934e00fa35eecef61272fc226f48cb5bd11aff4d`).

@@ -201,7 +201,7 @@ Pendencias:
 
 ASC-012 — AUDITORIA DE HABILIDADES E CATÁLOGO HERO/PACK
 Titulo: Corrigir caminhos de habilidade funcional e reorganizar a descoberta de conteúdo
-Status: DONE (implementacao, testes automatizados e build concluidos; inspecao visual humana pendente)
+Status: DONE (implementacao, testes automatizados, build e publicacao concluidos; inspecao visual humana pendente)
 Prioridade: ALTA
 Origem: worktree `srkaiohshin-droid-glowing-fortnight`, branch
   `srkaiohshin-droid-ascendant-gameplay-ui`, HEAD 7f55404 com alteracoes nao commitadas.
@@ -254,5 +254,5 @@ Validacao confirmada nesta integracao:
 Pendencias:
 - Inspecao visual humana em cliente grafico: HeroPackScreen, abas do catalogo, busca, filtros,
   botoes, feedback e menu radial.
-- Revisar diff/staging, commitar somente este lote e publicar com push normal.
-- Confirmar SHA local igual ao remoto antes de declarar sincronização.
+- Publicado em `origin/srkaiohshin-droid-ascendant-gameplay-ui` no commit
+  `934e00fa35eecef61272fc226f48cb5bd11aff4d`; SHA local e remoto conferem.

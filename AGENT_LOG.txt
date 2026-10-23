@@ -450,6 +450,8 @@ LOTE DE INTEGRACAO DO RUNTIME DE HABILIDADES E CATALOGO HERO/PACK (2026-10-22)
   - A validacao visual das telas, busca, filtros, botoes, feedback e menu radial nao foi feita por observacao humana.
   - Manifests de packs nao possuem perfis/retratos de personagens; a UI nao inventa esses dados.
   - Aviso LF/CRLF permanece em PowerRuntimeEngine.java e nao representa erro de conteudo.
+- Publicacao:
+  - Commit `934e00fa35eecef61272fc226f48cb5bd11aff4d` publicado com push normal em
+    `origin/srkaiohshin-droid-ascendant-gameplay-ui`; SHA local e remoto conferem.
 - Pendencias:
   - Inspecao visual humana em cliente grafico.
-  - Commit deste lote, push normal para a branch de trabalho e confirmacao do SHA remoto.

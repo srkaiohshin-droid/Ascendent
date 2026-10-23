@@ -302,6 +302,7 @@ o historico anterior.
   estreitas.
 
 ### Publicacao
-- Pendente: revisar diff/staging, commitar somente este lote, publicar com push
-  normal para `srkaiohshin-droid-ascendant-gameplay-ui` e confirmar que o SHA
-  remoto corresponde ao commit local.
+- Commit `934e00fa35eecef61272fc226f48cb5bd11aff4d` publicado com push normal
+  em `origin/srkaiohshin-droid-ascendant-gameplay-ui`.
+- SHA local e remoto conferidos como iguais em 2026-10-22.
+- Pendente apenas a inspecao visual humana da UI/radial em cliente grafico.

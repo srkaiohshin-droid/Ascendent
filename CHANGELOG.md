@@ -115,3 +115,4 @@
 - Novos arquivos: `FireWardComponent.java`, `ManagedEffectLease.java` e `CatalogClientState.java`.
 - Ajustes finais de auditoria: TICK sem cooldown executa a cada tick (com assercao no GameTest), o cooldown do cliente conta por game time, toggles ativos podem ser desligados durante o cooldown no catalogo e no radial, habilidade removida do registro limpa toggles/passives/cooldown, e os botoes do catalogo cabem em telas estreitas.
 - Validacao confirmada: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` com "All 59 required tests passed"; `build` BUILD SUCCESSFUL; `git diff --check` sem erros de conteudo; `runClient` iniciou sem crash e permaneceu estavel ate o ambiente encerrar a janela (execucao final de ~49s; uma execucao anterior passou de 2 minutos), sem inspecao visual humana.
+- Publicado em `origin/srkaiohshin-droid-ascendant-gameplay-ui` no commit `934e00fa35eecef61272fc226f48cb5bd11aff4d`; SHA local e remoto conferem.

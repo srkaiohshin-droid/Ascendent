@@ -121,5 +121,6 @@ ATUALIZACAO DE ESTADO EM 2026-10-22 (INTEGRACAO DO LOTE INTERROMPIDO ASC-012)
   "All 59 required tests passed"; build BUILD SUCCESSFUL; git diff --check sem
   erros (apenas aviso LF/CRLF); runClient iniciou sem crash e ficou estavel na
   execucao final por ~49s (uma execucao anterior passou de 2 minutos), sem inspecao visual humana.
-- Pendencias: inspecao visual humana da UI/radial; commit e push normal deste
-  lote com confirmacao do SHA remoto igual ao local.
+- Publicacao: commit `934e00fa35eecef61272fc226f48cb5bd11aff4d` publicado em
+  `origin/srkaiohshin-droid-ascendant-gameplay-ui`; SHA local e remoto conferem.
+- Pendencias: inspecao visual humana da UI/radial.
