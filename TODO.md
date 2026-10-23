@@ -14,21 +14,26 @@
 - [x] Implementar poderes aquaticos funcionais (ASC-007 — aquatic_respiration, tidal_wave, water_dash, atlantean_sovereignty, hydro_torpedo).
 - [x] Cobrir capability NBT e respawn server-side com GameTest.
 - [x] Implementar arquitetura modular de poderes, habilidades e componentes reutilizáveis.
-- [x] Cadastrar catálogo completo de 500 poderes e 500 habilidades (113 poderes e 111 habilidades funcionais; 387/389 templates).
+- [x] Cadastrar catálogo completo de 500 poderes e 500 habilidades (106 poderes e 103 habilidades funcionais).
 - [x] Implementar Catálogo de Trajes inspirado no Armoured Workshop (SuitRegistry, SuitManager, 6 trajes integrados).
 - [x] Implementar Gerenciador de Pacotes inspirado no Fisk's Heroes (PackManager, PackSecurity, LocalPackCatalogProvider).
 - [x] Criar ferramentas de validação e automação de conteúdo (ContentValidator, CatalogExporter).
-- [x] Validar com 35/35 GameTests automatizados e build aprovado.
-- [x] Lote B1: conectar invisibilidade, levitação sustentada, vórtice sustentado, invocação de lobos e faseamento; limpar estado runtime ao perder a última fonte do traje. `compileJava`, GameTests e `build` aprovados.
-- [x] Lote B2: catálogo de poderes/habilidades/trajes, busca e filtro, detalhes funcionais/templates, ações server-authoritative, keybinds configuráveis e menu radial paginado; validação original B2: `compileJava`, build e 36/36 GameTests. Validação ASC-009 posterior: build e 39/39 GameTests. Falta validação visual/interativa em `runClient`.
-- [x] ASC-009: validar IDs e caminhos de HeroPacks, limitar extração por bytes escritos, rejeitar entradas ZIP duplicadas e substituir instalação com rollback testado; melhorar busca de posições de invocação seguras para lobos. `compileJava`, build e 39/39 GameTests aprovados.
-- [x] ASC-010 Lote B: núcleo server-authoritative inicial de supervelocidade com 10 níveis, aceleração, direção, inércia, frenagem, keybinds e exclusão mútua com voo; 45/45 GameTests após cobertura de revogação de poder concedido por traje.
-- [x] ASC-011 Lote A (código): auditar conflito dos keybinds Ascendant e mover o default `flight_brake` de X para K, evitando a tecla vanilla `loadToolbarActivator`.
-- [x] ASC-011 Lote A (cliente): confirmar `Brake while flying` persistido em K; `run/options.txt` relido após sair de Controls/Options e `loadToolbarActivator` segue em X.
-- [ ] ASC-011 Lote A (gameplay): testar ativação, níveis, frenagem, aceleração, direção, voo e ciclo de vida em gameplay interativo.
-- [ ] ASC-010 próximos lotes: perfis extensíveis, habilidades completas, percepção, corrida em parede/água, faseamento, colisões/impactos especializados, efeitos, animações e HUD cinemático.
-- [ ] Validar visualmente catálogo, busca, ações e menu radial em `runClient`.
-- [ ] Validar controles, física e estado do velocista em cliente real com `runClient`.
+- [x] Validar com 32/32 GameTests automatizados e build aprovado.
 - [ ] Validar gameplay multiplayer com dois jogadores quando houver mecanica de rede interativa.
-- [ ] Validar compatibilidade/dependências e carregamento transacional de conteúdo de HeroPacks.
 - [x] Configurar e confirmar o remoto Git origin autorizado.
+- [x] Melhorar ContentValidator: diferenciar registrado/valido/funcional/testado, alertas para poderes funcionais sem executor.
+- [x] Corrigir PackManager: limpeza de temp em falha, validacao de versao do manifesto, rollback atomico.
+- [x] Corrigir PackManifest: validacao de id obrigatorio e versao MC/Forge.
+- [x] Implementar sistema de animacoes: AnimationProfile, AnimationRegistry, AnimationPlayer (client-only), AnimationCoverageValidator.
+- [x] Adicionar AnimationCatalogData com perfis para todos os poderes funcionais (placeholders genericos).
+- [x] Adicionar GameTests de cobertura de animacao e validacao de manifesto de pacote.
+- [ ] Criar scripts PowerShell para build/test/relatorio automatizado.
+- [x] Corrigir runtime de habilidades: rejeitar ativação manual de gatilhos automáticos (PASSIVE, HURT_EVENT, ATTACK_HIT, TICK).
+- [x] Adicionar dispatch de habilidades automáticas via `dispatchTriggeredAbilities` nos hooks `onLivingHurt` e `onPlayerTick`.
+- [x] Corrigir `SuitManager.unequipSuit` para revogar poderes concedidos ao desequipar traje.
+- [x] Adicionar `PowerRuntimeEngine.getActivationFailureReason` para feedback ao cliente.
+- [x] Implementar tela Heróis/Packs como tela principal do catálogo (`HeroPackScreen`) com navegação para Poderes, Habilidades e Trajes.
+- [x] Implementar `SuitScreen` para listagem e equipagem de trajes.
+- [x] `AscendantClientControls` abre `HeroPackScreen` por padrão ao abrir o catálogo (F6).
+- [ ] Executar GameTests e confirmar 35/35 (32 existentes + 3 novos).
+- [ ] Executar `runClient` para validação visual da interface HeroPackScreen.

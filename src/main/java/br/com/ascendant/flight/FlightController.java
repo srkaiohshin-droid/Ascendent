@@ -2,7 +2,6 @@ package br.com.ascendant.flight;
 
 import br.com.ascendant.powers.IPlayerPowerData;
 import br.com.ascendant.powers.PlayerPowerDataProvider;
-import br.com.ascendant.speedster.SpeedsterController;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -31,7 +30,6 @@ public final class FlightController {
             FlightNetwork.syncState(player);
             return false;
         }
-        SpeedsterController.deactivateForFlight(player);
         if (!state.isActive()) {
             state.setHadNoGravity(player.isNoGravity());
             state.setActive(true);

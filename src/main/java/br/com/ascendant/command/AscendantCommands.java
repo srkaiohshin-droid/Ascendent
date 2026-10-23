@@ -34,7 +34,6 @@ import java.util.List;
  * /ascendant power list <player>
  * /ascendant power info <power_id>
  * /ascendant power activate <player> <ability_id>
- * /ascendant power use <player> <power_id>
  * /ascendant suit equip <player> <suit_id>
  * /ascendant suit unequip <player>
  * /ascendant suit list
@@ -57,7 +56,7 @@ public final class AscendantCommands {
                             .then(Commands.argument("power", ResourceLocationArgument.id())
                                 .executes(ctx -> grantPower(ctx,
                                     EntityArgument.getPlayers(ctx, "targets"),
-                                    ResourceLocationArgument.getId(ctx, "power")))))))
+                                    ResourceLocationArgument.getId(ctx, "power"))))))
                     .then(Commands.literal("revoke")
                         .then(Commands.argument("targets", EntityArgument.players())
                             .then(Commands.argument("power", ResourceLocationArgument.id())
@@ -76,13 +75,7 @@ public final class AscendantCommands {
                             .then(Commands.argument("ability", ResourceLocationArgument.id())
                                 .executes(ctx -> activateAbility(ctx,
                                     EntityArgument.getPlayers(ctx, "targets"),
-                                    ResourceLocationArgument.getId(ctx, "ability"))))))
-                    .then(Commands.literal("use")
-                        .then(Commands.argument("targets", EntityArgument.players())
-                            .then(Commands.argument("power", ResourceLocationArgument.id())
-                                .executes(ctx -> activatePower(ctx,
-                                    EntityArgument.getPlayers(ctx, "targets"),
-                                    ResourceLocationArgument.getId(ctx, "power"))))))
+                                    ResourceLocationArgument.getId(ctx, "ability")))))))
                 .then(Commands.literal("suit")
                     .then(Commands.literal("list")
                         .executes(AscendantCommands::listSuits))
@@ -145,7 +138,6 @@ public final class AscendantCommands {
             boolean changed = data.revokePower(powerId);
             String name = player.getName().getString();
             if (changed) {
-                PowerRuntimeEngine.deactivatePowerIfInaccessible(player, powerId);
                 // If flight power was revoked and player is flying, stop flight immediately.
                 if (powerId.equals(FlightController.FLIGHT_POWER)) {
                     FlightController.stopAndSyncForRevoke(player);
@@ -209,26 +201,6 @@ public final class AscendantCommands {
                 ctx.getSource().sendSuccess(() -> Component.literal("Activated " + abilityId + " on " + player.getName().getString()), true);
             } else {
                 ctx.getSource().sendFailure(Component.literal("Failed to activate " + abilityId + " on " + player.getName().getString() + " (cooldown or condition)"));
-            }
-        }
-        return executed;
-    }
-
-    private static int activatePower(CommandContext<CommandSourceStack> ctx, Collection<ServerPlayer> targets, ResourceLocation powerId) {
-        PowerDefinition power = PowerRegistry.get(powerId);
-        if (power == null) {
-            ctx.getSource().sendFailure(Component.literal("Unknown power: " + powerId));
-            return 0;
-        }
-        int executed = 0;
-        for (ServerPlayer player : targets) {
-            if (PowerRuntimeEngine.activatePower(player, powerId)) {
-                executed++;
-                ctx.getSource().sendSuccess(() -> Component.literal(
-                        "Activated " + powerId + " on " + player.getName().getString()), true);
-            } else {
-                ctx.getSource().sendFailure(Component.literal("Failed to activate " + powerId + " on "
-                        + player.getName().getString() + " (power access, type, cooldown or condition)"));
             }
         }
         return executed;

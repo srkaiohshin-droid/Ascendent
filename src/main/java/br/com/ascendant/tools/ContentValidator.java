@@ -4,6 +4,8 @@ import br.com.ascendant.power.AbilityDefinition;
 import br.com.ascendant.power.AbilityRegistry;
 import br.com.ascendant.power.PowerDefinition;
 import br.com.ascendant.power.PowerRegistry;
+import br.com.ascendant.power.component.IPowerComponent;
+import br.com.ascendant.power.component.TemplateComponent;
 import br.com.ascendant.suit.SuitDefinition;
 import br.com.ascendant.suit.SuitRegistry;
 import net.minecraft.resources.ResourceLocation;
@@ -27,10 +29,16 @@ public final class ContentValidator {
             int functionalAbilities,
             int templateAbilities,
             int totalSuits,
-            List<String> errors
+            List<String> errors,
+            List<String> warnings,
+            int functionalPowersWithoutExecutableComponent
     ) {
         public boolean isValid() {
             return errors.isEmpty();
+        }
+
+        public boolean hasWarnings() {
+            return !warnings.isEmpty();
         }
 
         public String summary() {
@@ -40,16 +48,21 @@ public final class ContentValidator {
                     "- Abilities Registered: %d (Functional: %d, Templates: %d)%n" +
                     "- Suits Registered: %d%n" +
                     "- Errors: %d%n" +
+                    "- Warnings: %d%n" +
+                    "- Functional powers w/o executable component: %d%n" +
                     "- Status: %s",
                     totalPowers, functionalPowers, templatePowers,
                     totalAbilities, functionalAbilities, templateAbilities,
-                    totalSuits, errors.size(), isValid() ? "PASS" : "FAIL"
+                    totalSuits, errors.size(), warnings.size(),
+                    functionalPowersWithoutExecutableComponent,
+                    isValid() ? "PASS" : "FAIL"
             );
         }
     }
 
     public static ValidationReport validate() {
         List<String> errors = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
         Set<ResourceLocation> seenPowerIds = new HashSet<>();
         Set<ResourceLocation> seenAbilityIds = new HashSet<>();
         Set<ResourceLocation> seenSuitIds = new HashSet<>();
@@ -57,6 +70,7 @@ public final class ContentValidator {
         int totalPowers = 0;
         int functionalPowers = 0;
         int templatePowers = 0;
+        int functionalPowersWithoutExecutableComponent = 0;
 
         for (PowerDefinition power : PowerRegistry.getAll()) {
             totalPowers++;
@@ -74,6 +88,17 @@ public final class ContentValidator {
             }
             if (power.getComponents().isEmpty()) {
                 errors.add("Power has no components defined: " + power.getId());
+            }
+
+            boolean hasExecutableComponent = false;
+            for (IPowerComponent comp : power.getComponents()) {
+                if (comp.isFunctional() && !(comp instanceof TemplateComponent)) {
+                    hasExecutableComponent = true;
+                }
+            }
+            if (power.isFunctional() && !hasExecutableComponent) {
+                functionalPowersWithoutExecutableComponent++;
+                warnings.add("Functional power " + power.getId() + " has no executable (non-template) component");
             }
 
             if (power.isFunctional()) {
@@ -112,6 +137,16 @@ public final class ContentValidator {
                 errors.add("Ability " + ability.getId() + " references unknown power: " + ability.getPowerId());
             }
 
+            boolean hasExecutableAction = false;
+            for (IPowerComponent action : ability.getActions()) {
+                if (action.isFunctional() && !(action instanceof TemplateComponent)) {
+                    hasExecutableAction = true;
+                }
+            }
+            if (ability.isFunctional() && !hasExecutableAction) {
+                warnings.add("Functional ability " + ability.getId() + " has no executable (non-template) action");
+            }
+
             if (ability.isFunctional()) {
                 functionalAbilities++;
             } else {
@@ -141,7 +176,8 @@ public final class ContentValidator {
         return new ValidationReport(
                 totalPowers, functionalPowers, templatePowers,
                 totalAbilities, functionalAbilities, templateAbilities,
-                totalSuits, errors
+                totalSuits, errors, warnings,
+                functionalPowersWithoutExecutableComponent
         );
     }
 }

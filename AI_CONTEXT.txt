@@ -21,7 +21,7 @@ PRIORIDADES INICIAIS
 3. Superforca (Implementada com componentes modulares)
 4. Super-resistencia (Implementada com mitigação e componentes de dano)
 5. Poderes aquaticos (Implementados com adaptação aquática e impulso)
-6. Catálogo de 500 poderes e 500 habilidades (113 poderes funcionais, 111 habilidades funcionais)
+6. Catálogo de 500 poderes e 500 habilidades (106 poderes funcionais, 103 habilidades funcionais)
 7. Catálogo de Trajes (Armoured Workshop)
 8. Gerenciador de Pacotes e Segurança (Fisk's Heroes)
 
@@ -37,57 +37,29 @@ QUALIDADE OBRIGATORIA
 - Documentar arquivos alterados, comportamento, riscos e testes executados.
 - Preferir implementacoes profundas e completas a muitos poderes superficiais.
 
-ESTADO VERIFICADO EM 2026-10-21 (MODULAR SUPERPOWER FRAMEWORK)
+ESTADO VERIFICADO EM 2026-10-20 (MODULAR SUPERPOWER FRAMEWORK)
 - Arquitetura de componentes reutilizáveis (IPowerComponent, ComponentContext, ComponentRegistry):
   Dash, Blink, Leap, DamageAction, HealAction, KnockbackAction, PullAction, ExplosionAction,
   LightningAction, AreaEffectAction, ShieldAction, AttributeModifier, DamageMitigation,
-  WaterAdaptation, NightVision, ThermalVision, FlightAction, Invisibility, Levitation,
-  VortexAction, SummonEntity, Phase e Template.
+  WaterAdaptation, NightVision, ThermalVision, FlightAction e Template.
 - Catálogo de 500 poderes cadastrados em 40 categorias oficiais:
-  113 poderes com executores mecânicos funcionais e 387 poderes em template para expansões subsequentes.
+  106 poderes com executores mecânicos funcionais e 394 poderes em template para expansões subsequentes.
 - Catálogo de 500 habilidades cadastradas em 14 categorias funcionais:
-  111 habilidades funcionais e 389 em template.
+  103 habilidades funcionais e 397 em template.
 - Catálogo de Trajes (SuitRegistry, SuitManager, BuiltinSuitData) com 6 trajes integrados
   (Classic Ascendant, Speedster Mk-I, Titan Exosuit, Atlantean Regalia, Solar Aegis, Shadow Infiltrator).
 - Gerenciador de Pacotes (PackManager, PackSecurity, LocalPackCatalogProvider) com extração
   atômica, proteção contra Zip-Slip e bloqueio rigoroso de arquivos executáveis.
 - Ferramenta de validação e exportação (ContentValidator, CatalogExporter).
 - PowerRuntimeEngine (cooldowns, toggles de estado, hooks de dano, mitigação, queda e ticks).
-- 39/39 GameTests aprovados na validacao mais recente de `gradlew.bat runGameTestServer`;
-  o lote B2 original havia aprovado 36/36.
+- 32/32 GameTests aprovados em `gradlew.bat runGameTestServer` (16 voo, 2 capability, 9 poses, 5 framework).
 - `gradlew.bat build` concluído com sucesso.
-- Lote B1: cinco componentes ligados a poderes server-side; ACTIVE powers têm caminho de ativação
-  no runtime, pacote e comando. Limpeza de toggles, efeitos e modificadores ao perder a última
-  fonte de traje testada. Ver `docs/DEVELOPMENT_STATUS.md` e o registro B1 em `AGENT_LOG.txt`.
-- Lote B2: telas de catálogo e radial client-only, keybinds configuráveis, classificação de ações
-  compartilhada sem dependências client-only e solicitações usando o networking existente.
-  Catálogo inclui entradas funcionais e templates; radial inclui apenas poderes/abilities com
-  ativação manual. `compileJava`, `runGameTestServer` (36/36) e `build` passaram. Teste gráfico
-  interativo em `runClient` permanece pendente.
-- Lote ASC-009: importacao local valida o ID do manifesto e caminhos ZIP, limita tamanho descompactado
-  durante a escrita, rejeita caminhos duplicados e instala em staging com rollback da versao anterior.
-  GameTests cobrem IDs/entradas maliciosas, preservacao e substituicao de instalacao e rollback.
-  A invocacao de lobos agora procura destinos carregados e sem colisao; o GameTest cobre destino
-  preferencial bloqueado. `compileJava`, `runGameTestServer` (39/39) e `build` passaram nesta etapa;
-  a tarefa `test` do Gradle permanece `NO-SOURCE`.
-- Limites pendentes: validacao visual da UI em `runClient`; compatibilidade semantica/dependencias e
-  aplicacao transacional do conteudo ainda nao fazem parte da importacao do HeroPack.
-- ASC-010 (lote inicial): subsistema transitório `br.com.ascendant.speedster` com 10 níveis,
-  aceleração horizontal, curva direcional, inércia, sprint e frenagem de emergência configuráveis.
-  Ativa com `kinetic_sprint` próprio ou concedido por traje; estado e entrada são validados no servidor,
-  sincronizados pelo canal Ascendant existente e limpos em morte/respawn, logout e troca de dimensão.
-  A perda da última fonte de `kinetic_sprint` também interrompe o modo imediatamente; conceder o poder
-  por outra fonte preserva o estado ativo ao remover um traje.
-  Fase de voo e supervelocidade são mutuamente exclusivas. `runGameTestServer` passou 45/45;
-  `compileJava`, `build` e 45/45 GameTests passaram. `runClient` chegou ao menu e a um
-  mundo local, mas não foi possível enviar teclas à janela custom-drawn; controles e
-  física não tiveram validação interativa. HUD, habilidades adicionais, efeitos,
-  animações e perfis de personagens ainda não estão implementados.
-- ASC-011 Lote A: a auditoria do cliente encontrou `flight_brake` em X duplicando a tecla
-  vanilla `loadToolbarActivator` no `run/options.txt`; o default de voo foi movido para K,
-  livre nas atribuições observadas. Os demais defaults Ascendant são distintos entre si.
-  `compileJava`, `build` e `runGameTestServer` (45/45) passaram depois da correção. A
-  interface de keybinds foi aberta em `runClient`; `Brake while flying` foi configurado
-  para K, confirmado após sair das telas Controls e Options e reler `run/options.txt`.
-  O keybind vanilla `loadToolbarActivator` permanece em X. Configurações locais existentes
-  prevalecem sobre defaults; gameplay real dos controles e transições ainda não foi exercitado.
+
+SISTEMA DE ANIMAÇÕES (NOVO, 2026-10-20)
+- br.com.ascendant.animation.AnimationProfile: perfil visual data-driven (particulas, som, aura, pose, impacto).
+- br.com.ascendant.animation.AnimationRegistry: registro comum seguro de perfis por ID de poder/habilidade.
+- br.com.ascendant.animation.AnimationCatalogData: perfis default para poderes funcionais e placeholders genericos.
+- br.com.ascendant.animation.AnimationCoverageValidator: relatorio de cobertura visual (poderes/habilidades com/sem perfil).
+- br.com.ascendant.animation.client.AnimationPlayer: reproducao client-only de efeitos (isolada via @OnlyIn(Dist.CLIENT)).
+- GameTests: animationProfileRegistrationAndLookup, animationCoverageForAllFunctionalPowers.
+- Animacoes registradas para todos os 106 poderes funcionais (placeholders genericos para os sem perfil dedicado).

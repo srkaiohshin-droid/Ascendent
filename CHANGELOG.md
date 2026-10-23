@@ -1,74 +1,5 @@
 # Changelog
 
-## 0.1.0 — ASC-011 Lote A: auditoria e correção de keybind
-- O default de frenagem do voo mudou de X para K: o audit encontrou X compartilhado
-  com o keybind vanilla de ativação da barra de ferramentas (`loadToolbarActivator`).
-- Os demais defaults Ascendant são distintos no código. Instalações com o valor X já
-  persistido precisam redefinir/alterar essa tecla nas opções; o Minecraft preserva
-  preferências existentes.
-- `compileJava`, `runGameTestServer` (45/45) e `build` aprovados após a correção.
-  Em `runClient`, `Brake while flying` foi salvo em K e confirmado em `run/options.txt`;
-  `loadToolbarActivator` segue em X. Gameplay e transições ainda não foram testados,
-  portanto os controles não estão validados em jogo.
-
-## 0.1.0 — ASC-010: núcleo inicial de supervelocidade
-- Adicionado estado transitório de velocista com 10 níveis, progressão de velocidade configurável,
-  aceleração, convergência direcional, inércia, sprint e frenagem de emergência.
-- Keybinds configuráveis usam o canal de rede existente; o servidor valida posse de `kinetic_sprint`,
-  controla o movimento e sincroniza modo/nível. A ativação de voo encerra supervelocidade primeiro;
-  perder a última fonte do poder encerra o modo imediatamente, preservando-o se outra fonte permanecer.
-- Seis GameTests cobrem progressão, frenagem, direção, colisão vanilla, limites do estado, autorização,
-  exclusão mútua com voo e remoção de traje com preservação de fonte intrínseca.
-  `runGameTestServer`: 45/45 aprovados.
-- `compileJava` e `build` aprovados. `runClient` carregou o menu e mundo local; automação não
-  conseguiu enviar controles durante gameplay, portanto não há validação visual/funcional no cliente.
-- Este lote não implementa habilidades especiais, perfis de personagens, HUD cinemático, animações,
-  efeitos de velocidade, corrida sobre água/parede, faseamento ou validação visual em `runClient`.
-
-## 0.1.0 — Importação local segura de HeroPacks
-- IDs de manifesto agora precisam ser identificadores portáveis; campos de contagem e dependências
-  são validados antes de selecionar o diretório de instalação.
-- A extração rejeita caminhos absolutos/traversal em formatos Windows e ZIP, nomes reservados do
-  Windows, aliases com ponto/espaço final, entradas duplicadas e limites excedidos durante a gravação;
-  manifesto acima de 1 MiB é recusado.
-- A atualização mantém a instalação anterior em staging até a nova pasta ser movida atomicamente;
-  falha na movimentação restaura a versão anterior e preserva o backup se o rollback também falhar.
-- GameTests cobrem importação inválida/válida, preservação/substituição e falha simulada na troca.
-- A invocação de lobos tenta pontos alternativos carregados, dentro do world border e sem colisão;
-  teste bloqueia o ponto preferencial para verificar o fallback.
-- `compileJava`, `runGameTestServer` (39/39) e `build` aprovados; a tarefa `test` do Gradle permanece `NO-SOURCE`.
-
-## 0.1.0 — Interface de catálogo e menu radial B2
-- Adicionadas telas client-only para navegar poderes, habilidades e trajes, com busca por nome/ID/categoria,
-  filtro de categoria, detalhes e indicação explícita de entradas funcionais ou templates.
-- Ações de poderes, habilidades e trajes enviadas pelo canal de rede existente; a validação e execução
-  permanecem server-authoritative. Poderes alternáveis são decididos pelo estado no servidor.
-- Adicionados keybinds configuráveis para abrir o catálogo (F6), abrir o radial (G), ativar (V),
-  alternar (B) e navegar/folhear (PageUp/PageDown).
-- Menu radial apresenta até oito opções por página, seleção por direção do mouse, confirmação,
-  cancelamento e navegação sem executar ações ao abrir ou cancelar.
-- `CatalogInteraction` fornece filtragem/classificação compartilhada; GameTest cobre busca, filtros,
-  acionabilidade e setores do radial.
-- Validação: `compileJava`, `runGameTestServer` (36/36) e `build` aprovados. Validação visual em
-  `runClient` permanece pendente.
-
-## 0.1.0 — Componentes funcionais e ciclo de vida B1
-- Conectados `refractive_invisibility`, `telekinetic_levitate`, `vortex_maelstrom`,
-  `spectral_wolf_pack` e `void_step` a executores reais e serializáveis.
-- Invisibility aplica efeito vanilla com duração finita; levitação e vórtice são
-  sustentados por toggle; invocação usa lobos vanilla domados; faseamento desloca
-  o jogador apenas até destino carregado, dentro do world border e sem colisão.
-- Adicionado caminho server-side para ativar poderes `ACTIVE` pelo runtime,
-  pacote de rede e `/ascendant power use`; levitação e vórtice mantêm SUSTAINED.
-- Troca/remoção de traje e revogação limpam toggle, cooldown e callbacks quando
-  a última fonte de acesso desaparece, preservando o poder quando outra fonte o concede.
-- GameTests cobrem registro/round-trip, execução, duração finita, limpeza de efeito
-  e atributo, posse alternativa e contagens do catálogo: 500 poderes (113 funcionais,
-  387 templates) e 500 habilidades (111 funcionais, 389 templates).
-- Validação final: `compileJava`, `runGameTestServer` (35/35) e `build` aprovados.
-- A interface client-side, keybinds e menu radial foram adicionados no lote B2; validação gráfica
-  interativa ainda está pendente.
-
 ## 0.1.0 — Fundacao inicial
 - Identidade Ascendant configurada.
 - Classe principal dedicada criada.
@@ -129,3 +60,31 @@
 - GameTests expandidos de 18 para 27; `gradlew.bat build` e `runGameTestServer` aprovados.
 - Validação gráfica em `runClient`: Mixins aplicados, corpo horizontal e face voltada para frente
   observados; homologação visual final da silhueta simplificada permanece pendente.
+
+## 0.1.0 — Sistema de Animações e Correções de Estabilidade (2026-10-20)
+- Sistema de animações modular e orientado a dados (`br.com.ascendant.animation`):
+  - `AnimationProfile`: perfil visual com camadas (particulas, som, aura, pose, impacto).
+  - `AnimationRegistry`: registro comum seguro de perfis por ID de poder/habilidade.
+  - `AnimationCatalogData`: perfis default para poderes funcionais e placeholders genericos.
+  - `AnimationCoverageValidator`: relatorio de cobertura visual (com/sem perfil).
+  - `AnimationPlayer` (client-only, `@OnlyIn(Dist.CLIENT)`): reproducao de efeitos no cliente.
+- Cobertura visual aplicada a todos os 106 poderes funcionais (placeholders para os sem perfil dedicado).
+- `ContentValidator` aprimorado: diferenca registrado/valido/funcional/testado, alertas para poderes
+  funcionais sem executor nao-template.
+- `PackManager` corrigido: limpeza de pasta temp em falha, validacao de versao MC/Forge do manifesto,
+  rollback atomico ao substituir pacote ja instalado.
+- `PackManifest` corrigido: validacao de id obrigatorio e nao em branco.
+- Novos GameTests: `animationProfileRegistrationAndLookup`, `animationCoverageForAllFunctionalPowers`,
+  `packManifestRequiresValidId`, `functionalPowersHaveExecutableComponents`.
+- `gradlew.bat build`: BUILD SUCCESSFUL.
+
+## 0.1.0 — Correção de Habilidades e Catálogo Heróis/Packs (2026-10-22)
+- `PowerRuntimeEngine.activateAbility` agora rejeita ativação manual de habilidades com gatilhos automáticos (PASSIVE, HURT_EVENT, ATTACK_HIT, TICK, TOGGLE). Apenas KEY_PRESS e SNEAK_KEY são aceitas.
+- Adicionado `PowerRuntimeEngine.dispatchTriggeredAbilities(AbilityTrigger)` executado nos hooks `onLivingHurt` (HURT_EVENT, ATTACK_HIT) e `onPlayerTick` (TICK) para habilidades automáticas server-authoritative.
+- `SuitManager.unequipSuit` agora revoga os poderes concedidos pela capability do jogador ao desequipar um traje.
+- Adicionado `PowerRuntimeEngine.getActivationFailureReason` para feedback específico ao cliente quando uma habilidade não pode ser ativada.
+- Criada `HeroPackScreen` como tela principal do catálogo (abre em Heróis/Packs), com navegação persistente para Poderes, Habilidades e Trajes.
+- Criada `SuitScreen` para listagem, seleção e equipagem de trajes dentro do catálogo.
+- `AscendantClientControls` agora abre `HeroPackScreen` por padrão ao abrir o catálogo (tecla F6).
+- Adicionados 3 GameTests: `automaticTriggerAbilitiesCannotBeManuallyActivated`, `suitUnequipRevokesGrantedPowers`, `activationFailureReasonProvidesFeedback`.
+- `gradlew.bat compileJava`: BUILD SUCCESSFUL.

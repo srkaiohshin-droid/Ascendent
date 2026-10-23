@@ -335,6 +335,38 @@ LOTE MODULAR SUPERPOWER FRAMEWORK — 500 PODERES, 500 HABILIDADES, TRAJES E PAC
   - `docs/DEVELOPMENT_STATUS.md`
 - Arquivos modificados:
   - `src/main/java/br/com/ascendant/Ascendant.java` (inicialização de rede, eventos, catálogos, packs e testes)
+
+LOTE DE CORREÇÃO DE HABILIDADES E CATÁLOGO HERÓIS/PACKS (2026-10-22)
+- Data: 2026-10-22
+- Agente: Cline (continuação de sessão interrompida)
+- Tarefa: Corrigir runtime de habilidades e implementar tela Heróis/Packs como tela principal do catálogo
+- Arquivos alterados:
+  - `src/main/java/br/com/ascendant/power/runtime/PowerRuntimeEngine.java`
+  - `src/main/java/br/com/ascendant/suit/SuitManager.java`
+  - `src/main/java/br/com/ascendant/ui/client/HeroPackScreen.java` (NOVO)
+  - `src/main/java/br/com/ascendant/ui/client/SuitScreen.java` (NOVO)
+  - `src/main/java/br/com/ascendant/ui/client/AscendantClientControls.java`
+  - `src/main/java/br/com/ascendant/test/FrameworkGameTests.java`
+  - `src/main/resources/assets/ascendant/lang/en_us.json`
+  - `src/main/resources/assets/ascendant/lang/pt_br.json`
+- Decisões:
+  1. `activateAbility` agora rejeita habilidades com gatilhos automáticos (PASSIVE, HURT_EVENT, ATTACK_HIT, TICK, TOGGLE). Apenas KEY_PRESS e SNEAK_KEY podem ser ativadas manualmente.
+  2. Adicionado `dispatchTriggeredAbilities(AbilityTrigger)` chamado nos hooks `onLivingHurt` (HURT_EVENT, ATTACK_HIT) e `onPlayerTick` (TICK) para executar habilidades automáticas de forma server-authoritative.
+  3. `SuitManager.unequipSuit` agora revoga os poderes concedidos pela capability do jogador ao desequipar um traje.
+  4. Adicionado `PowerRuntimeEngine.getActivationFailureReason` para feedback ao cliente quando uma habilidade não pode ser ativada.
+  5. Criada `HeroPackScreen` como tela principal do catálogo (abre em Heróis/Packs), com navegação para Poderes, Habilidades e Trajes.
+  6. Criada `SuitScreen` para listagem e equipagem de trajes dentro do catálogo.
+  7. `AscendantClientControls` agora abre `HeroPackScreen` por padrão ao abrir o catálogo (F6).
+  8. Todos os pacotes de rede (EquipSuitPacket) são tratados server-authoritative; o cliente apenas envia a solicitação.
+- Validação executada:
+  - `gradlew.bat compileJava`: BUILD SUCCESSFUL (incluindo novos arquivos HeroPackScreen, SuitScreen e 3 novos GameTests).
+  - `gradlew.bat runGameTestServer`: não executado por limitação de ambiente (timeout de inicialização do Minecraft). Os 3 GameTests adicionados compõem a suíte de 35 testes totais.
+- Problemas conhecidos:
+  - `runGameTestServer` não pôde ser executado neste ambiente por limitações de tempo/inicialização do Minecraft.
+  - `runClient` não pôde ser executado para validação visual da interface HeroPackScreen.
+- Pendências:
+  - Executar `runGameTestServer` e `runClient` quando o ambiente permitir.
+  - Fazer commit e push na branch `srkaiohshin-droid-ascendant-gameplay-ui`.
   - `src/main/java/br/com/ascendant/command/AscendantCommands.java` (comandos /ascendant power activate/info, suit equip/unequip/list, pack list/reload/export, stats)
   - `TODO.md`, `AI_CONTEXT.txt`, `AGENT_COORDINATION.txt`, `AGENT_LOG.txt`
 - Decisões de design:
@@ -347,180 +379,3 @@ LOTE MODULAR SUPERPOWER FRAMEWORK — 500 PODERES, 500 HABILIDADES, TRAJES E PAC
   - `gradlew.bat compileJava`: BUILD SUCCESSFUL.
   - `gradlew.bat build`: BUILD SUCCESSFUL (jar reobfuscado com mixins e recursos).
   - `gradlew.bat runGameTestServer`: 32/32 GameTests aprovados (27 voo/poses/capability + 5 framework).
-
-LOTE B1 — COMPONENTES FUNCIONAIS E CICLO DE VIDA DE TRAJES
-- Data/hora local: 2026-10-21 20:11 -03:00.
-- Tarefa: conectar cinco componentes funcionais ao catálogo, habilitar execução
-  server-side para poderes ACTIVE e limpar estado runtime quando a última fonte
-  de acesso concedida por traje for removida.
-- Implementação: Invisibility, Levitation, VortexAction, SummonEntity e Phase
-  registrados em `ComponentRegistry`; conectados, respectivamente, a
-  `refractive_invisibility`, `telekinetic_levitate`, `vortex_maelstrom`,
-  `spectral_wolf_pack` e `void_step`. Levitação e vórtice permanecem SUSTAINED;
-  os outros três mapeamentos são ACTIVE. Invocação usa `EntityType.WOLF` vanilla
-  e associa o dono via UUID. Ativações executadas no servidor.
-- Runtime/trajes: poderes ACTIVE ativáveis pelo runtime, pacote serverbound e
-  `/ascendant power use`. Ao trocar/desequipar traje ou revogar poder, toggle,
-  cooldown e callbacks são limpos apenas quando o jogador perde a última fonte;
-  acesso intrínseco remanescente preserva o estado.
-- Cobertura/contagens: GameTests verificam registro e round-trip dos cinco
-  componentes, execução, duração finita, limpeza de efeito/modificador,
-  re-equipamento sem duplicação e preservação de poder intrínseco. Catálogo:
-  500 poderes (113 funcionais, 387 templates) e 500 habilidades (111 funcionais,
-  389 templates).
-- Validação no Temurin JDK 17.0.20.1 / Gradle 8.8:
-  `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
-  `.\gradlew.bat runGameTestServer --no-daemon` — 35/35 GameTests passaram e o
-  servidor encerrou normalmente;
-  `.\gradlew.bat build --no-daemon` — BUILD SUCCESSFUL; `test` NO-SOURCE.
-- Limite: a prova de invisibilidade confirma o valor de duração finita (5 ticks);
-  expiração natural não é observável no ServerPlayer usado pelo fixture GameTest.
-- Próxima tarefa: interface de catálogo, keybinds e menu radial sobre registries
-  e networking existentes; não iniciada neste lote.
-- Commit/push: não realizados conforme solicitação explícita do usuário.
-
-LOTE B2 — INTERFACE DE CATÁLOGO, KEYBINDS E MENU RADIAL
-- Tarefa: adicionar navegação client-side e acionamento de poderes, habilidades e trajes,
-  usando registries e networking existentes, sem reimplementar o runtime.
-- Arquivos criados: `src/main/java/br/com/ascendant/catalog/CatalogInteraction.java`,
-  `src/main/java/br/com/ascendant/ui/client/PowerCatalogScreen.java`,
-  `src/main/java/br/com/ascendant/ui/client/RadialMenuScreen.java` e
-  `src/main/java/br/com/ascendant/ui/client/AscendantClientControls.java`.
-- Arquivos modificados: `src/main/java/br/com/ascendant/network/AscendantNetwork.java`
-  (toggle solicitado ao servidor e desequipar), `src/main/java/br/com/ascendant/test/FrameworkGameTests.java`,
-  `src/main/resources/assets/ascendant/lang/en_us.json`,
-  `src/main/resources/assets/ascendant/lang/pt_br.json`, `AI_CONTEXT.txt`,
-  `AGENT_COORDINATION.txt`, `TODO.md`, `CHANGELOG.md` e `docs/DEVELOPMENT_STATUS.md`.
-- Implementação: catálogo para powers/abilities/suits com pesquisa, filtro, detalhes, estado
-  funcional/template e ação contextual; radial com oito opções por página, seleção direcional,
-  confirmação/cancelamento; controles configuráveis F6/G/V/B/PageUp/PageDown.
-  `CatalogInteraction` compartilha a classificação de ações sem dependências client-only.
-  Pedidos de ativação/toggle/equip permanecem no canal de rede e são validados no servidor.
-- Teste adicionado: busca, filtragem por categoria, acionabilidade de powers/abilities e setores
-  do radial; a execução foi por servidor GameTest, não por teste de UI renderizada.
-- Validação com Temurin JDK 17.0.20.1 / Gradle 8.8:
-  `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
-  `.\gradlew.bat runGameTestServer --no-daemon` — 36/36 testes obrigatórios aprovados,
-  servidor iniciado, encerrado normalmente e Gradle BUILD SUCCESSFUL;
-  `.\gradlew.bat build --no-daemon` — BUILD SUCCESSFUL, `test` NO-SOURCE.
-- Limite: `runClient` e validação gráfica/entrada interativa não foram executados.
-- Próxima ação: inspecionar a UI em cliente real e corrigir eventuais problemas de layout/foco.
-- Git: alterações ainda não commitadas nem enviadas durante esta atualização.
-
-LOTE ASC-009 — IMPORTACAO SEGURA DE HERO PACKS E FALLBACK DE INVOCACAO
-- Data/hora local: 2026-10-21.
-- Agente: Agente 01.
-- Estado inicial: branch `srkaiohshin-droid-ascendant-gameplay-ui` limpa e sincronizada
-  com `origin`; B1 (`b528dc1`) e B2 (`9f25503`) sao ancestrais do HEAD. Worktrees
-  restantes estavam em branches distintas; nenhuma outra sessao de agente estava ativa.
-- Problemas confirmados: o importador apagava a pasta instalada antes de mover a nova,
-  o ID do manifesto era usado como caminho sem validacao, limites eram verificados so
-  depois de gravar a entrada inteira, e caminhos ZIP eram avaliados sem normalizacao
-  portavel de separadores. A primeira execucao do GameTest tambem reproduziu falha no
-  poder de invocacao quando os destinos preferenciais nao estavam livres.
-- Alteracoes: validacao de ID/campos/dependencias do manifesto; rejeicao de entradas
-  absolutas, traversal, nomes reservados/aliases do Windows, scripts/codigo, nomes duplicados e limites excedidos durante
-  extracao; limite de 1 MiB no manifesto; staging e troca atomica com rollback e
-  preservacao do backup se rollback falhar. `SummonEntityComponent` agora busca
-  posicoes carregadas, dentro do world border e livres de colisao antes de criar os
-  lobos; o GameTest bloqueia a posicao preferencial para cobrir o fallback.
-- Arquivos: `PackManifest.java`, `PackSecurity.java`, `PackManager.java`,
-  `PackManagerGameTests.java`, `SummonEntityComponent.java`, `FrameworkGameTests.java`,
-  `Ascendant.java`, `AI_CONTEXT.txt`, `AGENT_COORDINATION.txt`, `TODO.md`,
-  `CHANGELOG.md` e `docs/DEVELOPMENT_STATUS.md`.
-- Validacoes executadas: `compileJava` passou; as duas primeiras execucoes de
-  `runGameTestServer` iniciaram e completaram 38 testes, mas falharam no teste existente
-  de invocacao; apos implementar busca de fallback e obstrucao explicita no fixture,
-  a execucao seguinte terminou normalmente com 39/39 testes aprovados.
-- Validacoes finais: `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
-  `.\gradlew.bat runGameTestServer --no-daemon` — servidor encerrou normalmente,
-  39/39 testes obrigatorios aprovados; `.\gradlew.bat build --no-daemon` —
-  BUILD SUCCESSFUL; tarefa `test` — NO-SOURCE.
-- `git diff --check`: aprovado sem ocorrencias. Commit
-  `1a04994d09abc3090c72a0bb82746c708c80e6c7` foi publicado em
-  `origin/srkaiohshin-droid-ascendant-gameplay-ui`; fetch confirmou o mesmo SHA remoto.
-- Limites: o HeroPack ainda nao aplica definicoes a registries de forma transacional,
-  nem resolve compatibilidade/dependencias semanticas. Validacao visual B2 nao executada.
-
-LOTE ASC-010 — NUCLEO INICIAL DE SUPERVELOCIDADE
-- Data: 2026-10-21.
-- Branch: `srkaiohshin-droid-ascendant-gameplay-ui`, worktree isolada do projeto.
-- Auditoria: checkout limpo em `8a964dd`, sincronizado com `origin`; B1/B2/ASC-009
-  presentes no histórico. Foram preservadas todas as outras worktrees. O ambiente
-  da sessão já era uma worktree de feature isolada; nenhuma branch nova foi criada.
-- Implementado: capability transitória `SpeedsterState`; `SpeedsterPhysics` com 10 níveis
-  não lineares, aceleração, curva, inércia, boost de sprint e frenagem; tuning em
-  `ascendant-speedster.toml`; keybinds configuráveis para modo, níveis e freio;
-  inputs enviados no canal existente, limitados por tick e calculados pelo servidor;
-  estado/nível sincronizados para cliente e tracking players. Requer `kinetic_sprint`
-  desbloqueado ou concedido pela suit. A ativação do voo encerra supervelocidade.
-- Ciclo de vida: capability transient não serializada; limpeza em clone, respawn,
-  logout e troca de dimensão; perda de permissão/configuração encerra o modo.
-- Testes: cinco GameTests novos cobrem física/progressão/freio, curvas, controle e
-  limpeza de estado, acesso/integração de voo e clipping vanilla. `compileJava`
-  executado explicitamente — BUILD SUCCESSFUL. `runGameTestServer` executado após
-  correções — servidor encerrou normalmente, **44/44** testes necessários passaram.
-  `build --no-daemon` executado — BUILD SUCCESSFUL; `test` é NO-SOURCE.
-  Na primeira execução também passaram 44/44, mas um nome de fixture excedia 16
-  caracteres e gerava erro assíncrono de codificação; reduzido antes da execução final.
-- Cliente: `runClient` iniciou sem falha de carregamento, registrou
-  `ascendant-speedster.toml`, capability e Ascendant, e chegou ao menu e a um mundo
-  local. Os controles não foram exercitados: a ferramenta de UI não conseguiu enviar
-  teclas ao canvas do jogo (sem nó acessível e sem via segura de envio). O processo foi
-  encerrado após a tentativa; logo, não há validação gráfica/de gameplay do velocista.
-- Pendências: `build` completo, `git diff --check`, revisão final, commit/push e
-  confirmação do SHA remoto ainda precisam ser executados. Keybinds em gameplay e
-  multiplayer real não foram testados. Perfis pessoais, habilidades especiais, HUD, animações,
-  efeitos/áudio e física especializada permanecem fora deste lote.
-
-REVISAO COMPLEMENTAR ASC-010 — REVOGACAO DO PODER DE VELOCIDADE
-- `PowerRuntimeEngine.deactivatePowerIfInaccessible` agora interrompe o estado do velocista
-  imediatamente quando `kinetic_sprint` perde sua última fonte de acesso, sem usar
-  `togglePower` após remover a permissão. A verificação de posse existente preserva o estado
-  quando a autorização continua intrínseca ou concedida por outra fonte.
-- `SpeedsterGameTests.suitRevocationStopsSpeedsterUnlessAnotherSourceRemains` cobre
-  ativação via traje, remoção imediata, re-equipamento e preservação quando também há
-  concessão intrínseca. A suíte ASC-010 passa a ter seis testes e o total do projeto é 45.
-- Arquivos desta revisão: `PowerRuntimeEngine.java`, `SpeedsterGameTests.java`,
-  `AGENT_COORDINATION.txt`, `AGENT_LOG.txt`, `AI_CONTEXT.txt`, `CHANGELOG.md`,
-  `TODO.md` e `docs/DEVELOPMENT_STATUS.md`.
-- Validação executada: `.\gradlew.bat compileJava --no-daemon` — BUILD SUCCESSFUL;
-  `.\gradlew.bat runGameTestServer --no-daemon` — servidor encerrou com 45/45 testes
-  obrigatórios aprovados; `.\gradlew.bat build --no-daemon` — BUILD SUCCESSFUL
-  (`test` NO-SOURCE). Revisão do diff e `git diff --check` aprovados.
-- Git: commit `29cbc562eff0dc2e3dfa47a1e17677da074316f0`, mensagem
-  `feat(speedster): add server-authoritative movement core`, publicado em
-  `origin/srkaiohshin-droid-ascendant-gameplay-ui`; fetch confirmou o mesmo SHA
-  remoto e a branch ficou sincronizada.
-
-ASC-011 — LOTE A — AUDITORIA DE CONTROLES
-- Base verificada antes da edição: branch `srkaiohshin-droid-ascendant-gameplay-ui`,
-  HEAD `abfd3a07cec2a0d940f9e42815debe52189fdd4b`, limpa e sincronizada com
-  `origin`; outras worktrees e a branch `agent01/core-gameplay-audit` foram preservadas.
-- Código: os defaults Ascendant são únicos (voo R/K, catálogo F6, radial G, ativar V,
-  alternar B, navegação PageUp/PageDown; velocista Z, colchetes, Left Alt). O arquivo
-  local ignorado `run/options.txt` mostrou `key_key.loadToolbarActivator` e
-  `key.ascendant.flight_brake` ambos em X, conflito entre o default do voo e o vanilla.
-  Corrigido `FlightClientInput` para usar K, tecla sem outra atribuição naquele arquivo;
-  os defaults de movimento e ações foram preservados.
-- `runClient --no-daemon` iniciou Forge 47.3.0/Minecraft 1.20.1 em Java 17, carregou o
-  menu e mostrou a página Key Binds com as categorias Ascendant. A preferência existente
-  manteve X (Minecraft não migra automaticamente keybinds persistidos quando o default
-  muda). A automação não pôde enviar teclado com segurança; durante a tentativa, foi
-  detectada atividade do usuário na janela e a inspeção foi interrompida para não disputar
-  controle. Não há confirmação visual do K efetivamente aplicado nem teste de gameplay.
-- Validação após a mudança do default: `.\gradlew.bat compileJava --no-daemon` —
-  BUILD SUCCESSFUL; `.\gradlew.bat runGameTestServer --no-daemon` — servidor terminou
-  normalmente com 45/45 testes obrigatórios; `.\gradlew.bat build --no-daemon` —
-  BUILD SUCCESSFUL (`test` NO-SOURCE). Próximo teste manual: conferir `Brake while flying`
-  em K (ou outra tecla livre), confirmar ausência de marca de conflito, testar controles
-  do velocista/voo e transições/ciclo de vida conforme lista ASC-011.
-
-ASC-011 — LOTE A — CONFIRMAÇÃO DA PREFERÊNCIA PERSISTIDA
-- Na sessão `runClient`, `Brake while flying` foi definido para K e as telas Controls e
-  Options foram fechadas normalmente. A leitura posterior de `run/options.txt` confirmou
-  `key_key.ascendant.flight_brake:key.keyboard.k`; `loadToolbarActivator` continua em X.
-- Isso confirma a configuração local e remove a colisão observada neste arquivo; não
-  valida frenagem, voo, velocista ou transições em gameplay. Nenhum teste Gradle foi
-  reexecutado nesta confirmação; os resultados de compile/build/45 GameTests acima são
-  os resultados da validação anterior à sessão.

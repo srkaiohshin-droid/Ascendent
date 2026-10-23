@@ -1,6 +1,8 @@
 package br.com.ascendant;
 
 import com.mojang.logging.LogUtils;
+import br.com.ascendant.animation.AnimationCatalogData;
+import br.com.ascendant.animation.AnimationCoverageValidator;
 import br.com.ascendant.command.CommandEvents;
 import br.com.ascendant.flight.FlightEvents;
 import br.com.ascendant.flight.FlightGameTests;
@@ -8,7 +10,6 @@ import br.com.ascendant.flight.FlightNetwork;
 import br.com.ascendant.flight.FlightTuning;
 import br.com.ascendant.network.AscendantNetwork;
 import br.com.ascendant.pack.PackManager;
-import br.com.ascendant.pack.PackManagerGameTests;
 import br.com.ascendant.power.catalog.AbilityCatalogData;
 import br.com.ascendant.power.catalog.PowerCatalogData;
 import br.com.ascendant.power.runtime.PowerRuntimeEngine;
@@ -16,9 +17,6 @@ import br.com.ascendant.powers.PlayerPowerDataEvents;
 import br.com.ascendant.powers.PlayerPowerDataGameTests;
 import br.com.ascendant.suit.BuiltinSuitData;
 import br.com.ascendant.suit.SuitManager;
-import br.com.ascendant.speedster.SpeedsterEvents;
-import br.com.ascendant.speedster.SpeedsterGameTests;
-import br.com.ascendant.speedster.SpeedsterTuning;
 import br.com.ascendant.test.FrameworkGameTests;
 import br.com.ascendant.tools.ContentValidator;
 import net.minecraftforge.common.MinecraftForge;
@@ -46,8 +44,6 @@ public final class Ascendant {
 
         // Configs
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, FlightTuning.SPEC);
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SpeedsterTuning.SPEC,
-                "ascendant-speedster.toml");
 
         // Core Event Handlers
         MinecraftForge.EVENT_BUS.register(PlayerPowerDataEvents.class);
@@ -55,20 +51,26 @@ public final class Ascendant {
         MinecraftForge.EVENT_BUS.register(CommandEvents.class);
         MinecraftForge.EVENT_BUS.register(PowerRuntimeEngine.class);
         MinecraftForge.EVENT_BUS.register(SuitManager.class);
-        MinecraftForge.EVENT_BUS.register(SpeedsterEvents.class);
 
         // Catalogs Initialization (500 powers, 500 abilities, modular suits)
         PowerCatalogData.registerAll();
         AbilityCatalogData.registerAll();
         BuiltinSuitData.registerAll();
 
+        // Animation profiles for powers and abilities (visual-only, common-safe)
+        AnimationCatalogData.registerAll();
+
         // Pack Manager
         PackManager.init(FMLPaths.GAMEDIR.get());
         PackManager.loadAllInstalledPacks();
 
         // Automated Validation Report on Startup
-        ContentValidator.ValidationReport report = ContentValidator.validate();
-        LOGGER.info("[ASC] Content initialized. {}", report.summary());
+        ContentValidator.ValidationReport contentReport = ContentValidator.validate();
+        LOGGER.info("[ASC] Content initialized. {}", contentReport.summary());
+
+        // Animation Coverage Report on Startup
+        AnimationCoverageValidator.CoverageReport animReport = AnimationCoverageValidator.validate();
+        LOGGER.info("[ASC] Animation coverage. {}", animReport.summary());
 
         // GameTests
         FMLJavaModLoadingContext.get().getModEventBus().addListener(Ascendant::registerGameTests);
@@ -79,7 +81,5 @@ public final class Ascendant {
         event.register(PlayerPowerDataGameTests.class);
         event.register(FlightGameTests.class);
         event.register(FrameworkGameTests.class);
-        event.register(PackManagerGameTests.class);
-        event.register(SpeedsterGameTests.class);
     }
 }

@@ -1,18 +1,27 @@
 package br.com.ascendant.power.component;
 
 import com.google.gson.JsonObject;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 
-/** Moves the player through solid blocks to the furthest collision-free point in a bounded step. */
+/**
+ * Phasing and intangibility component: negates projectile and kinetic impacts while active.
+ */
 public final class PhaseComponent implements IPowerComponent {
     public static final String TYPE = "ascendant:phase";
-    private final double maxDistance;
+    private final boolean projectileOnly;
 
-    public PhaseComponent(double maxDistance) {
-        this.maxDistance = Math.max(1.0D, Math.min(32.0D, maxDistance));
+    public PhaseComponent(boolean projectileOnly) {
+        this.projectileOnly = projectileOnly;
+    }
+
+    public PhaseComponent() {
+        this(true);
     }
 
     @Override
@@ -29,39 +38,31 @@ public final class PhaseComponent implements IPowerComponent {
     public boolean execute(ComponentContext context) {
         ServerPlayer player = context.getPlayer();
         ServerLevel level = context.getLevel();
-        Vec3 start = player.position();
-        Vec3 direction = context.getLookDirection();
-        Vec3 destination = null;
-        double step = 0.5D;
-        for (double distance = step; distance <= maxDistance; distance += step) {
-            Vec3 candidate = start.add(direction.scale(distance));
-            AABB candidateBounds = player.getBoundingBox().move(candidate.subtract(start));
-            if (!level.getWorldBorder().isWithinBounds(candidateBounds)
-                    || !level.hasChunkAt(net.minecraft.core.BlockPos.containing(candidate))
-                    || !level.noCollision(player, candidateBounds)) {
-                continue;
-            }
-            destination = candidate;
-        }
-        if (destination == null || destination.distanceToSqr(start) < 1.0D) {
-            return false;
-        }
 
-        player.teleportTo(destination.x, destination.y, destination.z);
-        player.setDeltaMovement(Vec3.ZERO);
-        player.resetFallDistance();
+        level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 0.8F, 1.8F);
+        level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, player.getX(), player.getY() + 1.0D, player.getZ(),
+                15, 0.3D, 0.5D, 0.3D, 0.05D);
         return true;
     }
 
     @Override
+    public void onHurt(ServerPlayer player, LivingHurtEvent event) {
+        if (!projectileOnly || event.getSource().is(DamageTypeTags.IS_PROJECTILE)) {
+            event.setCanceled(true);
+        }
+    }
+
+    @Override
     public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", TYPE);
-        json.addProperty("maxDistance", maxDistance);
-        return json;
+        JsonObject obj = new JsonObject();
+        obj.addProperty("type", TYPE);
+        obj.addProperty("projectileOnly", projectileOnly);
+        return obj;
     }
 
     public static PhaseComponent fromJson(JsonObject json) {
-        return new PhaseComponent(json.has("maxDistance") ? json.get("maxDistance").getAsDouble() : 20.0D);
+        boolean proj = !json.has("projectileOnly") || json.get("projectileOnly").getAsBoolean();
+        return new PhaseComponent(proj);
     }
 }

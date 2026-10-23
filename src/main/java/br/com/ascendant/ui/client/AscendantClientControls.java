@@ -67,8 +67,8 @@ public final class AscendantClientControls {
 
         while (OPEN_CATALOG.consumeClick()) {
             if (minecraft.screen == null) {
-                minecraft.setScreen(new PowerCatalogScreen(null));
-            } else if (minecraft.screen instanceof PowerCatalogScreen) {
+                minecraft.setScreen(new HeroPackScreen(null));
+            } else if (minecraft.screen instanceof HeroPackScreen || minecraft.screen instanceof PowerCatalogScreen) {
                 minecraft.setScreen(null);
             }
         }

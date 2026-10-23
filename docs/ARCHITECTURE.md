@@ -65,28 +65,6 @@ registrado; `runGameTestServer` e o comando para executa-lo.
 - [Events (Forge 1.20.1)](https://docs.minecraftforge.net/en/1.20.1/concepts/events/)
 - [Sides (Forge 1.20.x)](https://docs.minecraftforge.net/en/1.20.x/concepts/sides/)
 
-## ASC-010 — contrato inicial de supervelocidade
-
-- `SpeedsterState` é capability transitória, separada dos poderes duráveis e do estado de voo.
-  Guarda modo ativo, nível e última entrada recebida; não é serializada e é limpa no ciclo de vida.
-- `SpeedsterClientInput` envia controles e máscara direcional pelo `AscendantNetwork`; o servidor
-  exige posse de `ascendant:kinetic_sprint` (intrínseca ou por traje), limita níveis/entradas e
-  calcula a velocidade. O cliente aplica apenas previsão local da mesma função física.
-- `SpeedsterPhysics` é puro e compartilhado entre simulação/predição: 10 limites não lineares,
-  aceleração, convergência de direção, retenção de inércia e frenagem. Valores são configuráveis
-  em `ascendant-speedster.toml`; cada movimento segue a colisão normal de `Entity.move`.
-- Voo e corrida rápida não escrevem movimento simultaneamente: velocidade não ativa com voo;
-  ao ativar voo, `FlightController` encerra e sincroniza supervelocidade antes de assumir o controle.
-- Os pacotes não carregam posição nem velocidade final escolhidas pelo cliente. Estado/nível visível
-  é sincronizado para o jogador e observadores; inputs repetidos no mesmo tick são rejeitados e
-  entradas antigas são descartadas.
-- Os defaults próprios do Ascendant não compartilham teclas entre voo, catálogo/radial e velocista.
-  `flight_brake` usa K porque X colidia com `loadToolbarActivator` vanilla observado na configuração
-  local. Minecraft mantém keybinds persistidos ao atualizar; não sobrescrever preferências antigas.
-- O primeiro lote não define um registry de perfis nem afirma perfis de Barry/Wally/outros,
-  recursos energéticos, ataques, slow motion, habilidades de parede/água/fase, HUD ou animação.
-  Essas mecânicas exigem lotes e critérios independentes.
-
 ## Politica de estado, cooldowns e permissoes
 
 - Poderes desbloqueados sao direitos duraveis do jogador. O capability serializa
