@@ -208,11 +208,14 @@ public final class PowerCatalogData {
         regTempl("photon_volley", PowerCategory.ENERGY, PowerType.ACTIVE, 60, "multi_projectile", Map.of("count", "5"));
         regTempl("emp_shockwave", PowerCategory.ENERGY, PowerType.ACTIVE, 180, "tech_drain", Map.of("radius", "12.0"));
         regTempl("energy_siphon", PowerCategory.ENERGY, PowerType.ACTIVE, 90, "drain_target", Map.of("drainAmount", "10"));
-        regTempl("radiant_nova", PowerCategory.ENERGY, PowerType.ACTIVE, 240, "radial_discharge", Map.of("radius", "10.0"));
-        regTempl("plasma_cutter", PowerCategory.ENERGY, PowerType.ACTIVE, 50, "focused_slice", Map.of("length", "5.0"));
+        regFunc("radiant_nova", PowerCategory.ENERGY, PowerType.ACTIVE, 240,
+                new ShockwaveComponent(10.0D, 14.0F, 1.6D, 24), List.of());
+        regFunc("plasma_cutter", PowerCategory.ENERGY, PowerType.ACTIVE, 50,
+                new EnergyBeamComponent(10.0D, 9.0F, 2, "fire"), List.of());
         regTempl("prismatic_shield", PowerCategory.ENERGY, PowerType.TOGGLE, 0, "reflection_matrix", Map.of("reflectPct", "35"));
         regTempl("quantum_cascade", PowerCategory.ENERGY, PowerType.CHARGED, 300, "chain_detonation", Map.of("cascades", "4"));
-        regTempl("tachyon_pulse", PowerCategory.ENERGY, PowerType.ACTIVE, 70, "high_speed_beam", Map.of("speed", "4.0"));
+        regFunc("tachyon_pulse", PowerCategory.ENERGY, PowerType.ACTIVE, 70,
+                new EnergyBeamComponent(48.0D, 12.0F, 8, "magic"), List.of());
     }
 
     // 7. FIRE (13)
@@ -262,7 +265,8 @@ public final class PowerCatalogData {
         regTempl("volt_dash", PowerCategory.ELECTRICITY, PowerType.ACTIVE, 40, "instant_spark_dash", Map.of("dashSpeed", "2.5"));
         regTempl("magnetic_repulsion", PowerCategory.ELECTRICITY, PowerType.TOGGLE, 0, "projectile_deflect", Map.of("deflectChance", "0.7"));
         regTempl("arc_field", PowerCategory.ELECTRICITY, PowerType.SUSTAINED, 140, "continuous_sparks", Map.of("dps", "8"));
-        regTempl("taser_touch", PowerCategory.ELECTRICITY, PowerType.ACTIVE, 50, "stun_paralysis", Map.of("stunTicks", "40"));
+        regFunc("taser_touch", PowerCategory.ELECTRICITY, PowerType.ACTIVE, 50,
+                new StunComponent(3.5D, 60, 4), List.of());
         regTempl("plasma_railgun", PowerCategory.ELECTRICITY, PowerType.CHARGED, 180, "hypervelocity_bolt", Map.of("pierceDepth", "10"));
         regTempl("ball_lightning", PowerCategory.ELECTRICITY, PowerType.ACTIVE, 120, "slow_moving_orb", Map.of("orbLifetime", "100"));
         regTempl("overload_capacitors", PowerCategory.ELECTRICITY, PowerType.ACTIVE, 240, "stat_burst", Map.of("duration", "160"));
@@ -420,8 +424,10 @@ public final class PowerCatalogData {
         regFunc("gravitational_slam", PowerCategory.GRAVITY, PowerType.ACTIVE, 60, new DamageActionComponent(10.0F, 6.0D, "physical"), List.of());
         regFunc("weightlessness_cushion", PowerCategory.GRAVITY, PowerType.PASSIVE, 0, new DamageMitigationComponent(1.0F, "fall"), List.of());
 
-        regTempl("zero_gravity_field", PowerCategory.GRAVITY, PowerType.ACTIVE, 120, "float_all_entities", Map.of("radius", "8.0"));
-        regTempl("micro_black_hole", PowerCategory.GRAVITY, PowerType.CHARGED, 260, "intense_singularity", Map.of("suctionRadius", "12.0"));
+        regFunc("zero_gravity_field", PowerCategory.GRAVITY, PowerType.SUSTAINED, 120,
+                new GravityWellComponent(8.0D, 0.12D, GravityWellComponent.MODE_PUSH, 16), List.of());
+        regFunc("micro_black_hole", PowerCategory.GRAVITY, PowerType.SUSTAINED, 260,
+                new GravityWellComponent(12.0D, 0.22D, GravityWellComponent.MODE_PULL, 24), List.of());
         regTempl("heavy_gravity_zone", PowerCategory.GRAVITY, PowerType.ACTIVE, 100, "pin_down_entities", Map.of("fallSpeedBonus", "2.0"));
         regTempl("gravity_well", PowerCategory.GRAVITY, PowerType.ACTIVE, 80, "target_attract_orb", Map.of("duration", "80"));
         regTempl("invert_gravity", PowerCategory.GRAVITY, PowerType.ACTIVE, 140, "reverse_gravity_target", Map.of("duration", "60"));
@@ -429,7 +435,8 @@ public final class PowerCatalogData {
         regTempl("graviton_crush", PowerCategory.GRAVITY, PowerType.ACTIVE, 150, "downward_force_burst", Map.of("damage", "14"));
         regTempl("orbital_slingshot", PowerCategory.GRAVITY, PowerType.ACTIVE, 70, "high_speed_launch", Map.of("impulse", "3.0"));
         regTempl("density_flux", PowerCategory.GRAVITY, PowerType.TOGGLE, 0, "mass_multiplier", Map.of("multiplier", "3.0"));
-        regTempl("event_horizon_pulse", PowerCategory.GRAVITY, PowerType.ACTIVE, 220, "fatal_gravity_edge", Map.of("range", "10.0"));
+        regFunc("event_horizon_pulse", PowerCategory.GRAVITY, PowerType.ACTIVE, 220,
+                new GravityWellComponent(10.0D, 0.3D, GravityWellComponent.MODE_PUSH, 24), List.of());
     }
 
     // 19. SHIELDS (13)
@@ -596,7 +603,8 @@ public final class PowerCatalogData {
 
         regTempl("mass_tether", PowerCategory.CROWD_CONTROL, PowerType.ACTIVE, 100, "rope_all_nearby_mobs", Map.of("radius", "8.0"));
         regTempl("gravity_well_hold", PowerCategory.CROWD_CONTROL, PowerType.ACTIVE, 120, "implosive_containment", Map.of("radius", "6.0"));
-        regTempl("concussion_flash", PowerCategory.CROWD_CONTROL, PowerType.ACTIVE, 70, "daze_and_disarm", Map.of("stunDuration", "40"));
+        regFunc("concussion_flash", PowerCategory.CROWD_CONTROL, PowerType.ACTIVE, 70,
+                new StunComponent(8.0D, 40, 12), List.of());
         regTempl("whirlwind_lift", PowerCategory.CROWD_CONTROL, PowerType.ACTIVE, 90, "levitate_group", Map.of("height", "8.0"));
         regTempl("stone_entombment", PowerCategory.CROWD_CONTROL, PowerType.ACTIVE, 150, "encase_in_rock", Map.of("duration", "100"));
         regTempl("mind_pacification", PowerCategory.CROWD_CONTROL, PowerType.ACTIVE, 160, "halt_all_aggro", Map.of("duration", "120"));

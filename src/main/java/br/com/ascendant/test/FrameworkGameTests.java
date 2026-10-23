@@ -17,6 +17,10 @@ import br.com.ascendant.power.PowerRegistry;
 import br.com.ascendant.power.component.ComponentContext;
 import br.com.ascendant.power.component.DashComponent;
 import br.com.ascendant.power.component.ComponentRegistry;
+import br.com.ascendant.power.component.EnergyBeamComponent;
+import br.com.ascendant.power.component.GravityWellComponent;
+import br.com.ascendant.power.component.ShockwaveComponent;
+import br.com.ascendant.power.component.StunComponent;
 import br.com.ascendant.power.component.IPowerComponent;
 import br.com.ascendant.power.component.InvisibilityComponent;
 import br.com.ascendant.power.component.LevitationComponent;
@@ -78,10 +82,18 @@ public final class FrameworkGameTests {
         helper.assertTrue(report.isValid(), "Validation should have 0 errors, but had: " + report.errors());
         helper.assertTrue(PowerRegistry.size() == 500,
                 "PowerRegistry must contain exactly 500 powers, found: " + PowerRegistry.size());
-        helper.assertTrue(PowerRegistry.getFunctionalCount() == 113,
-                "PowerRegistry must contain exactly 113 functional powers, found: " + PowerRegistry.getFunctionalCount());
-        helper.assertTrue(PowerRegistry.size() - PowerRegistry.getFunctionalCount() == 387,
-                "PowerRegistry must retain 387 honest templates");
+        helper.assertTrue(PowerRegistry.getFunctionalCount() == 121,
+                "PowerRegistry must contain exactly 121 functional powers, found: " + PowerRegistry.getFunctionalCount());
+        helper.assertTrue(PowerRegistry.size() - PowerRegistry.getFunctionalCount() == 379,
+                "PowerRegistry must retain 379 honest templates");
+        helper.assertTrue(report.functionalPowersWithoutExecutableComponent() == 0,
+                "Every functional power must expose an executable component, found: "
+                        + report.functionalPowersWithoutExecutableComponent());
+        helper.assertTrue(PowerRegistry.getAll().stream()
+                        .filter(power -> !power.isFunctional())
+                        .allMatch(power -> power.getComponents().stream()
+                                .allMatch(component -> component instanceof br.com.ascendant.power.component.TemplateComponent)),
+                "Non-functional powers may only carry honest template components");
         helper.assertTrue(AbilityRegistry.size() == 500,
                 "AbilityRegistry must contain exactly 500 abilities, found: " + AbilityRegistry.size());
         helper.assertTrue(AbilityRegistry.getFunctionalCount() == 111,
@@ -226,6 +238,200 @@ public final class FrameworkGameTests {
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void convertedCatalogPowersExposeRealMechanics(GameTestHelper helper) {
+        assertPowerComponent(helper, powerId("tachyon_pulse"), EnergyBeamComponent.TYPE);
+        assertPowerComponent(helper, powerId("plasma_cutter"), EnergyBeamComponent.TYPE);
+        assertPowerComponent(helper, powerId("radiant_nova"), ShockwaveComponent.TYPE);
+        assertPowerComponent(helper, powerId("event_horizon_pulse"), GravityWellComponent.TYPE);
+        assertPowerComponent(helper, powerId("taser_touch"), StunComponent.TYPE);
+        assertPowerComponent(helper, powerId("concussion_flash"), StunComponent.TYPE);
+        assertPowerComponent(helper, powerId("micro_black_hole"), GravityWellComponent.TYPE);
+        assertPowerComponent(helper, powerId("zero_gravity_field"), GravityWellComponent.TYPE);
+        helper.assertTrue(PowerRegistry.get(powerId("micro_black_hole")).getType()
+                        == br.com.ascendant.core.PowerType.SUSTAINED
+                        && PowerRegistry.get(powerId("zero_gravity_field")).getType()
+                        == br.com.ascendant.core.PowerType.SUSTAINED,
+                "Sustained gravity fields must use the sustained runtime so they can be toggled off");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void energyBeamHitsVisibleTargetsAndStopsAtBlocks(GameTestHelper helper) {
+        TestServerPlayer testPlayer = createServerPlayer(helper);
+        ServerPlayer serverPlayer = testPlayer.player();
+        BlockPos spawn = helper.absolutePos(new BlockPos(1, 1, 1));
+        serverPlayer.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, 0.0F, 0.0F);
+        serverPlayer.setYRot(0.0F);
+        serverPlayer.setXRot(0.0F);
+
+        ServerLevel level = serverPlayer.serverLevel();
+        Mob visible = EntityType.ZOMBIE.create(level);
+        Mob shielded = EntityType.ZOMBIE.create(level);
+        helper.assertTrue(visible != null && shielded != null, "Beam test requires vanilla zombies");
+        visible.moveTo(serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ() + 2.0D, 0.0F, 0.0F);
+        shielded.moveTo(serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ() + 4.5D, 0.0F, 0.0F);
+        level.addFreshEntity(visible);
+        level.addFreshEntity(shielded);
+
+        BlockPos wall = BlockPos.containing(serverPlayer.getX(), serverPlayer.getY() + 1.0D,
+                serverPlayer.getZ() + 3.0D);
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+
+        EnergyBeamComponent beam = new EnergyBeamComponent(24.0D, 6.0F, 4, "magic");
+        float visibleBefore = visible.getHealth();
+        float shieldedBefore = shielded.getHealth();
+        helper.assertTrue(beam.execute(ComponentContext.of(serverPlayer, powerId("tachyon_pulse"))),
+                "The beam should report a hit when a visible target is in front of it");
+        helper.assertTrue(visible.getHealth() < visibleBefore,
+                "The beam must damage the visible target");
+        helper.assertTrue(Math.abs(shielded.getHealth() - shieldedBefore) < 1.0E-4F,
+                "The beam must stop at the first solid block and never reach targets behind it");
+        helper.assertTrue(ComponentRegistry.deserialize(beam.toJson()).isFunctional()
+                        && ComponentRegistry.deserialize(beam.toJson()).getType().equals(EnergyBeamComponent.TYPE),
+                "The beam component must round-trip through the component registry");
+
+        visible.discard();
+        shielded.discard();
+        level.removeBlock(wall, false);
+        serverPlayer.setXRot(-90.0F);
+        helper.assertTrue(!beam.execute(ComponentContext.of(serverPlayer, powerId("tachyon_pulse"))),
+                "A beam with no target must not report success, so whiffs cannot start cooldowns");
+        removeServerPlayer(testPlayer);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void shockwaveDamagesAndKnocksBackOnlyVisibleTargets(GameTestHelper helper) {
+        TestServerPlayer testPlayer = createServerPlayer(helper);
+        ServerPlayer serverPlayer = testPlayer.player();
+        BlockPos spawn = helper.absolutePos(new BlockPos(1, 1, 1));
+        serverPlayer.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, 0.0F, 0.0F);
+        serverPlayer.setYRot(0.0F);
+        serverPlayer.setXRot(0.0F);
+
+        ServerLevel level = serverPlayer.serverLevel();
+        Mob exposed = EntityType.ZOMBIE.create(level);
+        Mob behindWall = EntityType.ZOMBIE.create(level);
+        helper.assertTrue(exposed != null && behindWall != null, "Shockwave test requires vanilla zombies");
+        exposed.moveTo(serverPlayer.getX() + 2.0D, serverPlayer.getY(), serverPlayer.getZ() + 1.0D, 0.0F, 0.0F);
+        behindWall.moveTo(serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ() + 4.0D, 0.0F, 0.0F);
+        level.addFreshEntity(exposed);
+        level.addFreshEntity(behindWall);
+
+        BlockPos wallBase = BlockPos.containing(serverPlayer.getX(), serverPlayer.getY(),
+                serverPlayer.getZ() + 3.0D);
+        for (int dy = 0; dy <= 2; dy++) {
+            level.setBlock(wallBase.offset(0, dy, 0), Blocks.STONE.defaultBlockState(), 3);
+        }
+
+        ShockwaveComponent shockwave = new ShockwaveComponent(6.0D, 8.0F, 1.2D, 8);
+        float exposedBefore = exposed.getHealth();
+        float hiddenBefore = behindWall.getHealth();
+        helper.assertTrue(shockwave.execute(ComponentContext.of(serverPlayer, powerId("radiant_nova"))),
+                "The shockwave should report a hit when a visible target is in range");
+        helper.assertTrue(exposed.getHealth() < exposedBefore,
+                "The shockwave must damage visible targets inside its radius");
+        helper.assertTrue(exposed.getDeltaMovement().lengthSqr() > 0.0D,
+                "The shockwave must apply real knockback to visible targets");
+        helper.assertTrue(Math.abs(behindWall.getHealth() - hiddenBefore) < 1.0E-4F,
+                "The shockwave must not damage targets sealed behind terrain");
+        helper.assertTrue(behindWall.getDeltaMovement().lengthSqr() < 1.0E-6D,
+                "The shockwave must not push targets sealed behind terrain");
+
+        for (int dy = 0; dy <= 2; dy++) {
+            level.removeBlock(wallBase.offset(0, dy, 0), false);
+        }
+        removeServerPlayer(testPlayer);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void stunAppliesBoundedEffectsAndClearsAggro(GameTestHelper helper) {
+        TestServerPlayer testPlayer = createServerPlayer(helper);
+        ServerPlayer serverPlayer = testPlayer.player();
+        BlockPos spawn = helper.absolutePos(new BlockPos(1, 1, 1));
+        serverPlayer.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, 0.0F, 0.0F);
+
+        ServerLevel level = serverPlayer.serverLevel();
+        Mob target = EntityType.ZOMBIE.create(level);
+        helper.assertTrue(target != null, "Stun test requires a vanilla zombie");
+        target.moveTo(serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ() + 2.0D, 0.0F, 0.0F);
+        level.addFreshEntity(target);
+        target.setTarget(serverPlayer);
+
+        StunComponent stun = new StunComponent(5.0D, 40, 4);
+        helper.assertTrue(stun.execute(ComponentContext.of(serverPlayer, powerId("taser_touch"))),
+                "Stun should report success when a visible hostile is in range");
+        MobEffectInstance slow = target.getEffect(MobEffects.MOVEMENT_SLOWDOWN);
+        helper.assertTrue(slow != null && slow.getDuration() == 40,
+                "Stun must apply the configured bounded duration");
+        helper.assertTrue(target.hasEffect(MobEffects.WEAKNESS)
+                        && target.hasEffect(MobEffects.DIG_SLOWDOWN)
+                        && target.hasEffect(MobEffects.CONFUSION),
+                "Stun must apply observable vanilla effects instead of a hidden frozen state");
+        helper.assertTrue(target.getTarget() == null,
+                "Stun must clear mob aggression so the effect is mechanically real");
+        helper.assertTrue(new StunComponent(99.0D, 99_999, 999).getDurationTicks() == 240,
+                "Stun duration must be clamped to the documented maximum");
+        target.discard();
+        removeServerPlayer(testPlayer);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void gravityWellPullsAndPushesWithClampedVelocity(GameTestHelper helper) {
+        TestServerPlayer testPlayer = createServerPlayer(helper);
+        ServerPlayer serverPlayer = testPlayer.player();
+        BlockPos spawn = helper.absolutePos(new BlockPos(1, 1, 1));
+        serverPlayer.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, 0.0F, 0.0F);
+
+        ServerLevel level = serverPlayer.serverLevel();
+        Mob target = EntityType.ZOMBIE.create(level);
+        helper.assertTrue(target != null, "Gravity test requires a vanilla zombie");
+        target.moveTo(serverPlayer.getX() + 3.0D, serverPlayer.getY(), serverPlayer.getZ(), 0.0F, 0.0F);
+        level.addFreshEntity(target);
+
+        Vec3 toward = new Vec3(serverPlayer.getX() - target.getX(), 0.0D,
+                serverPlayer.getZ() - target.getZ()).normalize();
+        GravityWellComponent pull = new GravityWellComponent(8.0D, 0.2D,
+                GravityWellComponent.MODE_PULL, 8);
+        helper.assertTrue(pull.execute(ComponentContext.of(serverPlayer, powerId("micro_black_hole"))),
+                "The pull field should affect a visible hostile");
+        helper.assertTrue(target.getDeltaMovement().dot(toward) > 0.0D,
+                "The pull field must move targets toward the caster");
+        helper.assertTrue(target.getDeltaMovement().length() <= 1.1D + 1.0E-6D,
+                "The pull field must clamp velocity so it cannot launch entities arbitrarily");
+
+        target.setDeltaMovement(Vec3.ZERO);
+        GravityWellComponent push = new GravityWellComponent(8.0D, 0.2D,
+                GravityWellComponent.MODE_PUSH, 8);
+        helper.assertTrue(push.execute(ComponentContext.of(serverPlayer, powerId("zero_gravity_field"))),
+                "The push field should affect a visible hostile");
+        helper.assertTrue(target.getDeltaMovement().dot(toward.scale(-1.0D)) > 0.0D,
+                "The push field must move targets away from the caster");
+        helper.assertTrue(target.getDeltaMovement().length() <= 1.4D + 1.0E-6D,
+                "The push field must clamp velocity so it cannot launch entities arbitrarily");
+
+        IPlayerPowerData data = serverPlayer.getCapability(PlayerPowerDataProvider.CAPABILITY)
+                .orElseThrow(() -> new AssertionError("Power capability missing"));
+        data.unlockPower(powerId("micro_black_hole"));
+        data.unlockPower(powerId("zero_gravity_field"));
+        helper.assertTrue(PowerRuntimeEngine.togglePower(serverPlayer, powerId("micro_black_hole"), true)
+                        && PowerRuntimeEngine.isPowerToggled(serverPlayer, powerId("micro_black_hole")),
+                "A sustained gravity field must toggle on through the server runtime");
+        helper.assertTrue(PowerRuntimeEngine.togglePower(serverPlayer, powerId("micro_black_hole"), false)
+                        && !PowerRuntimeEngine.isPowerToggled(serverPlayer, powerId("micro_black_hole")),
+                "A sustained gravity field must toggle off cleanly");
+        helper.assertTrue(CatalogInteraction.forPower(PowerRegistry.get(powerId("micro_black_hole"))).type()
+                        == CatalogInteraction.ActionType.TOGGLE_POWER,
+                "The catalog must expose the gravity field through the real toggle path");
+
+        target.discard();
+        removeServerPlayer(testPlayer);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
     public static void temporaryInvisibilityUsesFiniteDuration(GameTestHelper helper) {
         TestServerPlayer testPlayer = createServerPlayer(helper);
         ServerPlayer serverPlayer = testPlayer.player();
@@ -293,6 +499,10 @@ public final class FrameworkGameTests {
                 "Removing one source must preserve an intrinsically unlocked active power");
         removeServerPlayer(testPlayer);
         helper.succeed();
+    }
+
+    private static ResourceLocation powerId(String path) {
+        return new ResourceLocation("ascendant", path);
     }
 
     private static void assertPowerComponent(GameTestHelper helper, ResourceLocation powerId, String componentType) {

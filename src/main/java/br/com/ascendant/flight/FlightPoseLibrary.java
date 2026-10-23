@@ -25,6 +25,8 @@ public final class FlightPoseLibrary {
     public static final float TURN_THRESHOLD_DEGREES = 11.0F;
     public static final float CLIMB_VERTICAL_SPEED = 0.06F;
     public static final float DIVE_VERTICAL_SPEED = -0.08F;
+    /** Ângulo mínimo da trajetória de velocidade (graus) para forçar subida/descida, independente do olhar. */
+    public static final float TRAJECTORY_PITCH_THRESHOLD = 8.0F;
 
     public static final float MIN_BODY_PITCH = -138.0F;
     public static final float MAX_BODY_PITCH = -5.0F;
@@ -61,10 +63,19 @@ public final class FlightPoseLibrary {
         }
 
         boolean moving = speed > 0.12F;
-        if (moving && (verticalSpeed <= DIVE_VERTICAL_SPEED || viewPitch > 28.0F)) {
+        // Ângulo da trajetória de velocidade: positivo = subindo, negativo = mergulhando.
+        // Isso faz o corpo seguir a direção real de voo, não apenas para onde o jogador olha.
+        float trajectoryPitch = speed > 0.01F
+                ? (float) Math.toDegrees(Math.atan2(verticalSpeed, speed))
+                : 0.0F;
+        if (moving && (verticalSpeed <= DIVE_VERTICAL_SPEED
+                || trajectoryPitch <= -TRAJECTORY_PITCH_THRESHOLD
+                || viewPitch > 28.0F)) {
             return FlightAnimationState.DIVE;
         }
-        if (moving && (verticalSpeed >= CLIMB_VERTICAL_SPEED || viewPitch < -24.0F)) {
+        if (moving && (verticalSpeed >= CLIMB_VERTICAL_SPEED
+                || trajectoryPitch >= TRAJECTORY_PITCH_THRESHOLD
+                || viewPitch < -24.0F)) {
             return FlightAnimationState.CLIMB;
         }
         if (speed < HOVER_SPEED) {

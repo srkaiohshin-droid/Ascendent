@@ -40,6 +40,12 @@ public final class FlightAnimationController {
     private static final float POSE_SMOOTHING = 0.30F;
     private static final float WEIGHT_STEP = 0.20F;
     private static final float REMOTE_INTERPOLATION_TICKS = 3.0F;
+    /** Frequência da oscilação sutil de equilíbrio no hover (radianos por tick). */
+    private static final float HOVER_IDLE_SPEED = 0.10F;
+    /** Amplitude máxima da oscilação vertical do corpo no hover, em blocos. */
+    private static final float HOVER_IDLE_LIFT = 0.015F;
+    /** Amplitude máxima da inclinação lateral de equilíbrio no hover, em graus. */
+    private static final float HOVER_IDLE_ROLL = 1.5F;
 
     private static ClientLevel lastLevel;
 
@@ -128,6 +134,22 @@ public final class FlightAnimationController {
                 if (maneuvering) {
                     target = target.withRoll(target.bodyRollDegrees + FlightPoseLibrary.maneuverRoll(
                             state.getManeuverDirection(), state.getManeuverTicksRemaining()));
+                }
+                // Hover parado no ar: pequena oscilação de equilíbrio e respiração,
+                // para não parecer uma pose congelada. Aplica apenas sobre o alvo,
+                // sem acumular rotação tick a tick.
+                if (animation == FlightAnimationState.HOVER) {
+                    float idle = Mth.sin(activeTicks * HOVER_IDLE_SPEED);
+                    target = new FlightPose(
+                            target.bodyPitchDegrees,
+                            target.bodyRollDegrees + idle * HOVER_IDLE_ROLL,
+                            target.bodyLift + idle * HOVER_IDLE_LIFT,
+                            target.headXRotDegrees,
+                            target.rightArmXRot, target.rightArmYRot, target.rightArmZRot,
+                            target.leftArmXRot, target.leftArmYRot, target.leftArmZRot,
+                            target.rightLegXRot, target.rightLegYRot, target.rightLegZRot,
+                            target.leftLegXRot, target.leftLegYRot, target.leftLegZRot
+                    );
                 }
                 previousWeight = weight;
                 weight = Math.min(1.0F, weight + WEIGHT_STEP);

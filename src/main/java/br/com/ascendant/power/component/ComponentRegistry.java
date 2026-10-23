@@ -38,6 +38,10 @@ public final class ComponentRegistry {
         register(VortexActionComponent.TYPE, VortexActionComponent::fromJson);
         register(SummonEntityComponent.TYPE, SummonEntityComponent::fromJson);
         register(PhaseComponent.TYPE, PhaseComponent::fromJson);
+        register(EnergyBeamComponent.TYPE, EnergyBeamComponent::fromJson);
+        register(ShockwaveComponent.TYPE, ShockwaveComponent::fromJson);
+        register(StunComponent.TYPE, StunComponent::fromJson);
+        register(GravityWellComponent.TYPE, GravityWellComponent::fromJson);
         register(TemplateComponent.TYPE, TemplateComponent::fromJson);
     }
 
