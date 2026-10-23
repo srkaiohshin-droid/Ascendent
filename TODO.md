@@ -79,3 +79,23 @@
 - [x] Ajustar os botoes do catalogo para telas estreitas.
 - [ ] Inspecao visual humana do catalogo, busca, filtros, botoes, feedback e menu radial em cliente grafico.
 - [x] Commitar somente este lote, publicar com push normal e confirmar SHA local igual ao remoto (`934e00fa35eecef61272fc226f48cb5bd11aff4d`).
+
+## Overhaul de gameplay, catalogo, animacoes e camera (2026-10-23)
+- [x] Tornar `kinetic_sprint` um TOGGLE real com `SpeedsterComponent` e manter o modificador de velocidade.
+- [x] Adicionar `canToggle`, `setPowerToggleSilently`, `getPowerToggleFailureReason` e `hasPowerAccess(Player, id)`.
+- [x] Unificar tecla Z, catalogo e radial no runtime; limpar toggle em paradas automaticas.
+- [x] Reconciliar toggle e modo transitorio em logout, respawn, clone e mudanca de dimensao.
+- [x] Corrigir voo concedido por traje em `FlightController`.
+- [x] Enviar recusas do servidor por action bar, incluindo cooldown em ticks.
+- [x] Aceitar `theme` opcional em `PackManifest` e corrigir o parser de campo opcional.
+- [x] Reescrever `PowerCatalogScreen` com HEROES inicial, abas, busca, filtros e detalhes.
+- [x] Transformar `HeroPackScreen` em subclasse fina do catalogo.
+- [x] Reescrever `RadialMenuScreen` com tema, estado, cooldown e dicas.
+- [x] Derivar tema do pack/traje selecionado ou equipado; corrigir chaves de tipo do radial.
+- [x] Integrar texturas comicas e documentar origem/licenca/derivacao em `docs/ASSETS.md`.
+- [x] Adicionar manobra aerea de 360 graus autoritativa e sincronizada com cooldown.
+- [x] Adicionar camera/FOV opcionais e animacoes de corrida/supervelocidade/idle.
+- [x] Adicionar/atualizar GameTests de manobra, tema e voo por traje.
+- [x] Validar `compileJava`, `runGameTestServer` (62/62), `build` e `git diff --check`.
+- [ ] Homologacao visual humana em cliente grafico (telas, poses, camera e manobra).
+- [ ] Confirmar SHA remoto apos o push normal deste lote (codigo/assets em `b2e1c97`).

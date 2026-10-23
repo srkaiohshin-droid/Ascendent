@@ -116,3 +116,33 @@
 - Ajustes finais de auditoria: TICK sem cooldown executa a cada tick (com assercao no GameTest), o cooldown do cliente conta por game time, toggles ativos podem ser desligados durante o cooldown no catalogo e no radial, habilidade removida do registro limpa toggles/passives/cooldown, e os botoes do catalogo cabem em telas estreitas.
 - Validacao confirmada: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` com "All 59 required tests passed"; `build` BUILD SUCCESSFUL; `git diff --check` sem erros de conteudo; `runClient` iniciou sem crash e permaneceu estavel ate o ambiente encerrar a janela (execucao final de ~49s; uma execucao anterior passou de 2 minutos), sem inspecao visual humana.
 - Publicado em `origin/srkaiohshin-droid-ascendant-gameplay-ui` no commit `934e00fa35eecef61272fc226f48cb5bd11aff4d`; SHA local e remoto conferem.
+
+## 0.1.0 - Overhaul de gameplay, catalogo, animacoes e camera (2026-10-23)
+- Supervelocidade exposta como poder TOGGLE real (`kinetic_sprint`) com `SpeedsterComponent`;
+  tecla Z, catalogo e radial compartilham o mesmo estado server-authoritative.
+- `IPowerComponent.canToggle` e validacao previa em `PowerRuntimeEngine.togglePower`;
+  `setPowerToggleSilently`, `getPowerToggleFailureReason` e `hasPowerAccess(Player, id)`.
+- Paradas automaticas da supervelocidade limpam o toggle e reenviam o catalogo; recusas do
+  servidor chegam ao jogador por action bar, inclusive cooldown em ticks.
+- `clearForLifecycle` reconcilia o toggle de `kinetic_sprint` com o modo transitorio em
+  logout, respawn, clone e mudanca de dimensao, sem depender da ordem dos eventos.
+- Voo concedido por traje passa a autorizar ativacao e manutencao em `FlightController`.
+- Catalogo com identidade comica: HEROES como primeira pagina, abas HEROES/POWERS/ABILITIES/SUITS,
+  busca, filtros de categoria/origem, cartoes, detalhes de mecanica, ativacao, requisitos,
+  cooldown, estado e origem. `HeroPackScreen` virou subclasse fina; radial usa a mesma linguagem.
+- Tema visual derivado de metadados de pack (`theme` opcional) ou do universo do traje
+  selecionado/equipado, sem nomes de herois no codigo.
+- Assets: `theme_cosmic.png` e `theme_retro.png` derivadas de *Race for the Moon* #2
+  (dominio publico nos EUA) e `halftone.png` procedural; proveniencia em `docs/ASSETS.md`.
+- Voo: manobra aerea de 360 graus autoritativa e sincronizada (protocolo de rede "2"),
+  com cooldown, interpolacao por arco mais curto e sem alterar posicao/fisica.
+- Camera de terceira pessoa e FOV opcionais (`ascendant-client.toml`), restauraveis;
+  animacoes de corrida/supervelocidade/idle com voo prioritario nos mixins.
+- Teclas C/V para rolamento aereo; cliques sao drenados quando fora de voo ou em telas.
+- Testes: `aerialManeuverMakesOneFullTurnAndHonoursCooldown`,
+  `packThemeIsOptionalMetadataAndValidated` e cobertura de voo por traje; 62/62 GameTests.
+- Validacao: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` "All 62 required tests passed";
+  `build` BUILD SUCCESSFUL; `git diff --check` sem erros (avisos LF/CRLF).
+- Publicacao: codigo e assets em `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f`; teste de
+  ciclo de vida e documentacao em commit seguinte na mesma branch.
+- Pendente: homologacao visual humana em cliente grafico (telas, poses, camera e manobra).

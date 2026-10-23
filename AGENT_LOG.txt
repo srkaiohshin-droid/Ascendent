@@ -455,3 +455,68 @@ LOTE DE INTEGRACAO DO RUNTIME DE HABILIDADES E CATALOGO HERO/PACK (2026-10-22)
     `origin/srkaiohshin-droid-ascendant-gameplay-ui`; SHA local e remoto conferem.
 - Pendencias:
   - Inspecao visual humana em cliente grafico.
+
+LOTE DE OVERHAUL DE GAMEPLAY, CATALOGO E ANIMACOES (2026-10-23)
+- Data: 2026-10-23
+- Agente: OpenCode (DeepSeek V4.1 Flash Free)
+- Tarefa: corrigir ativacao/toggles, expor supervelocidade, redesenhar catalogo/radial
+  com identidade comica, integrar assets redistribuiveis, adicionar animacoes de voo,
+  manobra aerea de 360 graus e camera dinamica, com testes e documentacao.
+- Base: branch srkaiohshin-droid-ascendant-gameplay-ui, HEAD publicado 934e00fa.
+- Runtime e rede:
+  - kinetic_sprint agora e TOGGLE e usa SpeedsterComponent; o modificador de velocidade
+    continua aplicado pelo mesmo poder.
+  - IPowerComponent.canToggle + validacao previa em PowerRuntimeEngine.togglePower;
+    setPowerToggleSilently, getPowerToggleFailureReason e hasPowerAccess(Player, id).
+  - SpeedsterController.toggle delega ao runtime; paradas automaticas limpam o toggle e
+    reenviam o catalogo. FlightController usa hasPowerAccess e aceita voo concedido por traje.
+  - Recusas do servidor usam action bar, inclusive cooldown em ticks.
+  - clearForLifecycle zera o toggle de kinetic_sprint silenciosamente, pois eventos de
+    ciclo de vida e o runtime podem executar em ordem indefinida.
+- Catalogo e assets:
+  - PackManifest.theme opcional (lowercase validado) com construtor de 13 argumentos preservado.
+  - CatalogTheme/ComicUi; PowerCatalogScreen reescrito com HEROES inicial, abas, busca,
+    filtros, cartoes, detalhes e feedback; HeroPackScreen e subclasse fina.
+  - RadialMenuScreen reescrito com tema, estado, cooldown e dicas de tecla.
+  - theme_cosmic.png/theme_retro.png derivadas de Race for the Moon #2 (dominio publico
+    nos EUA); halftone.png procedural. docs/ASSETS.md e CREDITS.txt atualizados.
+- Animacoes/camera:
+  - FlightState/PlayerFlightState com manobra; FlightController.requestManeuver e cooldown;
+    FlightNetwork protocolo "2" com ManeuverRequest e estado sincronizado.
+  - FlightPoseLibrary.MANEUVER_TICKS/estado MANEUVER/maneuverRoll; FlightPose.lerp com
+    arco mais curto; FlightAnimationController sobrepoe o roll sincronizado.
+  - FlightClientTuning (ascendant-client.toml) e FlightCameraController opcionais;
+    LocomotionPoseController para corrida/supervelocidade/idle; mixins dao prioridade ao voo.
+  - Teclas C/V para rolamento aereo; cliques sao drenados fora de voo/telas.
+- Testes:
+  - FlightGameTests.aerialManeuverMakesOneFullTurnAndHonoursCooldown.
+  - PackManagerGameTests.packThemeIsOptionalMetadataAndValidated.
+  - FrameworkGameTests atualizado para kinetic_sprint TOGGLE e voo concedido por traje.
+  - SpeedsterGameTests cobre a reconciliacao de ciclo de vida (modo transitorio e toggle).
+  - Corrigido PackManifest.fromJson para nao tratar `theme` opcional como obrigatorio.
+- Validacao real neste ambiente (Temurin 17.0.20.1, Gradle Wrapper 8.8):
+  - .\gradlew.bat compileJava --console=plain: BUILD SUCCESSFUL.
+  - .\gradlew.bat runGameTestServer --console=plain: 62/62 required tests passed;
+    "All 62 required tests passed".
+  - .\gradlew.bat build --console=plain: BUILD SUCCESSFUL.
+  - git diff --check: sem erros (apenas avisos LF/CRLF).
+  - runClient (2026-10-23, apos revalidacao): cliente abriu, carregou os mixins
+    HumanoidModelMixin/PlayerRendererMixin, atlas e audio, criou e entrou no mundo
+    integrado e aceitou os canais ascendant:main (1) e ascendant:flight (2). Encerrado
+    manualmente pelo agente apos a entrada no mundo; sem crash. O smoke test nao
+    substitui inspecao visual humana.
+- Limitacoes:
+  - A aparencia final das telas, poses, camera e manobra nao foi observada em cliente grafico.
+  - Manifests de packs continuam sem retratos/perfis de personagens; a UI nao inventa esses dados.
+- Corrida de builds: duas execucoes simultaneas de `build` corromperam apenas saidas
+  geradas (build/reobfJar e build/tmp/compileJava). Depois de remover essas pastas, um
+  `build` unico passou. Nenhum arquivo de fonte foi afetado.
+- Publicacao:
+  - Commit de codigo e assets `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f` na branch
+    `srkaiohshin-droid-ascendant-gameplay-ui`.
+  - Documentacao e teste de ciclo de vida no commit imediatamente seguinte; o SHA
+    remoto final sera conferido com `git ls-remote` e constara no relatorio da sessao.
+- Pendencias:
+  - Homologacao visual humana em cliente grafico (pendente; o smoke test nao a substitui).
+  - Reconciliar o lote de animacao/camera preservado neste workspace com o agente de
+    animacoes (worktree Ascendant-Animation-Lab), sem merge unilateral.

@@ -2,6 +2,7 @@ package br.com.ascendant.speedster;
 
 import br.com.ascendant.flight.FlightController;
 import br.com.ascendant.flight.FlightState;
+import br.com.ascendant.power.runtime.PowerRuntimeEngine;
 import br.com.ascendant.powers.IPlayerPowerData;
 import br.com.ascendant.powers.PlayerPowerDataProvider;
 import br.com.ascendant.suit.SuitDefinition;
@@ -153,7 +154,14 @@ public final class SpeedsterGameTests {
             powers.unlockPower(SpeedsterController.REQUIRED_POWER);
             helper.assertTrue(SuitManager.unequipSuit(player) && state.isActive(),
                     "Removing a suit must preserve speedster movement when the power remains intrinsic");
-            SpeedsterController.toggle(player);
+            helper.assertTrue(PowerRuntimeEngine
+                            .isPowerToggled(player, SpeedsterController.REQUIRED_POWER),
+                    "Active speedster movement must stay mirrored by the power toggle");
+            SpeedsterController.clearForLifecycle(player, false);
+            helper.assertTrue(!state.isActive()
+                            && !PowerRuntimeEngine
+                            .isPowerToggled(player, SpeedsterController.REQUIRED_POWER),
+                    "Lifecycle cleanup must clear both the transient mode and its power toggle");
         } finally {
             removeServerPlayer(testPlayer);
         }

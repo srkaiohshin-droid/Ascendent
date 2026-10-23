@@ -124,3 +124,52 @@ ATUALIZACAO DE ESTADO EM 2026-10-22 (INTEGRACAO DO LOTE INTERROMPIDO ASC-012)
 - Publicacao: commit `934e00fa35eecef61272fc226f48cb5bd11aff4d` publicado em
   `origin/srkaiohshin-droid-ascendant-gameplay-ui`; SHA local e remoto conferem.
 - Pendencias: inspecao visual humana da UI/radial.
+
+ATUALIZACAO DE ESTADO EM 2026-10-23 (OVERHAUL DE GAMEPLAY, CATALOGO E ANIMACOES)
+- Branch ativa: srkaiohshin-droid-ascendant-gameplay-ui. Base publicada:
+  934e00fa35eecef61272fc226f48cb5bd11aff4d.
+- Lote A (runtime e rede):
+  - kinetic_sprint passou de PASSIVE para TOGGLE e ganhou SpeedsterComponent; o
+    modificador de movement_speed continua no mesmo poder.
+  - IPowerComponent.canToggle permite recusar alternancias invalidas;
+    PowerRuntimeEngine.togglePower valida todos os componentes antes de mudar o estado.
+  - Novas APIs: setPowerToggleSilently, getPowerToggleFailureReason e
+    hasPowerAccess(Player, ResourceLocation).
+  - SpeedsterController.toggle usa o runtime; paradas automaticas limpam o toggle e
+    reenviam o catalogo. FlightController usa hasPowerAccess, corrigindo voo por traje.
+  - Recusas do servidor chegam por action bar, incluindo cooldown em ticks e condicoes.
+  - clearForLifecycle zera o toggle silenciosamente para reconciliar modo transitorio e
+    runtime, independentemente da ordem dos eventos de ciclo de vida.
+- Lote B (catalogo e assets):
+  - PackManifest aceita metadado opcional `theme` (id minusculo validado), preservando
+    o construtor de 13 argumentos e a compatibilidade de manifests existentes.
+  - CatalogTheme e ComicUi centralizam tema, fundo, paineis, selos, texto quebrado e
+    tela de meio-tom. O tema e derivado do traje/pack selecionado ou equipado, sem
+    nomes de herois no codigo.
+  - PowerCatalogScreen abre em HEROES e mantem abas HEROES, POWERS, ABILITIES e SUITS,
+    busca real, filtros de categoria/origem, cartoes, detalhes de mecanica, ativacao,
+    requisitos, cooldown, estado, origem e feedback. HeroPackScreen virou subclasse fina
+    da mesma tela. RadialMenuScreen usa a mesma linguagem visual e mostra estado/cooldown.
+  - Texturas: theme_cosmic.png e theme_retro.png derivadas de Race for the Moon #2
+    (dominio publico nos EUA), halftone.png procedural. Proveniencia em docs/ASSETS.md
+    e CREDITS.txt; nenhum download em runtime.
+- Lote C (animacoes, manobra e camera):
+  - FlightState/PlayerFlightState armazenam direcao, ticks restantes e cooldown da manobra.
+  - FlightController.requestManeuver valida voo ativo e cooldown; tickServer avanca e
+    sincroniza a manobra. FlightNetwork usa protocolo "2" e envia ManeuverRequest/
+    FlightStateUpdate com os campos da manobra.
+  - FlightPoseLibrary adiciona MANEUVER_TICKS=14, estado MANEUVER e maneuverRoll;
+    FlightPose.lerp interpola o roll pelo arco mais curto. FlightAnimationController
+    aplica o roll sincronizado sobre a pose de voo.
+  - FlightClientTuning registra ascendant-client.toml (enabled, dynamicCamera, dynamicFov,
+    cameraStrength, fovStrength). FlightCameraController aplica camera/FOV opcionais e
+    restaura o comportamento vanilla ao desligar.
+  - LocomotionPoseController adiciona corrida/supervelocidade/idle; voo tem prioridade
+    nos mixins. Teclas C/V solicitam rolamento aereo esquerdo/direito.
+- Validacao confirmada neste ambiente (Temurin 17.0.20.1, Gradle Wrapper 8.8):
+  compileJava BUILD SUCCESSFUL; runGameTestServer com "All 62 required tests passed";
+  build BUILD SUCCESSFUL; git diff --check sem erros (apenas avisos LF/CRLF).
+- Nao executado neste lote: inspecao visual humana em runClient. A homologacao visual
+  das telas, poses, camera e manobra permanece pendente.
+- Publicacao: commit de codigo e assets `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f`;
+  o teste de ciclo de vida e esta documentacao seguem em commit proprio na mesma branch.

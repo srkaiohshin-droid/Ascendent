@@ -256,3 +256,33 @@ Pendencias:
   botoes, feedback e menu radial.
 - Publicado em `origin/srkaiohshin-droid-ascendant-gameplay-ui` no commit
   `934e00fa35eecef61272fc226f48cb5bd11aff4d`; SHA local e remoto conferem.
+
+ASC-013
+Titulo: Overhaul de gameplay, catalogo comico, animacoes e camera de voo
+Status: REVIEW
+Prioridade: ALTA
+Dependencia: ASC-012
+Arquivos principais: flight/*, flight/client/*, power/runtime/PowerRuntimeEngine.java,
+  power/component/*, speedster/SpeedsterController.java, pack/PackManifest.java,
+  ui/client/*, resources/assets/ascendant/lang/*, resources/assets/ascendant/textures/gui/*,
+  docs/ASSETS.md, CREDITS.txt.
+Criterios:
+- [x] kinetic_sprint exposto como TOGGLE real e unificado com a tecla Z, catalogo e radial.
+- [x] Toggles validam componentes e recusas chegam ao jogador; desligar durante cooldown e permitido.
+- [x] Ciclo de vida (logout/respawn/clone/dimensao) reconcilia modo transitorio e toggle.
+- [x] Voo concedido por traje autoriza ativacao e manutencao.
+- [x] Catalogo abre em HEROES com abas HEROES/POWERS/ABILITIES/SUITS, busca, filtros,
+  detalhes de mecanica/ativacao/requisitos/estado/origem e feedback.
+- [x] Identidade visual derivada de metadados de pack/traje; sem nomes de herois no codigo.
+- [x] Assets comicos redistribuiveis documentados (origem, autor, licenca, derivacao, fallback).
+- [x] Manobra aerea de 360 graus autoritativa, sincronizada, com cooldown e sem teleporte.
+- [x] Camera/FOV de terceira pessoa opcionais e restauraveis.
+- [x] Animacoes de corrida/supervelocidade/idle com voo prioritario.
+- [x] Testes de manobra, tema de pack e voo por traje; 62/62 GameTests aprovados.
+- [ ] Homologacao visual humana das telas, poses, camera e manobra.
+- Validacao: compileJava BUILD SUCCESSFUL; runGameTestServer 62/62; build BUILD SUCCESSFUL;
+  git diff --check sem erros (avisos LF/CRLF). Smoke de runClient entrou no mundo integrado,
+  aceitou os canais ascendant:main (1) e ascendant:flight (2) e nao crashou; nao houve
+  inspecao visual humana.
+- Publicacao: codigo e assets em `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f`; teste de
+  ciclo de vida e documentacao em commit seguinte na mesma branch.
