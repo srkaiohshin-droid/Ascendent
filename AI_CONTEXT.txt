@@ -169,8 +169,14 @@ ATUALIZACAO DE ESTADO EM 2026-10-23 (OVERHAUL DE GAMEPLAY, CATALOGO E ANIMACOES)
 - Validacao confirmada neste ambiente (Temurin 17.0.20.1, Gradle Wrapper 8.8):
   compileJava BUILD SUCCESSFUL; runGameTestServer com "All 62 required tests passed";
   build BUILD SUCCESSFUL; git diff --check sem erros (apenas avisos LF/CRLF).
-- Nao executado neste lote: inspecao visual humana em runClient. A homologacao visual
-  das telas, poses, camera e manobra permanece pendente.
+- Inspecao visual humana em runClient: nao realizada. A homologacao visual das telas,
+  poses, camera e manobra permanece pendente (houve apenas smoke test de inicializacao).
 - Publicacao: codigo e assets em `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f`; teste de
   ciclo de vida e documentacao em `5d9f22ee55fa11699156781c8c6c1e6b1a4d1c47`; ambos
   publicados na mesma branch, com SHA remoto conferido por `git ls-remote`.
+- Cobertura adicional (pos-publicacao): `SpeedsterGameTests
+  .catalogTogglePathAppliesRealSpeedAndRestoresBaseline` exercita o toggle de
+  `kinetic_sprint` pelo `PowerRuntimeEngine` (mesmo caminho do catalogo/radial),
+  confirma o modificador de movement_speed +0.15, exige deslocamento real acima do
+  passo vanilla e restaura o atributo base ao desligar. `runGameTestServer` passou
+  com "All 63 required tests passed" e `build` com BUILD SUCCESSFUL.

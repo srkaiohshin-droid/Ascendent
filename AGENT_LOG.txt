@@ -521,3 +521,19 @@ LOTE DE OVERHAUL DE GAMEPLAY, CATALOGO E ANIMACOES (2026-10-23)
   - Homologacao visual humana em cliente grafico (pendente; o smoke test nao a substitui).
   - Reconciliar o lote de animacao/camera preservado neste workspace com o agente de
     animacoes (worktree Ascendant-Animation-Lab), sem merge unilateral.
+
+TESTE DE INTEGRACAO DA SUPERVELOCIDADE PELO CAMINHO DO CATALOGO (2026-10-23)
+- Objetivo: cobrir o caminho realmente usado pelo catalogo e pelo radial
+  (PowerRuntimeEngine.togglePower), e nao apenas o atalho SpeedsterController.toggle
+  ja exercitado pelos testes anteriores.
+- Novo GameTest catalogTogglePathAppliesRealSpeedAndRestoresBaseline em SpeedsterGameTests:
+  - desbloqueia kinetic_sprint e alterna pelo runtime, exigindo modo ativo e o
+    modificador de movement_speed de +0.15;
+  - executa um passo de alta velocidade real com Player.move e exige deslocamento
+    acima do passo de caminhada vanilla;
+  - desliga pelo mesmo caminho e exige estado inativo com atributo restaurado.
+- Escopo: apenas runtime e teste. Nenhum arquivo de animacao, camera ou render foi tocado.
+- Validacao real: runGameTestServer "All 63 required tests passed"; build BUILD SUCCESSFUL;
+  git diff --check sem erros de conteudo (apenas avisos LF/CRLF).
+- Publicacao: este commit foi enviado com push normal na branch
+  srkaiohshin-droid-ascendant-gameplay-ui; o SHA remoto foi conferido com git ls-remote.

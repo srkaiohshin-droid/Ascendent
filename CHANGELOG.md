@@ -147,3 +147,7 @@
   ciclo de vida e documentacao em `5d9f22ee55fa11699156781c8c6c1e6b1a4d1c47`; ambos
   publicados, com SHA remoto conferido por `git ls-remote`.
 - Pendente: homologacao visual humana em cliente grafico (telas, poses, camera e manobra).
+- Teste `catalogTogglePathAppliesRealSpeedAndRestoresBaseline`: o toggle de
+  `kinetic_sprint` pelo runtime (mesmo caminho do catalogo/radial) inicia a
+  supervelocidade, aplica +0,15 de movement_speed, move mais que um passo vanilla e
+  restaura o atributo base ao desligar. Suite passa a 63/63 GameTests.

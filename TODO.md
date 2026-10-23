@@ -97,6 +97,8 @@
 - [x] Adicionar camera/FOV opcionais e animacoes de corrida/supervelocidade/idle.
 - [x] Adicionar/atualizar GameTests de manobra, tema e voo por traje.
 - [x] Validar `compileJava`, `runGameTestServer` (62/62), `build` e `git diff --check`.
+- [x] Cobrir o toggle de `kinetic_sprint` pelo caminho do catalogo em GameTest, com
+  velocidade real e restauracao do atributo base (63/63 apos o novo teste).
 - [ ] Homologacao visual humana em cliente grafico (telas, poses, camera e manobra).
 - [x] Confirmar SHA remoto apos o push normal deste lote (codigo/assets em `b2e1c97`,
   teste/documentacao em `5d9f22e`; `git ls-remote` conferido).

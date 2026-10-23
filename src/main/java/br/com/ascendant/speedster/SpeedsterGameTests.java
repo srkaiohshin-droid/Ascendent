@@ -19,6 +19,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -184,6 +185,58 @@ public final class SpeedsterGameTests {
         player.move(MoverType.SELF, velocity);
         helper.assertTrue(player.getX() < origin.getX() + 2.0D,
                 "Vanilla movement collision must stop the fast trajectory at the wall");
+        helper.succeed();
+    }
+
+    /**
+     * End-to-end check of the path the catalog and the radial menu use: the power runtime
+     * must start the server-authoritative speedster mode, apply the movement speed modifier
+     * of the same power, and remove both when the toggle is turned off again.
+     */
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void catalogTogglePathAppliesRealSpeedAndRestoresBaseline(GameTestHelper helper) {
+        TestPlayer testPlayer = createServerPlayer(helper);
+        try {
+            ServerPlayer player = testPlayer.player();
+            IPlayerPowerData powers = player.getCapability(PlayerPowerDataProvider.CAPABILITY)
+                    .orElseThrow(() -> new AssertionError("Power capability is unavailable"));
+            powers.unlockPower(SpeedsterController.REQUIRED_POWER);
+            SpeedsterState state = SpeedsterController.getState(player);
+            helper.assertTrue(state != null, "Speedster state capability must be available");
+            double baseline = player.getAttributeValue(Attributes.MOVEMENT_SPEED);
+
+            helper.assertTrue(PowerRuntimeEngine.togglePower(player, SpeedsterController.REQUIRED_POWER, true),
+                    "The catalog toggle path must accept kinetic sprint");
+            helper.assertTrue(PowerRuntimeEngine.isPowerToggled(player, SpeedsterController.REQUIRED_POWER)
+                            && state.isActive(),
+                    "The runtime toggle must start the server-authoritative speedster mode");
+            helper.assertTrue(Math.abs(player.getAttributeValue(Attributes.MOVEMENT_SPEED)
+                            - (baseline + 0.15D)) < 1.0E-6D,
+                    "The active power must add its 0.15 movement speed modifier");
+
+            BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+            player.setPos(origin.getX() + 0.5D, origin.getY() + 1.0D, origin.getZ() + 0.5D);
+            Vec3 stride = Vec3.ZERO;
+            for (int tick = 0; tick < 40; tick++) {
+                stride = SpeedsterPhysics.nextVelocity(stride, 0.0F, SpeedsterState.FORWARD,
+                        state.getLevel(), 0.22D, 1.0D, 0.035D, 0.16D, 0.94D, 0.18D, 1.12D);
+            }
+            double startX = player.getX();
+            double startZ = player.getZ();
+            player.move(MoverType.SELF, stride);
+            double dx = player.getX() - startX;
+            double dz = player.getZ() - startZ;
+            helper.assertTrue(Math.sqrt(dx * dx + dz * dz) > 0.12D,
+                    "An active speedster stride must move further than a vanilla walking step");
+
+            helper.assertTrue(PowerRuntimeEngine.togglePower(player, SpeedsterController.REQUIRED_POWER, false)
+                            && !PowerRuntimeEngine.isPowerToggled(player, SpeedsterController.REQUIRED_POWER)
+                            && !state.isActive()
+                            && Math.abs(player.getAttributeValue(Attributes.MOVEMENT_SPEED) - baseline) < 1.0E-6D,
+                    "Toggling the power off must stop the mode and restore the movement speed baseline");
+        } finally {
+            removeServerPlayer(testPlayer);
+        }
         helper.succeed();
     }
 
