@@ -63,3 +63,31 @@ SISTEMA DE ANIMAÇÕES (NOVO, 2026-10-20)
 - br.com.ascendant.animation.client.AnimationPlayer: reproducao client-only de efeitos (isolada via @OnlyIn(Dist.CLIENT)).
 - GameTests: animationProfileRegistrationAndLookup, animationCoverageForAllFunctionalPowers.
 - Animacoes registradas para todos os 106 poderes funcionais (placeholders genericos para os sem perfil dedicado).
+
+ATUALIZACAO DE ESTADO EM 2026-10-22 (RECUPERACAO DO COMMIT a88f1cb)
+- Branch ativa: srkaiohshin-droid-ascendant-gameplay-ui.
+- Tag de seguranca: backup-before-a88f1cb-recovery.
+- Supervelocidade restaurada: PlayerSpeedsterState, SpeedsterController, SpeedsterEvents,
+  SpeedsterPhysics, SpeedsterState, SpeedsterStateProvider, SpeedsterTuning, SpeedsterGameTests,
+  SpeedsterClientPackets e SpeedsterClientInput.
+- Rede restaurada para controle/entrada/estado da supervelocidade e integrada ao FlightController.
+- Poderes permanentes: SuitManager.unequipSuit nao revoga mais a capability; remove apenas runtime
+  quando nao existe outra fonte de acesso (capability ou traje equipado). Troca de traje limpa
+  poderes e habilidades exclusivos do traje anterior.
+- Habilidades: autorizacao considera poder pai OU concessao direta do traje; ativacao manual valida
+  funcionalidade/gatilho/posse/cooldown; falhas reais chegam ao jogador; PASSIVE tem ciclo
+  aplicar-manter-limpar; TOGGLE tem alternancia server-authoritative; TICK, HURT_EVENT e ATTACK_HIT
+  possuem dispatchers dedicados e cooldown.
+- Packs: PackManifest valida ID obrigatorio e seguro; PackSecurity bloqueia path traversal/ZIP Slip,
+  executaveis e excesso de entradas/tamanho; PackManager instala de forma atomica com rollback e
+  mantem validacao de versao MC/Forge. PackManager.getInstalledPacks() alimenta a UI.
+- UI: HeroPackScreen e a tela inicial Heróis/Packs e mostra somente packs realmente instalados
+  (metadados e contagens). Poderes e Habilidades abrem PowerCatalogScreen nas abas corretas.
+  SuitScreen permanece como listagem/equipagem de trajes. O contrato de manifesto nao possui
+  previews de personagens, e isso e declarado na propria tela.
+- Catalogos atuais: 500 poderes (113 funcionais, 387 templates) e 500 habilidades
+  (111 funcionais, 389 templates).
+- Validacao confirmada no ambiente atual: compileJava BUILD SUCCESSFUL; runGameTestServer com
+  "All 55 required tests passed"; build BUILD SUCCESSFUL; git diff --check sem erros.
+- runClient iniciou sem crash e permaneceu estavel por 120s, mas a inspecao visual interativa da UI
+  nao foi realizada neste ambiente automatizado.

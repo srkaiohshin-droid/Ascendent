@@ -1,35 +1,24 @@
 package br.com.ascendant.power.component;
 
 import com.google.gson.JsonObject;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
-import java.util.List;
+import java.util.Comparator;
 
-/**
- * Suspends enemies in the air by applying Levitation.
- */
+/** Sustained telekinetic lift applied to the living entity the player is looking at. */
 public final class LevitationComponent implements IPowerComponent {
     public static final String TYPE = "ascendant:levitation";
-    private final double radius;
-    private final int durationTicks;
-    private final int amplifier;
+    private final double range;
+    private final double liftPerTick;
 
-    public LevitationComponent(double radius, int durationTicks, int amplifier) {
-        this.radius = radius;
-        this.durationTicks = durationTicks;
-        this.amplifier = amplifier;
-    }
-
-    public LevitationComponent(double radius, int durationTicks) {
-        this(radius, durationTicks, 1);
+    public LevitationComponent(double range, double liftPerTick) {
+        this.range = Math.max(1.0D, Math.min(32.0D, range));
+        this.liftPerTick = Math.max(0.01D, Math.min(0.5D, liftPerTick));
     }
 
     @Override
@@ -44,42 +33,64 @@ public final class LevitationComponent implements IPowerComponent {
 
     @Override
     public boolean execute(ComponentContext context) {
-        ServerPlayer player = context.getPlayer();
-        ServerLevel level = context.getLevel();
+        if (!(context.getTargetEntity() instanceof LivingEntity target)) {
+            return false;
+        }
+        return applyLift(context.getPlayer(), target);
+    }
 
-        AABB box = player.getBoundingBox().inflate(radius);
-        List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, box,
-                e -> e != player && e.isAlive() && !e.isAlliedTo(player));
+    @Override
+    public void onPlayerTick(ServerPlayer player) {
+        ServerLevel level = player.serverLevel();
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getLookAngle();
+        LivingEntity target = level.getEntitiesOfClass(LivingEntity.class,
+                        player.getBoundingBox().inflate(range),
+                        entity -> entity != player && entity.isAlive() && !entity.isAlliedTo(player))
+                .stream()
+                .filter(entity -> {
+                    Vec3 direction = entity.getEyePosition().subtract(eye).normalize();
+                    return look.dot(direction) >= 0.85D;
+                })
+                .min(Comparator.comparingDouble(entity -> entity.distanceToSqr(player)))
+                .orElse(null);
+        if (target == null) {
+            return;
+        }
 
-        if (targets.isEmpty()) {
+        applyLift(player, target);
+    }
+
+    private boolean applyLift(ServerPlayer player, LivingEntity target) {
+        if (!target.isAlive() || target == player || target.isAlliedTo(player)
+                || target.distanceToSqr(player) > range * range) {
+            return false;
+        }
+        ServerLevel level = player.serverLevel();
+        Vec3 targetEye = target.getEyePosition();
+        if (level.clip(new ClipContext(player.getEyePosition(), targetEye, ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE, player)).getType() != HitResult.Type.MISS) {
             return false;
         }
 
-        for (LivingEntity target : targets) {
-            target.addEffect(new MobEffectInstance(MobEffects.LEVITATION, durationTicks, amplifier, false, true, true));
-        }
-
-        level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                SoundEvents.SHULKER_SHOOT, SoundSource.PLAYERS, 1.0F, 1.2F);
-        level.sendParticles(ParticleTypes.PORTAL, player.getX(), player.getY() + 0.5D, player.getZ(),
-                20, radius * 0.5D, 0.4D, radius * 0.5D, 0.1D);
+        Vec3 movement = target.getDeltaMovement();
+        target.setDeltaMovement(movement.x, Math.max(movement.y, liftPerTick), movement.z);
+        target.hurtMarked = true;
         return true;
     }
 
     @Override
     public JsonObject toJson() {
-        JsonObject obj = new JsonObject();
-        obj.addProperty("type", TYPE);
-        obj.addProperty("radius", radius);
-        obj.addProperty("durationTicks", durationTicks);
-        obj.addProperty("amplifier", amplifier);
-        return obj;
+        JsonObject json = new JsonObject();
+        json.addProperty("type", TYPE);
+        json.addProperty("range", range);
+        json.addProperty("liftPerTick", liftPerTick);
+        return json;
     }
 
     public static LevitationComponent fromJson(JsonObject json) {
-        double rad = json.has("radius") ? json.get("radius").getAsDouble() : 6.0D;
-        int dur = json.has("durationTicks") ? json.get("durationTicks").getAsInt() : 60;
-        int amp = json.has("amplifier") ? json.get("amplifier").getAsInt() : 1;
-        return new LevitationComponent(rad, dur, amp);
+        return new LevitationComponent(
+                json.has("range") ? json.get("range").getAsDouble() : 16.0D,
+                json.has("liftPerTick") ? json.get("liftPerTick").getAsDouble() : 0.14D);
     }
 }

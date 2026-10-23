@@ -174,3 +174,54 @@ O módulo `br.com.ascendant.pack` implementa:
 2. **Executar validação de catálogo e compilação:**
    - Execute `.\gradlew.bat compileJava` para verificar a compilação.
    - Execute `.\gradlew.bat runGameTestServer` para rodar os 32 GameTests automatizados.
+
+---
+
+## 8. Atualização de Recuperação - Commit a88f1cb (2026-10-22)
+
+Esta seção registra o estado após a recuperação das regressões introduzidas por
+`a88f1cbfd02e2e2ad960af4372d06766d1f3a6f2`, sem apagar o histórico anterior.
+
+### Funcionalidades restauradas
+- Supervelocidade: pacote `speedster` completo, entrada cliente, rede e integração com o voo.
+- Testes: `SpeedsterGameTests` e `PackManagerGameTests` restaurados; casos anteriores de
+  `FrameworkGameTests` preservados e integrados aos novos testes de regressão.
+- Componentes de gameplay Invisibility, Levitation, Phase, SummonEntity e VortexAction,
+  com as entradas funcionais `void_step`, `vortex_maelstrom`, `telekinetic_levitate`,
+  `refractive_invisibility` e `spectral_wolf_pack`.
+
+### Poderes, trajes e habilidades
+- `SuitManager.unequipSuit` não revoga mais a capability persistente.
+- Poder exclusivo de traje fica inacessível ao desequipar; poder permanentemente desbloqueado
+  continua disponível; outra fonte de acesso preserva o poder.
+- Toggles, efeitos e cooldowns só são limpos quando o poder perde a última fonte de acesso.
+- Habilidades concedidas diretamente por traje são autorizadas sem exigir o poder pai.
+- Ativação manual valida função, gatilho, posse e cooldown; `getActivationFailureReason` é usado
+  no fluxo real e a falha é informada ao jogador.
+- PASSIVE aplica uma vez, mantém de forma idempotente e limpa ao perder acesso; TOGGLE é
+  alternado explicitamente; TICK, HURT_EVENT e ATTACK_HIT têm dispatchers dedicados com cooldown.
+
+### Packs e interface
+- Validação de ID/manifesto, proteção anti-traversal/ZIP Slip, limites de entradas/tamanho,
+  bloqueio de executáveis, instalação atômica, rollback e validação de versão MC/Forge restaurados.
+- `HeroPackScreen` lista somente packs realmente instalados via `PackManager.getInstalledPacks()`,
+  mostra metadados/contagens reais e declara que o manifesto não fornece previews de personagem.
+- Poderes e Habilidades abrem a aba correta; a listagem/equipagem de trajes permanece na `SuitScreen`.
+
+### Estado dos catálogos
+- 500 poderes: 113 funcionais e 387 templates.
+- 500 habilidades: 111 funcionais e 389 templates.
+- 6 trajes integrados.
+
+### Validação confirmada em 2026-10-22 (Java 17 / Gradle 8.8)
+- `.\gradlew.bat compileJava --no-daemon --console=plain`: BUILD SUCCESSFUL.
+- `.\gradlew.bat runGameTestServer --no-daemon --console=plain`: 55/55 required tests passed.
+- `.\gradlew.bat build --no-daemon --console=plain`: BUILD SUCCESSFUL.
+- `git diff --check`: sem erros.
+- `.\gradlew.bat runClient --no-daemon --console=plain`: iniciou sem crash, carregou mixins,
+  atlas, áudio e conteúdo com 0 erros, permanecendo estável por 120s. A inspeção visual
+  interativa da UI/controles não foi realizada neste ambiente automatizado.
+
+### Pendência de homologação
+- Revisão visual humana em cliente gráfico: tela Heróis/Packs, navegação, seleção de trajes,
+  catálogo de habilidades, voo e controles de supervelocidade.

@@ -1,7 +1,5 @@
 package br.com.ascendant.power.runtime;
 
-import javax.annotation.Nullable;
-
 import br.com.ascendant.core.AbilityTrigger;
 import br.com.ascendant.core.PowerType;
 import br.com.ascendant.power.AbilityDefinition;
@@ -10,17 +8,20 @@ import br.com.ascendant.power.PowerDefinition;
 import br.com.ascendant.power.PowerRegistry;
 import br.com.ascendant.power.component.ComponentContext;
 import br.com.ascendant.power.component.IPowerComponent;
-import br.com.ascendant.powers.IPlayerPowerData;
 import br.com.ascendant.powers.PlayerPowerDataProvider;
+import br.com.ascendant.speedster.SpeedsterController;
 import br.com.ascendant.suit.SuitManager;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,6 +32,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PowerRuntimeEngine {
     private static final Map<UUID, Map<ResourceLocation, Long>> COOLDOWNS = new ConcurrentHashMap<>();
     private static final Map<UUID, Set<ResourceLocation>> ACTIVE_TOGGLES = new ConcurrentHashMap<>();
+    private static final Map<UUID, Set<ResourceLocation>> TOGGLED_ABILITIES = new ConcurrentHashMap<>();
+    private static final Map<UUID, Set<ResourceLocation>> ACTIVE_PASSIVES = new ConcurrentHashMap<>();
 
     private PowerRuntimeEngine() {
     }
@@ -80,38 +83,9 @@ public final class PowerRuntimeEngine {
         return toggles != null && toggles.contains(powerId);
     }
 
-    /**
-     * Activates a power (for ACTIVE type powers) without toggling.
-     * For TOGGLE/SUSTAINED powers, use togglePower instead.
-     */
-    public static boolean activatePower(ServerPlayer player, ResourceLocation powerId) {
-        if (!hasPowerAccess(player, powerId)) {
-            return false;
-        }
-        PowerDefinition power = PowerRegistry.get(powerId);
-        if (power == null) {
-            return false;
-        }
-
-        // For active powers, we can trigger their components immediately
-        if (power.getType() == PowerType.ACTIVE) {
-            if (isOnCooldown(player, powerId)) {
-                return false;
-            }
-            setCooldown(player, powerId, power.getCooldownTicks());
-            
-            // Execute all active components
-            for (IPowerComponent comp : power.getComponents()) {
-                if (comp.isFunctional()) {
-                    // Create a component context for execution
-                    ComponentContext context = ComponentContext.of(player, powerId);
-                    comp.execute(context);
-                }
-            }
-            return true;
-        }
-        
-        return false;
+    public static boolean isAbilityToggled(ServerPlayer player, ResourceLocation abilityId) {
+        Set<ResourceLocation> toggles = TOGGLED_ABILITIES.get(player.getUUID());
+        return toggles != null && toggles.contains(abilityId);
     }
 
     public static boolean togglePower(ServerPlayer player, ResourceLocation powerId, boolean enable) {
@@ -119,95 +93,202 @@ public final class PowerRuntimeEngine {
             return false;
         }
         PowerDefinition power = PowerRegistry.get(powerId);
-        if (power == null) {
+        if (power == null || !power.isFunctional()
+                || (power.getType() != PowerType.TOGGLE && power.getType() != PowerType.SUSTAINED)) {
             return false;
         }
 
         Set<ResourceLocation> toggles = ACTIVE_TOGGLES.computeIfAbsent(player.getUUID(), k -> ConcurrentHashMap.newKeySet());
+        boolean changed;
         if (enable) {
-            toggles.add(powerId);
+            changed = toggles.add(powerId);
         } else {
-            toggles.remove(powerId);
+            changed = toggles.remove(powerId);
         }
 
-        for (IPowerComponent comp : power.getComponents()) {
-            comp.onToggle(player, enable);
+        if (changed) {
+            for (IPowerComponent comp : power.getComponents()) {
+                comp.onToggle(player, enable);
+            }
+            if (toggles.isEmpty()) {
+                ACTIVE_TOGGLES.remove(player.getUUID(), toggles);
+            }
         }
         return true;
     }
 
-    public static boolean activateAbility(ServerPlayer player, ResourceLocation abilityId) {
-        AbilityDefinition ability = AbilityRegistry.get(abilityId);
-        if (ability == null) {
+    public static boolean activatePower(ServerPlayer player, ResourceLocation powerId) {
+        PowerDefinition power = PowerRegistry.get(powerId);
+        if (power == null || !power.isFunctional() || power.getType() != PowerType.ACTIVE
+                || !hasPowerAccess(player, powerId) || isOnCooldown(player, powerId)) {
             return false;
         }
 
-        // Abilities with automatic triggers must not be manually activated.
-        // Only KEY_PRESS and SNEAK_KEY abilities can be triggered by player input.
+        ComponentContext context = ComponentContext.of(player, powerId);
+        boolean executed = false;
+        for (IPowerComponent component : power.getComponents()) {
+            if (component.isFunctional() && component.execute(context)) {
+                executed = true;
+            }
+        }
+        if (executed && power.getCooldownTicks() > 0) {
+            setCooldown(player, powerId, power.getCooldownTicks());
+        }
+        return executed;
+    }
+
+    /**
+     * Removes a power's transient runtime state after its final ownership source is lost.
+     * This deliberately bypasses togglePower's access check, which must reject client activation.
+     */
+    public static boolean deactivatePowerIfInaccessible(ServerPlayer player, ResourceLocation powerId) {
+        if (hasPowerAccess(player, powerId)) {
+            return false;
+        }
+        if (SpeedsterController.REQUIRED_POWER.equals(powerId)) {
+            SpeedsterController.deactivateIfPowerWasRevoked(player);
+        }
+
+        Map<ResourceLocation, Long> playerCooldowns = COOLDOWNS.get(player.getUUID());
+        if (playerCooldowns != null) {
+            playerCooldowns.remove(powerId);
+        }
+        Set<ResourceLocation> toggles = ACTIVE_TOGGLES.get(player.getUUID());
+        if (toggles != null) {
+            toggles.remove(powerId);
+            if (toggles.isEmpty()) {
+                ACTIVE_TOGGLES.remove(player.getUUID(), toggles);
+            }
+        }
+
+        PowerDefinition power = PowerRegistry.get(powerId);
+        if (power != null) {
+            for (IPowerComponent component : power.getComponents()) {
+                component.onToggle(player, false);
+            }
+        }
+
+        // Abilities derived from this power lose access too unless another source still grants them.
+        for (AbilityDefinition ability : AbilityRegistry.getAll()) {
+            if (powerId.equals(ability.getPowerId())) {
+                deactivateAbilityIfInaccessible(player, ability.getId());
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Manually activates a key-triggered ability after validating functionality, ownership and cooldown.
+     */
+    public static boolean activateAbility(ServerPlayer player, ResourceLocation abilityId) {
+        AbilityDefinition ability = AbilityRegistry.get(abilityId);
+        if (ability == null || !ability.isFunctional() || !hasExecutableActions(ability)) {
+            return false;
+        }
+
         AbilityTrigger trigger = ability.getTrigger();
         if (trigger != AbilityTrigger.KEY_PRESS && trigger != AbilityTrigger.SNEAK_KEY) {
             return false;
         }
 
-        // Validate power ownership if ability is tied to a power
-        if (!ability.isUniversal()) {
-            if (!hasPowerAccess(player, ability.getPowerId())) {
-                return false;
-            }
-        }
-
-        // Check cooldown
-        if (isOnCooldown(player, abilityId)) {
+        if (!hasAbilityAccess(player, ability) || isOnCooldown(player, abilityId)) {
             return false;
         }
 
         ComponentContext context = ComponentContext.of(player, abilityId);
         boolean anyExecuted = false;
-
         for (IPowerComponent action : ability.getActions()) {
-            if (action.isFunctional()) {
-                boolean result = action.execute(context);
-                if (result) {
-                    anyExecuted = true;
-                }
+            if (action.isFunctional() && action.execute(context)) {
+                anyExecuted = true;
             }
         }
 
         if (anyExecuted && ability.getCooldownTicks() > 0) {
             setCooldown(player, abilityId, ability.getCooldownTicks());
         }
-
         return anyExecuted;
     }
 
     /**
-     * Dispatches abilities whose trigger matches the given game event.
-     * Called by the server-authoritative event hooks so automatic abilities
-     * (HURT_EVENT, ATTACK_HIT, TICK) run without player input.
+     * Server-side activation entry point used by the network layer. Reports the real failure
+     * reason to the requesting player instead of assuming success.
      */
-    public static void dispatchTriggeredAbilities(ServerPlayer player, AbilityTrigger trigger) {
-        if (!player.level().isClientSide && player.isAlive()) {
-            for (AbilityDefinition ability : AbilityRegistry.getAll()) {
-                if (!ability.isFunctional()) continue;
-                if (ability.getTrigger() != trigger) continue;
-                if (!ability.isUniversal()) {
-                    if (!hasPowerAccess(player, ability.getPowerId())) continue;
-                }
-                if (isOnCooldown(player, ability.getId())) continue;
-                ComponentContext context = ComponentContext.of(player, ability.getId());
-                boolean anyExecuted = false;
-                for (IPowerComponent action : ability.getActions()) {
-                    if (action.isFunctional()) {
-                        if (action.execute(context)) {
-                            anyExecuted = true;
-                        }
-                    }
-                }
-                if (anyExecuted && ability.getCooldownTicks() > 0) {
-                    setCooldown(player, ability.getId(), ability.getCooldownTicks());
-                }
+    public static boolean activateAbilityWithFeedback(ServerPlayer player, ResourceLocation abilityId) {
+        String failureReason = getActivationFailureReason(player, abilityId);
+        if (failureReason != null) {
+            player.displayClientMessage(Component.translatable(failureReason), true);
+            return false;
+        }
+        boolean activated = activateAbility(player, abilityId);
+        if (!activated) {
+            player.displayClientMessage(
+                    Component.translatable("gui.ascendant.catalog.activation_failed"), true);
+        }
+        return activated;
+    }
+
+    /**
+     * Explicitly toggles a TOGGLE-triggered ability. Enabling applies the component toggle state;
+     * disabling removes it and clears managed transient state.
+     */
+    public static boolean toggleAbility(ServerPlayer player, ResourceLocation abilityId) {
+        AbilityDefinition ability = AbilityRegistry.get(abilityId);
+        if (ability == null || !ability.isFunctional() || !hasExecutableActions(ability)
+                || ability.getTrigger() != AbilityTrigger.TOGGLE || !hasAbilityAccess(player, ability)) {
+            return false;
+        }
+
+        Set<ResourceLocation> toggles = TOGGLED_ABILITIES.computeIfAbsent(
+                player.getUUID(), k -> ConcurrentHashMap.newKeySet());
+        boolean enable = !toggles.contains(abilityId);
+        if (enable) {
+            toggles.add(abilityId);
+        } else {
+            toggles.remove(abilityId);
+            if (toggles.isEmpty()) {
+                TOGGLED_ABILITIES.remove(player.getUUID(), toggles);
             }
         }
+        for (IPowerComponent action : ability.getActions()) {
+            if (action.isFunctional()) {
+                action.onToggle(player, enable);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Cleans a suit/ability's transient state once its last access source disappears.
+     */
+    public static boolean deactivateAbilityIfInaccessible(ServerPlayer player, ResourceLocation abilityId) {
+        AbilityDefinition ability = AbilityRegistry.get(abilityId);
+        if (ability == null || hasAbilityAccess(player, ability)) {
+            return false;
+        }
+
+        clearCooldown(player, abilityId);
+        boolean cleaned = false;
+        Set<ResourceLocation> toggles = TOGGLED_ABILITIES.get(player.getUUID());
+        if (toggles != null && toggles.remove(abilityId)) {
+            cleaned = true;
+            if (toggles.isEmpty()) {
+                TOGGLED_ABILITIES.remove(player.getUUID(), toggles);
+            }
+        }
+        Set<ResourceLocation> passives = ACTIVE_PASSIVES.get(player.getUUID());
+        if (passives != null && passives.remove(abilityId)) {
+            cleaned = true;
+            if (passives.isEmpty()) {
+                ACTIVE_PASSIVES.remove(player.getUUID(), passives);
+            }
+        }
+
+        if (cleaned) {
+            for (IPowerComponent action : ability.getActions()) {
+                action.onToggle(player, false);
+            }
+        }
+        return cleaned;
     }
 
     public static boolean hasPowerAccess(ServerPlayer player, ResourceLocation powerId) {
@@ -224,6 +305,17 @@ public final class PowerRuntimeEngine {
     }
 
     /**
+     * A suit may grant an ability directly, so parent power ownership alone is not sufficient.
+     */
+    public static boolean hasAbilityAccess(ServerPlayer player, AbilityDefinition ability) {
+        if (ability.isUniversal()) {
+            return true;
+        }
+        return hasPowerAccess(player, ability.getPowerId())
+                || SuitManager.grantsAbility(player, ability.getId());
+    }
+
+    /**
      * Returns a human-readable reason why an ability cannot be activated, or null when activation is allowed.
      * Used for client feedback so the player understands why an entry is blocked.
      */
@@ -234,21 +326,19 @@ public final class PowerRuntimeEngine {
             return "gui.ascendant.catalog.unavailable_reason";
         }
         AbilityTrigger trigger = ability.getTrigger();
-        if (trigger != AbilityTrigger.KEY_PRESS && trigger != AbilityTrigger.SNEAK_KEY) {
+        if (trigger != AbilityTrigger.KEY_PRESS && trigger != AbilityTrigger.SNEAK_KEY
+                && trigger != AbilityTrigger.TOGGLE) {
             return "gui.ascendant.catalog.ability_trigger_reason";
         }
-        if (!ability.isUniversal() && ability.getPowerId() != null) {
-            if (!hasPowerAccess(player, ability.getPowerId())) {
-                return "gui.ascendant.catalog.ownership_note";
-            }
+        if (!ability.isFunctional() || !hasExecutableActions(ability)) {
+            return "gui.ascendant.catalog.template_reason";
+        }
+        if (!hasAbilityAccess(player, ability)) {
+            return "gui.ascendant.catalog.ownership_note";
         }
         if (isOnCooldown(player, abilityId)) {
             long remaining = getCooldownRemainingTicks(player, abilityId);
             return remaining > 0 ? "gui.ascendant.catalog.unavailable" : null;
-        }
-        if (!ability.isFunctional() || ability.getActions().isEmpty()
-                || ability.getActions().stream().noneMatch(IPowerComponent::isFunctional)) {
-            return "gui.ascendant.catalog.template_reason";
         }
         return null;
     }
@@ -276,8 +366,10 @@ public final class PowerRuntimeEngine {
                     }
                 }
             }
-            // Dispatch tick-triggered abilities (passive monitoring, auras, etc.)
-            dispatchTriggeredAbilities(player, AbilityTrigger.TICK);
+
+            dispatchPassiveAbilities(player);
+            dispatchToggledAbilities(player);
+            dispatchTickAbilities(player);
         }
     }
 
@@ -294,8 +386,8 @@ public final class PowerRuntimeEngine {
                     }
                 }
             }
-            // Dispatch reactive abilities triggered by taking damage
-            dispatchTriggeredAbilities(player, AbilityTrigger.HURT_EVENT);
+            applyPassiveAbilityDamageHooks(player, event);
+            dispatchHurtAbilities(player, event);
         }
         // Attack buffs / offensive triggers
         if (event.getSource().getEntity() instanceof ServerPlayer attacker) {
@@ -308,8 +400,7 @@ public final class PowerRuntimeEngine {
                     }
                 }
             }
-            // Dispatch offensive abilities triggered by landing a hit
-            dispatchTriggeredAbilities(attacker, AbilityTrigger.ATTACK_HIT);
+            dispatchAttackAbilities(attacker, event);
         }
     }
 
@@ -325,7 +416,170 @@ public final class PowerRuntimeEngine {
                     }
                 }
             }
+            for (AbilityDefinition ability : getActivePassiveAbilities(player)) {
+                for (IPowerComponent action : ability.getActions()) {
+                    action.onFall(player, event);
+                }
+            }
         }
+    }
+
+    /**
+     * PASSIVE abilities are applied once, maintained idempotently, and cleaned when access ends.
+     * They must never be executed as a one-shot action every tick.
+     */
+    public static void dispatchPassiveAbilities(ServerPlayer player) {
+        Set<ResourceLocation> active = ACTIVE_PASSIVES.computeIfAbsent(
+                player.getUUID(), k -> ConcurrentHashMap.newKeySet());
+        Set<ResourceLocation> accessible = new HashSet<>();
+        for (AbilityDefinition ability : AbilityRegistry.getAll()) {
+            if (ability.getTrigger() != AbilityTrigger.PASSIVE || !ability.isFunctional()
+                    || !hasExecutableActions(ability) || !hasAbilityAccess(player, ability)) {
+                continue;
+            }
+            accessible.add(ability.getId());
+            if (active.add(ability.getId())) {
+                ComponentContext context = ComponentContext.of(player, ability.getId());
+                for (IPowerComponent action : ability.getActions()) {
+                    if (action.isFunctional()) {
+                        action.execute(context);
+                    }
+                }
+            }
+            for (IPowerComponent action : ability.getActions()) {
+                action.onPlayerTick(player);
+            }
+        }
+
+        for (ResourceLocation abilityId : new HashSet<>(active)) {
+            if (accessible.contains(abilityId)) {
+                continue;
+            }
+            active.remove(abilityId);
+            AbilityDefinition ability = AbilityRegistry.get(abilityId);
+            if (ability != null) {
+                for (IPowerComponent action : ability.getActions()) {
+                    action.onToggle(player, false);
+                }
+            }
+        }
+        if (active.isEmpty()) {
+            ACTIVE_PASSIVES.remove(player.getUUID(), active);
+        }
+    }
+
+    public static void dispatchToggledAbilities(ServerPlayer player) {
+        Set<ResourceLocation> toggles = TOGGLED_ABILITIES.get(player.getUUID());
+        if (toggles == null) {
+            return;
+        }
+        for (ResourceLocation abilityId : new HashSet<>(toggles)) {
+            AbilityDefinition ability = AbilityRegistry.get(abilityId);
+            if (ability == null || !ability.isFunctional() || !hasAbilityAccess(player, ability)) {
+                deactivateAbilityIfInaccessible(player, abilityId);
+                continue;
+            }
+            for (IPowerComponent action : ability.getActions()) {
+                action.onPlayerTick(player);
+            }
+        }
+    }
+
+    /**
+     * TICK abilities receive periodic maintenance through onPlayerTick. One-shot execution is
+     * throttled by the ability cooldown so it cannot run indiscriminately every tick.
+     */
+    public static void dispatchTickAbilities(ServerPlayer player) {
+        for (AbilityDefinition ability : AbilityRegistry.getAll()) {
+            if (ability.getTrigger() != AbilityTrigger.TICK || !ability.isFunctional()
+                    || !hasExecutableActions(ability) || !hasAbilityAccess(player, ability)) {
+                continue;
+            }
+            for (IPowerComponent action : ability.getActions()) {
+                action.onPlayerTick(player);
+            }
+            if (ability.getCooldownTicks() <= 0 || isOnCooldown(player, ability.getId())) {
+                continue;
+            }
+            executeAbilityActions(player, ability, null);
+        }
+    }
+
+    public static void dispatchHurtAbilities(ServerPlayer player, LivingHurtEvent event) {
+        Entity attacker = event.getSource().getEntity();
+        for (AbilityDefinition ability : AbilityRegistry.getAll()) {
+            if (ability.getTrigger() != AbilityTrigger.HURT_EVENT || !ability.isFunctional()
+                    || !hasExecutableActions(ability) || !hasAbilityAccess(player, ability)) {
+                continue;
+            }
+            if (isOnCooldown(player, ability.getId())) {
+                continue;
+            }
+            for (IPowerComponent action : ability.getActions()) {
+                action.onHurt(player, event);
+            }
+            executeAbilityActions(player, ability, attacker);
+        }
+    }
+
+    public static void dispatchAttackAbilities(ServerPlayer attacker, LivingHurtEvent event) {
+        for (AbilityDefinition ability : AbilityRegistry.getAll()) {
+            if (ability.getTrigger() != AbilityTrigger.ATTACK_HIT || !ability.isFunctional()
+                    || !hasExecutableActions(ability) || !hasAbilityAccess(attacker, ability)) {
+                continue;
+            }
+            if (isOnCooldown(attacker, ability.getId())) {
+                continue;
+            }
+            for (IPowerComponent action : ability.getActions()) {
+                action.onAttack(attacker, event);
+            }
+            executeAbilityActions(attacker, ability, event.getEntity());
+        }
+    }
+
+    private static void applyPassiveAbilityDamageHooks(ServerPlayer player, LivingHurtEvent event) {
+        for (AbilityDefinition ability : getActivePassiveAbilities(player)) {
+            for (IPowerComponent action : ability.getActions()) {
+                action.onHurt(player, event);
+            }
+        }
+    }
+
+    private static List<AbilityDefinition> getActivePassiveAbilities(ServerPlayer player) {
+        Set<ResourceLocation> active = ACTIVE_PASSIVES.get(player.getUUID());
+        if (active == null || active.isEmpty()) {
+            return List.of();
+        }
+        List<AbilityDefinition> abilities = new ArrayList<>(active.size());
+        for (ResourceLocation abilityId : active) {
+            AbilityDefinition ability = AbilityRegistry.get(abilityId);
+            if (ability != null) {
+                abilities.add(ability);
+            }
+        }
+        return abilities;
+    }
+
+    private static boolean executeAbilityActions(ServerPlayer player, AbilityDefinition ability,
+                                                 @Nullable Entity target) {
+        ComponentContext context = target == null
+                ? ComponentContext.of(player, ability.getId())
+                : ComponentContext.of(player, ability.getId(), target);
+        boolean executed = false;
+        for (IPowerComponent action : ability.getActions()) {
+            if (action.isFunctional() && action.execute(context)) {
+                executed = true;
+            }
+        }
+        if (executed && ability.getCooldownTicks() > 0) {
+            setCooldown(player, ability.getId(), ability.getCooldownTicks());
+        }
+        return executed;
+    }
+
+    private static boolean hasExecutableActions(AbilityDefinition ability) {
+        return ability.getActions().stream().anyMatch(IPowerComponent::isFunctional);
     }
 
     @SubscribeEvent
@@ -333,11 +587,15 @@ public final class PowerRuntimeEngine {
         UUID uuid = event.getEntity().getUUID();
         COOLDOWNS.remove(uuid);
         ACTIVE_TOGGLES.remove(uuid);
+        TOGGLED_ABILITIES.remove(uuid);
+        ACTIVE_PASSIVES.remove(uuid);
     }
 
     @SubscribeEvent
     public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
         UUID uuid = event.getEntity().getUUID();
         ACTIVE_TOGGLES.remove(uuid);
+        TOGGLED_ABILITIES.remove(uuid);
+        ACTIVE_PASSIVES.remove(uuid);
     }
 }

@@ -165,3 +165,36 @@ Criterios:
 - [x] 32/32 GameTests aprovados e build bem-sucedido.
 
 Nenhuma tarefa esta concluida apenas por existir nesta fila.
+
+LOTE 2026-10-22 - RECUPERACAO DE REGRESSOES DO COMMIT a88f1cb
+Status: REVIEW (implementacao e validacao automatizada concluidas; inspecao visual manual pendente)
+Branch: srkaiohshin-droid-ascendant-gameplay-ui
+Commit de referencia: a88f1cbfd02e2e2ad960af4372d06766d1f3a6f2 (pai: 7f554042b68c62d601fd7bd0ee2d351e4cbfd5f4)
+Referencia de seguranca: tag backup-before-a88f1cb-recovery
+Arquivos reservados/alterados:
+- src/main/java/br/com/ascendant/speedster/*, ui/client/SpeedsterClientInput.java
+- src/main/java/br/com/ascendant/Ascendant.java, network/AscendantNetwork.java, flight/FlightController.java
+- src/main/java/br/com/ascendant/suit/SuitManager.java
+- src/main/java/br/com/ascendant/power/runtime/PowerRuntimeEngine.java, power/AbilityRegistry.java
+- src/main/java/br/com/ascendant/power/component/{Invisibility,Levitation,Phase,SummonEntity,VortexAction}Component.java
+- src/main/java/br/com/ascendant/power/catalog/PowerCatalogData.java
+- src/main/java/br/com/ascendant/pack/{PackManager,PackManifest,PackSecurity,PackManagerGameTests}.java
+- src/main/java/br/com/ascendant/test/FrameworkGameTests.java
+- src/main/java/br/com/ascendant/ui/client/{HeroPackScreen,PowerCatalogScreen}.java
+- src/main/java/br/com/ascendant/catalog/CatalogInteraction.java
+- src/main/resources/assets/ascendant/lang/{en_us,pt_br}.json
+- AGENT_LOG.txt, AI_CONTEXT.txt, TODO.md, CHANGELOG.md, docs/DEVELOPMENT_STATUS.md
+Resultado:
+- Supervelocidade, testes e protecoes de packs restaurados.
+- Poderes permanentes sobrevivem a remocao do traje; poderes exclusivos do traje ficam inacessiveis.
+- Gatilhos automaticos, TOGGLE, PASSIVE, cooldown e feedback de falha implementados e cobertos.
+- HeroPackScreen lista packs instalados e navega para a aba correta de Poderes/Habilidades; trajes permanecem na SuitScreen.
+Validacao confirmada:
+- compileJava: BUILD SUCCESSFUL
+- runGameTestServer: 55/55 required tests passed
+- build: BUILD SUCCESSFUL
+- git diff --check: sem erros
+- runClient: iniciou sem crash e permaneceu estavel por 120s; inspecao visual humana nao realizada
+Pendencias:
+- Revisao humana da UI e controles em cliente grafico.
+- Commit e push normal (sem force) com confirmacao do SHA remoto.

@@ -379,3 +379,45 @@ LOTE DE CORREÇÃO DE HABILIDADES E CATÁLOGO HERÓIS/PACKS (2026-10-22)
   - `gradlew.bat compileJava`: BUILD SUCCESSFUL.
   - `gradlew.bat build`: BUILD SUCCESSFUL (jar reobfuscado com mixins e recursos).
   - `gradlew.bat runGameTestServer`: 32/32 GameTests aprovados (27 voo/poses/capability + 5 framework).
+
+LOTE DE RECUPERACAO DE REGRESSOES DO COMMIT a88f1cb (2026-10-22)
+- Data: 2026-10-22
+- Agente: OpenCode (DeepSeek V4.1 Flash Free)
+- Tarefa: Recuperar as regressoes introduzidas por a88f1cbfd02e2e2ad960af4372d06766d1f3a6f2 na branch srkaiohshin-droid-ascendant-gameplay-ui, preservando as melhorias validas do commit atual.
+- Referencia de seguranca: tag anotada backup-before-a88f1cb-recovery apontando para a88f1cb. Nenhum reset destrutivo foi executado.
+- Fontes de recuperacao: commit pai 7f554042b68c62d601fd7bd0ee2d351e4cbfd5f4 e versao atual a88f1cb, integradas manualmente.
+- Arquivos restaurados integralmente do commit pai:
+  - src/main/java/br/com/ascendant/speedster/* (10 arquivos, incluindo SpeedsterGameTests)
+  - src/main/java/br/com/ascendant/ui/client/SpeedsterClientInput.java
+  - src/main/java/br/com/ascendant/pack/PackManagerGameTests.java
+  - componentes de gameplay Invisibility, Levitation, Phase, SummonEntity e VortexAction
+  - entradas funcionais void_step, vortex_maelstrom, telekinetic_levitate, refractive_invisibility e spectral_wolf_pack em PowerCatalogData
+- Arquivos integrados sem substituicao cega:
+  - Ascendant.java: eventos, config e GameTests da supervelocidade restaurados; animacoes do commit atual preservadas.
+  - AscendantNetwork.java: pacotes da supervelocidade restaurados; ativacao de habilidade agora alterna TOGGLE e envia feedback real de falha.
+  - FlightController.java: coordenacao com SpeedsterController restaurada.
+  - SuitManager.java: unequipSuit deixou de revogar a capability persistente; limpa apenas runtime sem fonte restante; troca de traje tambem limpa poderes/habilidades do traje anterior.
+  - PowerRuntimeEngine.java: acesso por poder ou traje, deactivatePowerIfInaccessible, deactivateAbilityIfInaccessible, ativacao manual validada, cooldown, feedback, gatilhos TICK/HURT_EVENT/ATTACK_HIT, ciclo PASSIVE/TOGGLE e manutencao idempotente.
+  - PackManager.java: instalacao atomica/rollback e protecoes restauradas, com validacao de versao do commit atual e getInstalledPacks() para a UI.
+  - PackManifest.java e PackSecurity.java: validacao de ID, limites, anti-traversal, anti-ZIP Slip e bloqueio de executaveis restaurados.
+  - FrameworkGameTests.java: testes anteriores preservados e integrados aos novos testes de regressao.
+  - HeroPackScreen.java: lista packs realmente instalados via PackManager.getInstalledPacks(), sem apresentar trajes como packs; Poderes e Habilidades abrem a aba correta.
+  - PowerCatalogScreen.java: construtor com aba inicial; SuitScreen continua sendo a listagem de trajes.
+- Decisoes:
+  1. A capability representa desbloqueios permanentes e nunca e revogada por remocao de traje.
+  2. Habilidades concedidas diretamente por traje sao autorizadas independentemente do poder pai.
+  3. PASSIVE aplica uma vez, mantem por tick e limpa ao perder a ultima fonte; TOGGLE exige alternancia explicita.
+  4. Habilidades template/incompletas nao executam e falhas reais sao enviadas ao jogador por action bar.
+  5. Manifest de pack continua expondo metadados e contagens, nao previews de personagem; a tela documenta essa limitacao em vez de inventar dados.
+- Validacoes executadas em 2026-10-22, Java 17 (Temurin 17.0.20.1), Gradle Wrapper 8.8:
+  - .\gradlew.bat compileJava --no-daemon --console=plain: BUILD SUCCESSFUL.
+  - .\gradlew.bat runGameTestServer --no-daemon --console=plain: 55/55 required tests passed; "All 55 required tests passed".
+  - .\gradlew.bat build --no-daemon --console=plain: BUILD SUCCESSFUL.
+  - git diff --check: sem erros (apenas avisos LF/CRLF do Git).
+  - .\gradlew.bat runClient --no-daemon --console=plain: cliente iniciou, carregou mixins, atlas, audio e o relatorio de conteudo com 0 erros; permaneceu em execucao estavel por 120s e foi encerrado pelo teste. Nao houve inspecao visual interativa da UI nesse ambiente automatizado.
+- Problemas conhecidos / limitacoes:
+  - Validacao visual da tela Herois/Packs, navegacao, selecao de trajes e controles de supervelocidade nao foi feita por observacao humana; apenas startup e logs do cliente foram verificados.
+  - Manifests de packs nao possuem dados de personagens/previews; a UI mostra somente metadados e contagens reais.
+- Pendencias:
+  - Inspecao visual manual em runClient quando houver ambiente grafico acompanhado.
+  - Push normal para origin e confirmacao do SHA remoto pelo agente responsavel pelo envio.

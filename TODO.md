@@ -35,5 +35,21 @@
 - [x] Implementar tela Heróis/Packs como tela principal do catálogo (`HeroPackScreen`) com navegação para Poderes, Habilidades e Trajes.
 - [x] Implementar `SuitScreen` para listagem e equipagem de trajes.
 - [x] `AscendantClientControls` abre `HeroPackScreen` por padrão ao abrir o catálogo (F6).
-- [ ] Executar GameTests e confirmar 35/35 (32 existentes + 3 novos).
+- [x] Executar GameTests e confirmar 55/55 em 2026-10-22 (todas as suítes registradas; resultado real "All 55 required tests passed").
 - [ ] Executar `runClient` para validação visual da interface HeroPackScreen.
+
+## Recuperação de regressões do commit a88f1cb (2026-10-22)
+- [x] Restaurar arquivos e testes da supervelocidade (`speedster/*`, `SpeedsterClientInput`, `SpeedsterGameTests`).
+- [x] Restaurar `PackManagerGameTests` e integrar os testes anteriores de `FrameworkGameTests` aos novos.
+- [x] Remover a revogação indiscriminada da capability em `SuitManager.unequipSuit`.
+- [x] Garantir que poderes permanentes sobrevivam à remoção do traje e que poderes exclusivos do traje fiquem inacessíveis.
+- [x] Adicionar GameTest de voo permanente + voo concedido por traje + desequipamento.
+- [x] Implementar autorização de habilidades concedidas diretamente por traje.
+- [x] Implementar ativação manual validada, cooldown, feedback de falha e ciclo PASSIVE/TOGGLE.
+- [x] Implementar dispatchers TICK, HURT_EVENT e ATTACK_HIT com cooldown e testes de gatilho.
+- [x] Restaurar validação de manifesto/ID, proteção anti-traversal/ZIP Slip, limites e bloqueio de executáveis.
+- [x] Restaurar instalação atômica, rollback e testes de importação válida/inválida.
+- [x] Fazer `HeroPackScreen` listar packs realmente instalados via `PackManager`, sem confundir trajes com packs.
+- [x] Fazer os botões Poderes e Habilidades abrirem as abas corretas do catálogo.
+- [x] Validar `compileJava`, `runGameTestServer` (55/55), `build` e `git diff --check`.
+- [ ] Revisão visual humana da UI e dos controles de supervelocidade no cliente gráfico. O `runClient` iniciou sem crash e ficou estável por 120s em 2026-10-22, mas não houve inspeção visual neste ambiente automatizado.

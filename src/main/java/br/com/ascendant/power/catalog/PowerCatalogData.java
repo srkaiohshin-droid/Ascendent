@@ -177,7 +177,7 @@ public final class PowerCatalogData {
         regTempl("quantum_swap", PowerCategory.TELEPORTATION, PowerType.ACTIVE, 120, "position_exchange", Map.of("range", "24.0"));
         regTempl("teleport_beacon", PowerCategory.TELEPORTATION, PowerType.ACTIVE, 200, "recall_anchor", Map.of("recallDelay", "0"));
         regTempl("micro_warp", PowerCategory.TELEPORTATION, PowerType.ACTIVE, 20, "short_step", Map.of("distance", "6.0"));
-        regTempl("void_step", PowerCategory.TELEPORTATION, PowerType.ACTIVE, 90, "phased_step", Map.of("distance", "20.0"));
+        regFunc("void_step", PowerCategory.TELEPORTATION, PowerType.ACTIVE, 90, new PhaseComponent(20.0D), List.of());
         regTempl("spatial_anchor", PowerCategory.TELEPORTATION, PowerType.TOGGLE, 0, "teleport_lock", Map.of("antiTeleportRadius", "16.0"));
         regTempl("wormhole_gate", PowerCategory.TELEPORTATION, PowerType.CHARGED, 400, "two_way_gate", Map.of("gateLifetime", "400"));
         regTempl("distant_traverse", PowerCategory.TELEPORTATION, PowerType.CHARGED, 600, "long_range_warp", Map.of("maxKm", "1.0"));
@@ -265,7 +265,7 @@ public final class PowerCatalogData {
         regTempl("hydro_cutter", PowerCategory.WATER, PowerType.ACTIVE, 40, "high_pressure_stream", Map.of("range", "16.0"));
         regTempl("bubble_prison", PowerCategory.WATER, PowerType.ACTIVE, 140, "water_sphere_trap", Map.of("holdTicks", "100"));
         regTempl("healing_rain", PowerCategory.WATER, PowerType.ACTIVE, 200, "area_shower_regen", Map.of("radius", "8.0"));
-        regTempl("vortex_maelstrom", PowerCategory.WATER, PowerType.SUSTAINED, 180, "water_pull_vortex", Map.of("pullRadius", "10.0"));
+        regFunc("vortex_maelstrom", PowerCategory.WATER, PowerType.SUSTAINED, 180, new VortexActionComponent(10.0D, 0.08D), List.of());
         regTempl("liquid_form", PowerCategory.WATER, PowerType.TOGGLE, 0, "fluid_phase", Map.of("damageReduction", "0.6"));
         regTempl("geyser_erupt", PowerCategory.WATER, PowerType.ACTIVE, 90, "vertical_water_thrust", Map.of("launchPower", "2.0"));
         regTempl("mist_veil", PowerCategory.WATER, PowerType.ACTIVE, 120, "evasion_fog", Map.of("radius", "6.0"));
@@ -389,7 +389,7 @@ public final class PowerCatalogData {
         regFunc("kinetic_push", PowerCategory.TELEKINESIS, PowerType.ACTIVE, 30, new KnockbackActionComponent(7.0D, 1.8D), List.of());
         regFunc("psychic_slam", PowerCategory.TELEKINESIS, PowerType.ACTIVE, 60, new DamageActionComponent(8.0F, 5.0D, "physical"), List.of());
 
-        regTempl("telekinetic_levitate", PowerCategory.TELEKINESIS, PowerType.SUSTAINED, 0, "lift_target_entity", Map.of("maxWeight", "heavy"));
+        regFunc("telekinetic_levitate", PowerCategory.TELEKINESIS, PowerType.SUSTAINED, 0, new LevitationComponent(16.0D, 0.14D), List.of());
         regTempl("object_throw", PowerCategory.TELEKINESIS, PowerType.ACTIVE, 40, "hurl_nearby_debris", Map.of("speed", "2.0"));
         regTempl("debris_orbit_shield", PowerCategory.TELEKINESIS, PowerType.TOGGLE, 0, "revolving_debris_ring", Map.of("ringCount", "4"));
         regTempl("crush_grip", PowerCategory.TELEKINESIS, PowerType.CHARGED, 120, "implosive_squeeze", Map.of("maxDmg", "20"));
@@ -496,7 +496,7 @@ public final class PowerCatalogData {
         regFunc("stealth_strike", PowerCategory.CAMOUFLAGE, PowerType.ACTIVE, 40, new DamageActionComponent(10.0F, 3.5D, "physical"), List.of());
 
         regTempl("adaptive_skin_camouflage", PowerCategory.CAMOUFLAGE, PowerType.TOGGLE, 0, "blend_into_background_block", Map.of("standStill", "true"));
-        regTempl("refractive_invisibility", PowerCategory.CAMOUFLAGE, PowerType.ACTIVE, 120, "vanish_for_duration", Map.of("duration", "100"));
+        regFunc("refractive_invisibility", PowerCategory.CAMOUFLAGE, PowerType.ACTIVE, 120, new InvisibilityComponent(100), List.of());
         regTempl("smoke_screen", PowerCategory.CAMOUFLAGE, PowerType.ACTIVE, 80, "thick_smoke_drop", Map.of("radius", "6.0"));
         regTempl("silhouette_mimic", PowerCategory.CAMOUFLAGE, PowerType.ACTIVE, 160, "appear_as_neutral_mob", Map.of("mobType", "villager"));
         regTempl("heat_masking", PowerCategory.CAMOUFLAGE, PowerType.PASSIVE, 0, "hidden_from_thermal_sight", Map.of("masked", "true"));
@@ -547,7 +547,7 @@ public final class PowerCatalogData {
         regFunc("healing_wisp", PowerCategory.SUMMONING, PowerType.ACTIVE, 90, new HealActionComponent(8.0F, false), List.of());
 
         regTempl("summon_golem_sentinel", PowerCategory.SUMMONING, PowerType.ACTIVE, 300, "spawn_allied_golem", Map.of("golemType", "iron"));
-        regTempl("spectral_wolf_pack", PowerCategory.SUMMONING, PowerType.ACTIVE, 180, "spawn_spirit_wolves", Map.of("wolfCount", "3"));
+        regFunc("spectral_wolf_pack", PowerCategory.SUMMONING, PowerType.ACTIVE, 180, new SummonEntityComponent(3, 2.5D), List.of());
         regTempl("flame_elemental", PowerCategory.SUMMONING, PowerType.ACTIVE, 200, "spawn_fire_spirit", Map.of("burnEnemies", "true"));
         regTempl("undead_minion_raise", PowerCategory.SUMMONING, PowerType.ACTIVE, 140, "resurrect_skeleton", Map.of("lifespan", "300"));
         regTempl("astral_familiar", PowerCategory.SUMMONING, PowerType.TOGGLE, 0, "permanent_pet_scout", Map.of("petType", "raven"));

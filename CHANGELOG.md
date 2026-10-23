@@ -88,3 +88,14 @@
 - `AscendantClientControls` agora abre `HeroPackScreen` por padrão ao abrir o catálogo (tecla F6).
 - Adicionados 3 GameTests: `automaticTriggerAbilitiesCannotBeManuallyActivated`, `suitUnequipRevokesGrantedPowers`, `activationFailureReasonProvidesFeedback`.
 - `gradlew.bat compileJava`: BUILD SUCCESSFUL.
+
+## 0.1.0 - Recuperação de regressões do commit a88f1cb (2026-10-22)
+- Restaurada a supervelocidade completa e seus testes (`speedster/*`, `SpeedsterClientInput`, `SpeedsterGameTests`) e reintegrados os pacotes de rede e a coordenação com o voo.
+- Restaurado `PackManagerGameTests`; testes anteriores de `FrameworkGameTests` foram preservados e integrados aos novos testes de regressão.
+- `SuitManager.unequipSuit` não revoga mais a capability persistente. Poderes concedidos apenas pelo traje ficam inacessíveis; poderes permanentes continuam disponíveis; toggles/efeitos só são limpos quando não há outra fonte.
+- Adicionado GameTest de jogador com voo permanente e voo concedido por traje que mantém o voo após desequipar.
+- Runtime de habilidades ampliado: autorização por poder pai ou concessão direta do traje, ativação manual validada, cooldown, feedback real de falha, PASSIVE com ciclo de vida, TOGGLE explícito e dispatchers TICK/HURT_EVENT/ATTACK_HIT.
+- Restaurada a integridade de packs: validação de ID/manifesto, anti-traversal/ZIP Slip, limites de tamanho/entradas, bloqueio de executáveis, substituição atômica e rollback, com validação de versão MC/Forge.
+- `HeroPackScreen` agora lista packs realmente instalados via `PackManager.getInstalledPacks()`, documenta a limitação do manifesto (sem previews de personagem) e abre Poderes/Habilidades nas abas corretas; trajes permanecem na `SuitScreen`.
+- Restaurados os componentes de gameplay Invisibility, Levitation, Phase, SummonEntity e VortexAction e as cinco entradas funcionais correspondentes no catálogo.
+- Validação confirmada: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` com 55/55 testes obrigatórios aprovados; `build` BUILD SUCCESSFUL; `git diff --check` sem erros; `runClient` iniciou sem crash e permaneceu estável por 120s (inspeção visual humana pendente).

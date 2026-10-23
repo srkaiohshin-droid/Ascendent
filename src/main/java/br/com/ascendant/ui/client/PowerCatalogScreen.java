@@ -30,7 +30,7 @@ import java.util.Locale;
 
 @OnlyIn(Dist.CLIENT)
 public final class PowerCatalogScreen extends Screen {
-    private enum Tab {
+    enum Tab {
         POWERS,
         ABILITIES,
         SUITS
@@ -64,8 +64,13 @@ public final class PowerCatalogScreen extends Screen {
     private Button unequipButton;
 
     public PowerCatalogScreen(Screen parent) {
+        this(parent, Tab.POWERS);
+    }
+
+    PowerCatalogScreen(Screen parent, Tab initialTab) {
         super(Component.translatable("gui.ascendant.catalog.title"));
         this.parent = parent;
+        this.tab = initialTab;
     }
 
     @Override

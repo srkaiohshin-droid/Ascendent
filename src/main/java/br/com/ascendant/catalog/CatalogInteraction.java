@@ -61,11 +61,14 @@ public final class CatalogInteraction {
     }
 
     public static Action forAbility(AbilityDefinition ability) {
-        if (ability == null || !ability.isFunctional()
-                || (ability.getTrigger() != AbilityTrigger.KEY_PRESS
-                && ability.getTrigger() != AbilityTrigger.SNEAK_KEY)) {
+        if (ability == null || !ability.isFunctional()) {
             return new Action(ActionType.NONE,
                     ability == null ? new ResourceLocation("ascendant", "missing") : ability.getId());
+        }
+        AbilityTrigger trigger = ability.getTrigger();
+        if (trigger != AbilityTrigger.KEY_PRESS && trigger != AbilityTrigger.SNEAK_KEY
+                && trigger != AbilityTrigger.TOGGLE) {
+            return new Action(ActionType.NONE, ability.getId());
         }
         return new Action(ActionType.ACTIVATE_ABILITY, ability.getId());
     }

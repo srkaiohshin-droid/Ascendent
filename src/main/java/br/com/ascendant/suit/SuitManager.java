@@ -1,6 +1,6 @@
 package br.com.ascendant.suit;
 
-import br.com.ascendant.powers.PlayerPowerDataProvider;
+import br.com.ascendant.power.runtime.PowerRuntimeEngine;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -23,25 +23,42 @@ public final class SuitManager {
         if (suit == null) {
             return false;
         }
+        ResourceLocation previousId = EQUIPPED_SUITS.get(player.getUUID());
+        if (suitId.equals(previousId)) {
+            return true;
+        }
+        SuitDefinition previous = previousId == null ? null : SuitRegistry.get(previousId);
         EQUIPPED_SUITS.put(player.getUUID(), suitId);
+        if (previous != null) {
+            for (ResourceLocation powerId : previous.getGrantedPowers()) {
+                if (!suit.getGrantedPowers().contains(powerId)) {
+                    PowerRuntimeEngine.deactivatePowerIfInaccessible(player, powerId);
+                }
+            }
+            for (ResourceLocation abilityId : previous.getGrantedAbilities()) {
+                if (!suit.getGrantedAbilities().contains(abilityId)) {
+                    PowerRuntimeEngine.deactivateAbilityIfInaccessible(player, abilityId);
+                }
+            }
+        }
         return true;
     }
 
     public static boolean unequipSuit(ServerPlayer player) {
-        ResourceLocation suitId = EQUIPPED_SUITS.remove(player.getUUID());
-        if (suitId == null) {
+        ResourceLocation removedId = EQUIPPED_SUITS.remove(player.getUUID());
+        if (removedId == null) {
             return false;
         }
-        SuitDefinition suit = SuitRegistry.get(suitId);
-        if (suit != null) {
-            player.getCapability(PlayerPowerDataProvider.CAPABILITY).ifPresent(data -> {
-                for (ResourceLocation powerId : suit.getGrantedPowers()) {
-                    data.revokePower(powerId);
-                }
-                for (ResourceLocation abilityId : suit.getGrantedAbilities()) {
-                    // Abilities are not persisted as owned powers; they are contextual grants.
-                }
-            });
+        SuitDefinition removed = SuitRegistry.get(removedId);
+        if (removed != null) {
+            // Suit access is contextual: never revoke the persistent capability.
+            // Only transient runtime state is cleaned when the last access source is gone.
+            for (ResourceLocation powerId : removed.getGrantedPowers()) {
+                PowerRuntimeEngine.deactivatePowerIfInaccessible(player, powerId);
+            }
+            for (ResourceLocation abilityId : removed.getGrantedAbilities()) {
+                PowerRuntimeEngine.deactivateAbilityIfInaccessible(player, abilityId);
+            }
         }
         return true;
     }
@@ -63,6 +80,16 @@ public final class SuitManager {
     public static List<ResourceLocation> getEquippedSuitGrantedPowers(ServerPlayer player) {
         SuitDefinition suit = getEquippedSuit(player);
         return suit != null ? suit.getGrantedPowers() : Collections.emptyList();
+    }
+
+    public static boolean grantsAbility(ServerPlayer player, ResourceLocation abilityId) {
+        SuitDefinition suit = getEquippedSuit(player);
+        return suit != null && suit.getGrantedAbilities().contains(abilityId);
+    }
+
+    public static List<ResourceLocation> getEquippedSuitGrantedAbilities(ServerPlayer player) {
+        SuitDefinition suit = getEquippedSuit(player);
+        return suit != null ? suit.getGrantedAbilities() : Collections.emptyList();
     }
 
     @SubscribeEvent

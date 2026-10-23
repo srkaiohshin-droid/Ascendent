@@ -21,6 +21,11 @@ public final class AbilityRegistry {
         ABILITIES.put(ability.getId(), ability);
     }
 
+    /** Removes a dynamically registered definition (used by tests and pack reloads). */
+    public static synchronized boolean unregister(ResourceLocation id) {
+        return id != null && ABILITIES.remove(id) != null;
+    }
+
     public static AbilityDefinition get(ResourceLocation id) {
         return ABILITIES.get(id);
     }
