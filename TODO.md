@@ -155,5 +155,7 @@
   `git diff --check`.
 - [ ] Homologacao visual humana do loop, reversao, banco, pitch, camera, FOV, decolagem,
   hover, boost, frenagem, pouso e cabeca/torso.
+- [x] Autorizacao do dono, commit `15d264f` publicado com push normal e SHA remoto
+  confirmado via `git ls-remote`.
 - [x] Autorizacao do dono, commit `df49ac6` publicado com push normal e SHA remoto
   confirmado via `git ls-remote`.

@@ -295,3 +295,6 @@ LOTE DE MANOBRAS E CAPTURA (2026-10-23, sobre `418038e`)
 - Validacao: `compileJava` e `build` BUILD SUCCESSFUL; `runGameTestServer` "All 83
   required tests passed"; captura concluida sem crash; `git diff --check` sem erros de
   conteudo. Nao houve inspecao interativa humana nem homologacao visual final.
+- Publicacao: commit `15d264facc790f7fa02a0a00b54124bc1ab0ce46` enviado com push normal
+  na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
+  remoto.

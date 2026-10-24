@@ -397,4 +397,6 @@ Criterios:
   sem erros de conteudo.
 - [ ] Homologacao visual humana do loop, reversao, banco, pitch, camera e FOV pelo pack
   `run/screenshots/ascendant-flight-capture.html` e por inspecao interativa.
-- Publicacao: pendente no momento deste registro.
+- Publicacao: commit `15d264facc790f7fa02a0a00b54124bc1ab0ce46` enviado com push normal
+  na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
+  remoto. Resta apenas a homologacao visual humana.

@@ -702,5 +702,8 @@ LOOP VERTICAL, REVERSAO 180 E CAPTURA VISUAL DE VOO (2026-10-23)
   - `git diff --check`: sem erros de conteudo (apenas avisos LF/CRLF).
 - Limitacoes: nao houve inspecao interativa humana nem homologacao visual final do
   loop/reversao/camera. O pack automatico e evidencia, nao substitui essa aprovacao.
-- Proximo passo: revisar o pack de captura, publicar o lote com push normal e confirmar
-  o SHA remoto; aguardar homologacao humana.
+- Publicacao: commit `15d264facc790f7fa02a0a00b54124bc1ab0ce46` enviado com push normal
+  na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
+  remoto.
+- Proximo passo: revisar o pack de captura e conceder ou recusar a homologacao visual
+  humana do loop, reversao, banco, pitch, camera e FOV.

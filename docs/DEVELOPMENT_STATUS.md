@@ -348,3 +348,6 @@ o historico anterior.
   passed"; `git diff --check` sem erros de conteudo (avisos LF/CRLF).
 - Limitacao: nao houve inspecao visual interativa humana. O pack de captura e evidencia
   para homologacao, nao a substitui.
+- Publicacao: commit `15d264facc790f7fa02a0a00b54124bc1ab0ce46` enviado com push normal
+  na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
+  remoto.
