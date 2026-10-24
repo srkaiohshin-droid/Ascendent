@@ -26,3 +26,11 @@ forge*changelog.txt
 
 # Local-only Minecraft reference sources are not distributable project files
 /net/
+
+# Local development logs and process files (kept on disk, never committed)
+/*.log
+/*.pid
+/compile_output.txt
+
+# Stakpak tool session data
+.stakpak/
