@@ -18,6 +18,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+import static br.com.ascendant.ui.client.ComicUi.withAlpha;
+
 @OnlyIn(Dist.CLIENT)
 public final class SuitScreen extends Screen {
 
@@ -46,24 +48,24 @@ public final class SuitScreen extends Screen {
         int listWidth = Math.max(200, (int) (width * 0.55D));
         int listX = 12;
         int listY = 45;
-        int listHeight = height - 100;
+        int listHeight = height - 110;
 
         backButton = Button.builder(
                 Component.translatable("gui.ascendant.catalog.close", "Close"),
                 btn -> Minecraft.getInstance().setScreen(parent)
-        ).bounds(width - 110, height - 30, 100, 20).build();
+        ).bounds(width - 110, height - 28, 100, 20).build();
         addRenderableWidget(backButton);
 
         equipButton = Button.builder(
                 Component.translatable("gui.ascendant.catalog.equip", "Equip"),
                 btn -> equipSelected()
-        ).bounds(listX, height - 30, 90, 20).build();
+        ).bounds(listX, height - 28, 90, 20).build();
         addRenderableWidget(equipButton);
 
         unequipButton = Button.builder(
                 Component.translatable("gui.ascendant.catalog.unequip", "Unequip suit"),
                 btn -> unequipSelected()
-        ).bounds(listX + 100, height - 30, 120, 20).build();
+        ).bounds(listX + 100, height - 28, 120, 20).build();
         addRenderableWidget(unequipButton);
 
         updateActionButtons();
@@ -71,8 +73,13 @@ public final class SuitScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics);
-        graphics.drawCenteredString(font, this.title, width / 2, 16, 0xFFFFFF);
+        CatalogTheme theme = CatalogTheme.current();
+        ComicUi.backdrop(graphics, theme, width, height);
+        graphics.drawCenteredString(font, this.title, width / 2, 14, theme.accentBright());
+        String subtitle = text("gui.ascendant.catalog.suit_available", "Available loadouts")
+                + "  ·  " + entries.size() + " " + text("gui.ascendant.catalog.type.suit", "suits");
+        graphics.drawString(font, ComicUi.fit(font, subtitle, width - 24), width / 2 - font.width(subtitle) / 2, 26,
+                theme.muted(), false);
 
         int listX = 12;
         int listY = 45;
@@ -80,32 +87,35 @@ public final class SuitScreen extends Screen {
         int entryHeight = 44;
         int entryGap = 8;
 
-        int visible = Math.max(1, (height - 100) / (entryHeight + entryGap));
+        int visible = Math.max(1, (height - 110) / (entryHeight + entryGap));
         int maxOffset = Math.max(0, entries.size() - visible);
 
         int y = listY;
-        for (int i = scrollOffset; i < entries.size() && y < height - 45; i++) {
+        for (int i = scrollOffset; i < entries.size() && y < height - 55; i++) {
             SuitEntry entry = entries.get(i);
             boolean highlighted = i == selectedIndex;
             boolean equipped = isEquipped(entry.suit.getId());
 
-            int bg = equipped ? 0xFF406040 : (highlighted ? 0xFF405080 : 0xFF202838);
+            int bg = equipped ? withAlpha(theme.accent(), 0x3C)
+                    : highlighted ? withAlpha(theme.accent(), 0x20) : theme.panel();
             graphics.fill(listX, y, listX + listWidth, y + entryHeight, bg);
             graphics.renderOutline(listX, y, listWidth, entryHeight,
-                    highlighted ? 0xFFFFD040 : 0xFF607090);
+                    equipped ? theme.accentBright()
+                            : highlighted ? theme.accent() : withAlpha(theme.muted(), 0x55));
 
             int rarityColor = entry.suit.getRarity().getColorHex();
             graphics.fill(listX, y, listX + 6, y + entryHeight, rarityColor | 0xFF000000);
 
             String name = displayName(entry.suit.getNameKey(), entry.suit.getId());
-            graphics.drawString(font, name, listX + 14, y + 6, 0xFFFFFF, false);
+            graphics.drawString(font, ComicUi.fit(font, name, listWidth - 120),
+                    listX + 14, y + 6, equipped ? theme.accentBright() : theme.ink(), false);
 
             String rarity = localized(entry.suit.getRarity().getTranslationKey(),
                     entry.suit.getRarity().name());
-            graphics.drawString(font, rarity, listX + 14, y + 18, rarityColor, false);
+            graphics.drawString(font, ComicUi.fit(font, rarity, listWidth - 120), listX + 14, y + 18, rarityColor, false);
 
-            String equippedText = equipped ? " [EQUIPADO]" : "";
-            graphics.drawString(font, equippedText, listX + 14, y + 30, 0x80FF80, false);
+            String equippedText = equipped ? text("gui.ascendant.catalog.suit_equipped", "Equipped") : "";
+            graphics.drawString(font, equippedText, listX + 14, y + 30, withAlpha(theme.accentBright(), 0xEE), false);
 
             y += entryHeight + entryGap;
         }
@@ -127,9 +137,10 @@ public final class SuitScreen extends Screen {
             int listY = 45;
             int entryHeight = 44;
             int entryGap = 8;
+            int listWidth = Math.max(200, (int) (width * 0.55D));
             int y = listY;
-            for (int i = scrollOffset; i < entries.size() && y < height - 45; i++) {
-                if (mouseX >= listX && mouseX < listX + Math.max(200, (int) (width * 0.55D))
+            for (int i = scrollOffset; i < entries.size() && y < height - 55; i++) {
+                if (mouseX >= listX && mouseX < listX + listWidth
                         && mouseY >= y && mouseY < y + entryHeight) {
                     selectedIndex = i;
                     updateActionButtons();
@@ -145,7 +156,7 @@ public final class SuitScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         int entryHeight = 44;
         int entryGap = 8;
-        int visible = Math.max(1, (height - 100) / (entryHeight + entryGap));
+        int visible = Math.max(1, (height - 110) / (entryHeight + entryGap));
         int maxOffset = Math.max(0, entries.size() - visible);
         scrollOffset = net.minecraft.util.Mth.clamp(scrollOffset - (int) Math.signum(delta), 0, maxOffset);
         return true;
@@ -183,7 +194,7 @@ public final class SuitScreen extends Screen {
         selectedIndex = net.minecraft.util.Mth.clamp(selectedIndex + delta, 0, entries.size() - 1);
         int entryHeight = 44;
         int entryGap = 8;
-        int visible = Math.max(1, (height - 100) / (entryHeight + entryGap));
+        int visible = Math.max(1, (height - 110) / (entryHeight + entryGap));
         int maxOffset = Math.max(0, entries.size() - visible);
         if (selectedIndex < scrollOffset) {
             scrollOffset = selectedIndex;
@@ -197,31 +208,46 @@ public final class SuitScreen extends Screen {
     private void equipSelected() {
         if (entries.isEmpty()) return;
         SuitEntry entry = entries.get(selectedIndex);
+        if (isEquipped(entry.suit.getId())) {
+            return;
+        }
         AscendantNetwork.sendEquipSuit(entry.suit.getId(), true);
     }
 
     private void unequipSelected() {
+        ResourceLocation equippedSuit = CatalogClientState.getEquippedSuit();
+        if (equippedSuit == null) {
+            return;
+        }
         AscendantNetwork.sendUnequipSuit();
     }
 
     private boolean isEquipped(ResourceLocation suitId) {
-        // Client-side cannot authoritatively know the equipped suit; server is authoritative.
-        // Rendering without equipped highlight is acceptable; the server confirms via packet handling.
-        return false;
+        ResourceLocation equipped = CatalogClientState.getEquippedSuit();
+        return equipped != null && equipped.equals(suitId);
     }
 
     private void updateActionButtons() {
         boolean hasEntries = !entries.isEmpty();
+        SuitEntry selected = hasEntries ? entries.get(selectedIndex) : null;
+        boolean equipped = selected != null && isEquipped(selected.suit.getId());
+
         equipButton.visible = hasEntries;
         unequipButton.visible = hasEntries;
-        equipButton.active = hasEntries;
-        unequipButton.active = hasEntries;
+        equipButton.active = hasEntries && !equipped && selected != null;
+        unequipButton.active = hasEntries && equipped;
     }
 
     private static String displayName(String key, ResourceLocation id) {
         return net.minecraft.client.resources.language.I18n.exists(key)
                 ? net.minecraft.client.resources.language.I18n.get(key)
                 : humanize(id.getPath());
+    }
+
+    private static String text(String key, String fallback) {
+        return net.minecraft.client.resources.language.I18n.exists(key)
+                ? net.minecraft.client.resources.language.I18n.get(key)
+                : fallback;
     }
 
     private static String localized(String key, String fallback) {

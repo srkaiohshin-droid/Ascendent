@@ -73,13 +73,13 @@ public class PowerCatalogScreen extends Screen {
     private static final int MARGIN = 12;
     private static final int TAB_Y = 45;
     private static final int TAB_HEIGHT = 18;
-    private static final int SEARCH_Y = 70;
-    private static final int CHIP_Y = 92;
+    private static final int SEARCH_Y = 68;
+    private static final int CHIP_Y = 90;
     private static final int CHIP_HEIGHT = 16;
-    private static final int LIST_TOP = 114;
-    private static final int CARD_HEIGHT = 46;
-    private static final int CARD_GAP = 4;
-    private static final int BOTTOM_RESERVED = 38;
+    private static final int LIST_TOP = 110;
+    private static final int CARD_HEIGHT = 48;
+    private static final int CARD_GAP = 5;
+    private static final int BOTTOM_RESERVED = 52;
 
     private final Screen parent;
     private final List<Entry> entries = new ArrayList<>();
@@ -149,13 +149,14 @@ public class PowerCatalogScreen extends Screen {
         int detailWidth = Math.max(60, width - detailX - MARGIN);
         int actionGap = 6;
         int actionWidth = Math.max(44, (detailWidth - actionGap) / 2);
+        int buttonY = height - 28;
         executeButton = Button.builder(label("gui.ascendant.catalog.execute", "Use selection"),
                         button -> executeSelected(null))
-                .bounds(detailX, height - 30, actionWidth, 20).build();
+                .bounds(detailX, buttonY, actionWidth, 20).build();
         addRenderableWidget(executeButton);
         unequipButton = Button.builder(label("gui.ascendant.catalog.unequip", "Unequip suit"),
                         button -> unequipSuit())
-                .bounds(detailX + actionWidth + actionGap, height - 30,
+                .bounds(detailX + actionWidth + actionGap, buttonY,
                         Math.max(44, detailWidth - actionWidth - actionGap), 20).build();
         addRenderableWidget(unequipButton);
         addRenderableWidget(Button.builder(label("gui.ascendant.catalog.close", "Close"), button -> onClose())
@@ -667,15 +668,17 @@ public class PowerCatalogScreen extends Screen {
 
     private void renderHeader(GuiGraphics graphics, CatalogTheme theme, int mouseX, int mouseY) {
         graphics.drawString(font, text("gui.ascendant.catalog.brand", "ASCENDANT"),
-                MARGIN, 8, theme.accentBright(), false);
+                MARGIN, 7, theme.accentBright(), false);
         graphics.drawString(font, text("gui.ascendant.catalog.title", "Ascendant Catalog"),
-                MARGIN, 19, theme.ink(), false);
+                MARGIN, 18, theme.ink(), false);
         String subtitle = text("gui.ascendant.catalog.subtitle",
                 "Server-authoritative powers, abilities and suits");
-        graphics.drawString(font, ComicUi.fit(font, subtitle, width - 240), MARGIN, 31, theme.muted(), false);
+        graphics.drawString(font, ComicUi.fit(font, subtitle, width - 220), MARGIN, 30, theme.muted(), false);
 
         String themeLabel = localized(theme.labelKey(), theme.id());
-        ComicUi.badge(graphics, font, themeLabel, width - 190, 27, withAlpha(theme.accent(), 0x44), theme.accentBright());
+        int badgeWidth = font.width(themeLabel) + 8;
+        int badgeX = width - MARGIN - badgeWidth;
+        ComicUi.badge(graphics, font, themeLabel, badgeX, 26, withAlpha(theme.accent(), 0x44), theme.accentBright());
 
         int tabsX = MARGIN;
         int available = width - MARGIN * 2 - 84;
@@ -712,11 +715,12 @@ public class PowerCatalogScreen extends Screen {
             x = drawChip(graphics, theme, x, CHIP_Y, sourceLabel().getString(), mouseX, mouseY);
         }
         if (filtersActive()) {
-            drawChip(graphics, theme, x, CHIP_Y, text("gui.ascendant.catalog.reset_filters", "Reset"), mouseX, mouseY);
+            x = drawChip(graphics, theme, x, CHIP_Y, text("gui.ascendant.catalog.reset_filters", "Reset"), mouseX, mouseY);
         }
 
         String count = text("gui.ascendant.catalog.result_count", "%s entries").formatted(visibleEntries.size());
-        graphics.drawString(font, count, MARGIN + listWidth - font.width(count), CHIP_Y + 4, theme.muted(), false);
+        int countY = CHIP_Y + CHIP_HEIGHT + 4;
+        graphics.drawString(font, count, MARGIN + listWidth - font.width(count), countY, theme.muted(), false);
     }
 
     private int drawChip(GuiGraphics graphics, CatalogTheme theme, int x, int y, String label,
@@ -777,18 +781,20 @@ public class PowerCatalogScreen extends Screen {
         graphics.fill(MARGIN + 4, top, MARGIN + 8, top + CARD_HEIGHT, accent);
 
         int textX = MARGIN + 14;
-        graphics.drawString(font, ComicUi.fit(font, entry.name(), listWidth - 100),
-                textX, top + 5, selected ? theme.ink() : 0xFFE8EEF6, false);
-        String meta = categoryLabel(entry) + "  ·  " + typeLabel(entry);
-        graphics.drawString(font, ComicUi.fit(font, meta, listWidth - 100), textX, top + 18,
-                theme.muted(), false);
-        graphics.drawString(font, ComicUi.fit(font, activationHint(entry, false), listWidth - 100),
-                textX, top + 30, withAlpha(accent, 0xDD), false);
-
-        int stateColor = stateColor(entry, theme);
         String state = shortState(entry);
         int badgeWidth = font.width(state) + 12;
         int badgeX = MARGIN + listWidth - badgeWidth - 8;
+        int textMaxWidth = badgeX - textX - 6;
+
+        graphics.drawString(font, ComicUi.fit(font, entry.name(), textMaxWidth),
+                textX, top + 5, selected ? theme.ink() : 0xFFE8EEF6, false);
+        String meta = categoryLabel(entry) + "  ·  " + typeLabel(entry);
+        graphics.drawString(font, ComicUi.fit(font, meta, textMaxWidth), textX, top + 18,
+                theme.muted(), false);
+        graphics.drawString(font, ComicUi.fit(font, activationHint(entry, false), textMaxWidth),
+                textX, top + 30, withAlpha(accent, 0xDD), false);
+
+        int stateColor = stateColor(entry, theme);
         graphics.fill(badgeX, top + 6, badgeX + badgeWidth, top + 17, withAlpha(stateColor, 0x33));
         graphics.renderOutline(badgeX, top + 6, badgeWidth, 11, withAlpha(stateColor, 0x88));
         graphics.drawString(font, state, badgeX + 6, top + 8, stateColor, false);
