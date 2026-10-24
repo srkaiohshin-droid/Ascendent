@@ -17,14 +17,16 @@ package br.com.ascendant.flight;
  *   <li>{@code bodyRollDegrees > 0} banks to the player's right.</li>
  *   <li>{@code headXRotDegrees} is the absolute local head rotation. A
  *       horizontal body needs roughly -90 degrees so the face looks along the
- *       flight direction instead of at the ground.</li>
+ *       flight direction instead of at the ground. {@code headYRotDegrees}
+ *       looks into a turn and {@code headZRotDegrees} keeps the head level
+ *       while the body banks.</li>
  *   <li>{@code bodyLift} is measured in the pre-flip model frame of
  *       {@code setupRotations}; positive values lower the horizontal body.</li>
  * </ul>
  */
 public final class FlightPose {
     public static final FlightPose VANILLA = new FlightPose(
-            0.0F, 0.0F, 0.0F, 0.0F,
+            0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
             0.0F, 0.0F, 0.0F,
             0.0F, 0.0F, 0.0F,
             0.0F, 0.0F, 0.0F,
@@ -34,6 +36,8 @@ public final class FlightPose {
     public final float bodyRollDegrees;
     public final float bodyLift;
     public final float headXRotDegrees;
+    public final float headYRotDegrees;
+    public final float headZRotDegrees;
 
     public final float rightArmXRot;
     public final float rightArmYRot;
@@ -49,7 +53,7 @@ public final class FlightPose {
     public final float leftLegZRot;
 
     public FlightPose(float bodyPitchDegrees, float bodyRollDegrees, float bodyLift,
-                      float headXRotDegrees,
+                      float headXRotDegrees, float headYRotDegrees, float headZRotDegrees,
                       float rightArmXRot, float rightArmYRot, float rightArmZRot,
                       float leftArmXRot, float leftArmYRot, float leftArmZRot,
                       float rightLegXRot, float rightLegYRot, float rightLegZRot,
@@ -58,6 +62,8 @@ public final class FlightPose {
         this.bodyRollDegrees = bodyRollDegrees;
         this.bodyLift = bodyLift;
         this.headXRotDegrees = headXRotDegrees;
+        this.headYRotDegrees = headYRotDegrees;
+        this.headZRotDegrees = headZRotDegrees;
         this.rightArmXRot = rightArmXRot;
         this.rightArmYRot = rightArmYRot;
         this.rightArmZRot = rightArmZRot;
@@ -72,9 +78,38 @@ public final class FlightPose {
         this.leftLegZRot = leftLegZRot;
     }
 
+    /**
+     * Backwards-compatible constructor without the lateral neck angles. New
+     * poses should pass the full neck orientation so banks and turns read
+     * clearly on the head.
+     */
+    public FlightPose(float bodyPitchDegrees, float bodyRollDegrees, float bodyLift,
+                      float headXRotDegrees,
+                      float rightArmXRot, float rightArmYRot, float rightArmZRot,
+                      float leftArmXRot, float leftArmYRot, float leftArmZRot,
+                      float rightLegXRot, float rightLegYRot, float rightLegZRot,
+                      float leftLegXRot, float leftLegYRot, float leftLegZRot) {
+        this(bodyPitchDegrees, bodyRollDegrees, bodyLift, headXRotDegrees, 0.0F, 0.0F,
+                rightArmXRot, rightArmYRot, rightArmZRot,
+                leftArmXRot, leftArmYRot, leftArmZRot,
+                rightLegXRot, rightLegYRot, rightLegZRot,
+                leftLegXRot, leftLegYRot, leftLegZRot);
+    }
+
     /** Returns a copy with a different whole-body bank. */
     public FlightPose withRoll(float rollDegrees) {
-        return new FlightPose(bodyPitchDegrees, rollDegrees, bodyLift, headXRotDegrees,
+        return new FlightPose(bodyPitchDegrees, rollDegrees, bodyLift,
+                headXRotDegrees, headYRotDegrees, headZRotDegrees,
+                rightArmXRot, rightArmYRot, rightArmZRot,
+                leftArmXRot, leftArmYRot, leftArmZRot,
+                rightLegXRot, rightLegYRot, rightLegZRot,
+                leftLegXRot, leftLegYRot, leftLegZRot);
+    }
+
+    /** Returns a copy with a different whole-body pitch. */
+    public FlightPose withPitch(float pitchDegrees) {
+        return new FlightPose(pitchDegrees, bodyRollDegrees, bodyLift,
+                headXRotDegrees, headYRotDegrees, headZRotDegrees,
                 rightArmXRot, rightArmYRot, rightArmZRot,
                 leftArmXRot, leftArmYRot, leftArmZRot,
                 rightLegXRot, rightLegYRot, rightLegZRot,
@@ -94,6 +129,8 @@ public final class FlightPose {
                 lerpAngle(from.bodyRollDegrees, to.bodyRollDegrees, delta),
                 lerp(from.bodyLift, to.bodyLift, delta),
                 lerp(from.headXRotDegrees, to.headXRotDegrees, delta),
+                lerpAngle(from.headYRotDegrees, to.headYRotDegrees, delta),
+                lerpAngle(from.headZRotDegrees, to.headZRotDegrees, delta),
                 lerp(from.rightArmXRot, to.rightArmXRot, delta),
                 lerp(from.rightArmYRot, to.rightArmYRot, delta),
                 lerp(from.rightArmZRot, to.rightArmZRot, delta),

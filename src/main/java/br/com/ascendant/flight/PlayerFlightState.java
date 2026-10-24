@@ -6,9 +6,13 @@ final class PlayerFlightState implements FlightState {
     private long lastInputGameTick = Long.MIN_VALUE;
     private boolean hasLeftGround;
     private boolean hadNoGravity;
+    private int maneuverKind = MANEUVER_NONE;
     private int maneuverDirection;
     private int maneuverTicksRemaining;
     private int maneuverCooldownTicks;
+    private boolean inverted;
+    private float maneuverYaw;
+    private float maneuverSpeed;
 
     @Override
     public boolean isActive() {
@@ -27,6 +31,9 @@ final class PlayerFlightState implements FlightState {
             hasLeftGround = false;
             clearManeuver();
             maneuverCooldownTicks = 0;
+            inverted = false;
+            maneuverYaw = 0.0F;
+            maneuverSpeed = 0.0F;
         }
     }
 
@@ -44,6 +51,14 @@ final class PlayerFlightState implements FlightState {
     public boolean acceptInput(int inputMask, long gameTick) {
         if ((inputMask & ~VALID_INPUT_MASK) != 0 || gameTick == lastInputGameTick) {
             return false;
+        }
+        // A/D are steering inputs while flying, never vanilla strafing. The
+        // opposing directions cancel instead of both being held down.
+        if ((inputMask & LEFT) != 0 && (inputMask & RIGHT) != 0) {
+            inputMask &= ~(LEFT | RIGHT);
+        }
+        if ((inputMask & ASCEND) != 0 && (inputMask & DESCEND) != 0) {
+            inputMask &= ~(ASCEND | DESCEND);
         }
         this.inputMask = inputMask;
         lastInputGameTick = gameTick;
@@ -81,6 +96,11 @@ final class PlayerFlightState implements FlightState {
     }
 
     @Override
+    public int getManeuverKind() {
+        return maneuverKind;
+    }
+
+    @Override
     public int getManeuverDirection() {
         return maneuverDirection;
     }
@@ -101,23 +121,57 @@ final class PlayerFlightState implements FlightState {
     }
 
     @Override
+    public boolean isInverted() {
+        return inverted;
+    }
+
+    @Override
+    public void setInverted(boolean inverted) {
+        this.inverted = inverted;
+    }
+
+    @Override
     public boolean startManeuver(int direction, int durationTicks) {
-        if (direction != -1 && direction != 1) {
+        return startManeuver(MANEUVER_ROLL_360, direction, durationTicks);
+    }
+
+    @Override
+    public boolean startManeuver(int kind, int direction, int durationTicks) {
+        if (!isValidKind(kind) || direction != -1 && direction != 1) {
             return false;
         }
         if (maneuverTicksRemaining > 0 || maneuverCooldownTicks > 0 || durationTicks <= 0) {
             return false;
         }
+        maneuverKind = kind;
         maneuverDirection = direction;
         maneuverTicksRemaining = durationTicks;
         return true;
     }
 
     @Override
-    public void setManeuver(int direction, int ticksRemaining) {
+    public void setManeuverBasis(float yawDegrees, float speed) {
+        maneuverYaw = yawDegrees;
+        maneuverSpeed = Math.max(0.0F, speed);
+    }
+
+    @Override
+    public float getManeuverYaw() {
+        return maneuverYaw;
+    }
+
+    @Override
+    public float getManeuverSpeed() {
+        return maneuverSpeed;
+    }
+
+    @Override
+    public void setManeuver(int kind, int direction, int ticksRemaining) {
+        maneuverKind = isValidKind(kind) ? kind : MANEUVER_NONE;
         maneuverDirection = direction == -1 || direction == 1 ? direction : 0;
         maneuverTicksRemaining = Math.max(0, ticksRemaining);
         if (maneuverTicksRemaining == 0) {
+            maneuverKind = MANEUVER_NONE;
             maneuverDirection = 0;
         }
     }
@@ -127,6 +181,10 @@ final class PlayerFlightState implements FlightState {
         if (maneuverTicksRemaining > 0) {
             maneuverTicksRemaining--;
             if (maneuverTicksRemaining == 0) {
+                if (maneuverKind == MANEUVER_ROLL_180) {
+                    inverted = !inverted;
+                }
+                maneuverKind = MANEUVER_NONE;
                 maneuverDirection = 0;
             }
         }
@@ -137,6 +195,7 @@ final class PlayerFlightState implements FlightState {
 
     @Override
     public void clearManeuver() {
+        maneuverKind = MANEUVER_NONE;
         maneuverDirection = 0;
         maneuverTicksRemaining = 0;
     }
@@ -148,8 +207,14 @@ final class PlayerFlightState implements FlightState {
         lastInputGameTick = Long.MIN_VALUE;
         hasLeftGround = false;
         hadNoGravity = false;
-        maneuverDirection = 0;
-        maneuverTicksRemaining = 0;
+        inverted = false;
+        clearManeuver();
         maneuverCooldownTicks = 0;
+        maneuverYaw = 0.0F;
+        maneuverSpeed = 0.0F;
+    }
+
+    private static boolean isValidKind(int kind) {
+        return kind == MANEUVER_ROLL_360 || kind == MANEUVER_LOOP || kind == MANEUVER_ROLL_180;
     }
 }

@@ -19,7 +19,7 @@ final class FlightClientPackets {
             player.getCapability(FlightStateProvider.CAPABILITY).ifPresent(state -> {
                 state.setActive(active);
                 if (active) {
-                    state.setManeuver(maneuverDirection, maneuverTicksRemaining);
+                    state.setManeuver(FlightState.MANEUVER_ROLL_360, maneuverDirection, maneuverTicksRemaining);
                 }
             });
         }

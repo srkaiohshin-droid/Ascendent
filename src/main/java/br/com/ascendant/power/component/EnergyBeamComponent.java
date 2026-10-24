@@ -74,7 +74,7 @@ public final class EnergyBeamComponent implements IPowerComponent {
                     1, 0.02D, 0.02D, 0.02D, 0.0D);
         }
         level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                SoundEvents.BEACON_ATTACK, SoundSource.PLAYERS, 0.9F, 1.6F);
+                SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 0.9F, 1.6F);
     }
 
     @Override

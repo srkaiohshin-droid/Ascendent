@@ -95,14 +95,17 @@ public final class FlightPoseLibrary {
                                     float viewPitch, float turnDegrees) {
         return switch (state) {
             case HOVER -> hover(turnDegrees);
+            case SLOW_FLIGHT -> hover(turnDegrees);
             case TAKEOFF -> takeoff(activeTicks, speed, viewPitch, turnDegrees);
+            case ACCELERATING -> heroic(speed, viewPitch, turnDegrees);
+            case DECELERATING -> braking(turnDegrees);
             case BRAKING -> braking(turnDegrees);
             case DIVE -> dive(verticalSpeed, viewPitch, turnDegrees);
             case CLIMB -> climb(verticalSpeed, viewPitch, turnDegrees);
             case TURNING -> turning(speed, viewPitch, turnDegrees);
             case CRUISE -> cruise(speed, viewPitch, turnDegrees);
             case HEROIC_FLIGHT, MANEUVER -> heroic(speed, viewPitch, turnDegrees);
-            case EXIT -> FlightPose.VANILLA;
+            case LANDING, EXIT -> FlightPose.VANILLA;
         };
     }
 
