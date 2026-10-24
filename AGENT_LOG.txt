@@ -656,3 +656,6 @@ OVERHAUL DE VOO, ANIMACAO, MANOBRAS E CAMERA (AGENTE DE VOO, 2026-10-23)
   estava sendo editado; esses arquivos nao pertencem ao lote de voo e nao foram tocados.
 - Proximo passo: homologacao visual humana. Publicacao concluida: `git ls-remote`
   confirmou `df49ac6` na branch, incluindo os ancestrais `a45cef0` e `e870892`.
+- Revalidacao pos-publicacao em `c1f0ece` (inclui o lote de keybinds do speedster
+  `e1319eb`): `runGameTestServer` "All 80 required tests passed" e `build`
+  BUILD SUCCESSFUL.

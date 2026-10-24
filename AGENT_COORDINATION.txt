@@ -355,3 +355,5 @@ Criterios:
   na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
   remoto. O push tambem publicou os ancestrais `a45cef0` e `e870892`, de outros agentes,
   que ja estavam na branch local.
+- Revalidacao pos-publicacao no HEAD `c1f0ece` (com o lote de keybinds do speedster
+  `e1319eb`): `runGameTestServer` 80/80 e `build` BUILD SUCCESSFUL.
