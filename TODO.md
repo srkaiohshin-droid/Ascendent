@@ -118,3 +118,5 @@
 - [ ] Homologacao visual humana da aba LORE, selos e motivos de recusa.
 - [ ] Descrever os 379 poderes e 389 habilidades restantes apenas quando virarem mecanicas
   reais; o relatorio de cobertura deve continuar expondo esse gap ate la.
+- [x] Publicar o lote com push normal e confirmar o SHA remoto
+  (`2542676b27b44aca97ee80a39213871c33626bd9`) via `git ls-remote`.

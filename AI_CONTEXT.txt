@@ -207,3 +207,6 @@ ESTADO VERIFICADO EM 2026-10-23 (CATALOGO, LORE E COBERTURA DE TRADUCAO)
 - Fronteira: nenhum arquivo de voo, animacao, pose, rig, camera ou render foi alterado
   neste lote. O commit f0226b9 do agente de animacao (pitch de trajetoria e idle de
   hover) permanece intacto e e publicado junto por estar no mesmo historico local.
+- Publicacao: commit `2542676b27b44aca97ee80a39213871c33626bd9` na branch
+  `srkaiohshin-droid-ascendant-gameplay-ui`, com push normal e SHA remoto conferido por
+  `git ls-remote`.

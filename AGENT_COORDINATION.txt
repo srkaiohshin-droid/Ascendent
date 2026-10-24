@@ -308,4 +308,5 @@ Criterios:
 - Validacao: compileJava BUILD SUCCESSFUL; runGameTestServer 70/70; build BUILD SUCCESSFUL;
   git diff --check sem erros; runClient smoke entrou no mundo e encerrou sem crash.
 - Pendente: homologacao visual humana da aba LORE e dos novos selos/motivos de recusa.
-- Publicacao: ver AGENT_LOG.txt apos o push deste lote.
+- Publicacao: commit `2542676b27b44aca97ee80a39213871c33626bd9` publicado com push normal;
+  `git ls-remote` confirmou o SHA remoto.
