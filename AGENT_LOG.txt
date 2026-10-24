@@ -537,3 +537,42 @@ TESTE DE INTEGRACAO DA SUPERVELOCIDADE PELO CAMINHO DO CATALOGO (2026-10-23)
   git diff --check sem erros de conteudo (apenas avisos LF/CRLF).
 - Publicacao: este commit foi enviado com push normal na branch
   srkaiohshin-droid-ascendant-gameplay-ui; o SHA remoto foi conferido com git ls-remote.
+
+CATALOGO COM ESTADO REAL, ARQUIVO DE LORE E COBERTURA DE TRADUCAO (AGENTE 01, 2026-10-23)
+- Auditoria antes de alterar: branch srkaiohshin-droid-ascendant-gameplay-ui; o commit
+  f0226b9 do agente de animacao ja estava no HEAD local e nao foi tocado. Nenhuma
+  operacao destrutiva foi executada.
+- Baseline medido: 500 poderes (121 funcionais/379 templates), 500 habilidades
+  (111 funcionais/389 templates), 6 trajes e referencias de traje integras.
+- Implementado:
+  - `CatalogEntryState` (client-independente) classifica READY, ACTIVE, COOLDOWN, LOCKED,
+    TEMPLATE, LOADING, PASSIVE, AUTOMATIC, METADATA, EQUIPPED e AVAILABLE, com chave de
+    recusa e ticks restantes. `PowerCatalogScreen` usa o mesmo resultado em selo, cor,
+    botao, detalhe e feedback, entao cartao e acao nao divergem.
+  - Lore modular: `LoreCategory`, `LoreAccess`, `LoreUnlock`, `LoreEntry`, `LoreRegistry`
+    e `NativeLoreData` com 12 entradas originais. Desbloqueio deriva de poder, habilidade
+    ou traje realmente acessivel; nao existe contador de progresso paralelo.
+  - Aba LORE no catalogo com filtro por categoria, estado bloqueado/desbloqueado,
+    requisito, poderes/trajes relacionados e comportamento somente leitura.
+  - `ContentValidator`: valida trajes concedentes, lore (ID/chave/referencia/desbloqueio)
+    e cobertura de traducao. `BuiltinContentManifest` restringe a exigencia de traducao
+    aos seis trajes internos, para nao quebrar conteudo registrado em GameTest/packs.
+  - 127 chaves novas por idioma (316 em cada arquivo) cobrindo UI, categorias, seis
+    trajes, 18 poderes e 7 habilidades concedidos e as 12 entradas de lore.
+  - GameTests `catalogEntryStateExplainsRefusalReasons` e
+    `loreRegistryUnlocksAndTranslationCoverage`.
+- Validacao real:
+  - compileJava: BUILD SUCCESSFUL.
+  - runGameTestServer: "All 70 required tests passed" (BUILD SUCCESSFUL in 36s).
+  - build: BUILD SUCCESSFUL.
+  - git diff --check: sem erros de conteudo (apenas avisos LF/CRLF).
+  - runClient: entrou no mundo integrado ("Dev joined the game"), encerrou de forma
+    limpa com BUILD SUCCESSFUL. Nao houve inspecao visual humana da aba LORE.
+- Honestidade de conteudo: 379 poderes e 389 habilidades continuam marcados como
+  templates; o relatorio segue acusando 482 descricoes de poderes e 493 de habilidades
+  ausentes. Nao foram inventadas descricoes para todo o catalogo.
+- Fronteira respeitada: nenhum arquivo de voo, animacao, pose, rig, camera ou render foi
+  modificado. `EnergyBeamComponent` e demais alteracoes de outros agentes nao foram
+  incluidas neste lote.
+- Pendencias: homologacao visual humana; descricoes completas do catalogo somente quando
+  as mecanicas correspondentes forem implementadas.

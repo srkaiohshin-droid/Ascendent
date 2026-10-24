@@ -9,6 +9,7 @@ import br.com.ascendant.flight.FlightEvents;
 import br.com.ascendant.flight.FlightGameTests;
 import br.com.ascendant.flight.FlightNetwork;
 import br.com.ascendant.flight.FlightTuning;
+import br.com.ascendant.lore.NativeLoreData;
 import br.com.ascendant.network.AscendantNetwork;
 import br.com.ascendant.pack.PackManager;
 import br.com.ascendant.pack.PackManagerGameTests;
@@ -66,6 +67,7 @@ public final class Ascendant {
         PowerCatalogData.registerAll();
         AbilityCatalogData.registerAll();
         BuiltinSuitData.registerAll();
+        NativeLoreData.registerAll();
 
         // Animation profiles for powers and abilities (visual-only, common-safe)
         AnimationCatalogData.registerAll();

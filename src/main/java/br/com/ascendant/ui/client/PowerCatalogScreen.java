@@ -1,8 +1,14 @@
 package br.com.ascendant.ui.client;
 
+import br.com.ascendant.catalog.CatalogEntryState;
 import br.com.ascendant.catalog.CatalogInteraction;
 import br.com.ascendant.core.AbilityCategory;
 import br.com.ascendant.core.PowerCategory;
+import br.com.ascendant.lore.LoreAccess;
+import br.com.ascendant.lore.LoreCategory;
+import br.com.ascendant.lore.LoreEntry;
+import br.com.ascendant.lore.LoreRegistry;
+import br.com.ascendant.lore.LoreUnlock;
 import br.com.ascendant.network.AscendantNetwork;
 import br.com.ascendant.pack.PackManager;
 import br.com.ascendant.pack.PackManifest;
@@ -43,7 +49,8 @@ public class PowerCatalogScreen extends Screen {
         HEROES("gui.ascendant.catalog.heroes", "Heroes / Packs"),
         POWERS("gui.ascendant.catalog.powers", "Powers"),
         ABILITIES("gui.ascendant.catalog.abilities", "Abilities"),
-        SUITS("gui.ascendant.catalog.suits", "Suits");
+        SUITS("gui.ascendant.catalog.suits", "Suits"),
+        LORE("gui.ascendant.catalog.lore", "Lore");
 
         private final String key;
         private final String fallback;
@@ -55,7 +62,7 @@ public class PowerCatalogScreen extends Screen {
     }
 
     private enum EntryType {
-        POWER, ABILITY, SUIT, PACK
+        POWER, ABILITY, SUIT, PACK, LORE
     }
 
     private record Entry(EntryType type, ResourceLocation id, String name, String description,
@@ -91,6 +98,27 @@ public class PowerCatalogScreen extends Screen {
     private EditBox searchBox;
     private Button executeButton;
     private Button unequipButton;
+
+    /**
+     * Lore unlocks read the same authoritative snapshot the catalog already
+     * uses: unlocked powers plus the equipped suit. Nothing is stored client-side.
+     */
+    private static final LoreAccess CATALOG_ACCESS = new LoreAccess() {
+        @Override
+        public boolean hasPower(ResourceLocation powerId) {
+            return CatalogClientState.hasPower(powerId);
+        }
+
+        @Override
+        public boolean hasAbility(ResourceLocation abilityId) {
+            return CatalogClientState.hasAbility(abilityId);
+        }
+
+        @Override
+        public boolean hasSuit(ResourceLocation suitId) {
+            return suitId.equals(CatalogClientState.getEquippedSuit());
+        }
+    };
 
     public PowerCatalogScreen(Screen parent) {
         this(parent, Tab.HEROES);
@@ -179,6 +207,9 @@ public class PowerCatalogScreen extends Screen {
             }
             case SUITS -> SuitRegistry.getAll().stream().map(suit -> suit.getRarity().name())
                     .distinct().sorted().forEach(values::add);
+            case LORE -> {
+                for (LoreCategory value : LoreCategory.values()) values.add(value.name());
+            }
         }
         return values;
     }
@@ -269,6 +300,8 @@ public class PowerCatalogScreen extends Screen {
             case SUITS -> SuitRegistry.getAll().stream()
                     .sorted(Comparator.comparing(suit -> suit.getId().toString()))
                     .map(this::entryFor).forEach(entries::add);
+            case LORE -> LoreRegistry.getAllSorted().stream()
+                    .map(this::entryFor).forEach(entries::add);
         }
         filterDirty = true;
     }
@@ -306,6 +339,16 @@ public class PowerCatalogScreen extends Screen {
         return new Entry(EntryType.PACK, id, pack.getName(), pack.getDescription(), "packs", null,
                 true, 0, details, new CatalogInteraction.Action(CatalogInteraction.ActionType.NONE, id),
                 pack.getId());
+    }
+
+    private Entry entryFor(LoreEntry lore) {
+        return new Entry(EntryType.LORE, lore.id(),
+                localized(lore.getTitleKey(), humanize(lore.id().getPath())),
+                localized(lore.getSummaryKey(), text("gui.ascendant.catalog.description_missing",
+                        "No localized description is available.")),
+                lore.category().name(), lore.category().getTranslationKey(),
+                true, 0, loreUnlockText(lore.unlock()),
+                new CatalogInteraction.Action(CatalogInteraction.ActionType.NONE, lore.id()), null);
     }
 
     private List<PackManifest> availablePacks() {
@@ -371,13 +414,16 @@ public class PowerCatalogScreen extends Screen {
 
     private void updateActionButtons() {
         Entry selected = selectedEntry();
-        executeButton.active = selected != null && selected.action().type() != CatalogInteraction.ActionType.NONE
-                && isAuthorizedAndReady(selected);
+        executeButton.active = selected != null && isAuthorizedAndReady(selected);
         unequipButton.visible = tab == Tab.SUITS || tab == Tab.HEROES;
         unequipButton.active = unequipButton.visible && CatalogClientState.isInitialized()
                 && CatalogClientState.getEquippedSuit() != null;
         if (selected == null) {
             executeButton.setMessage(label("gui.ascendant.catalog.execute", "Use selection"));
+            return;
+        }
+        if (selected.type() == EntryType.LORE) {
+            executeButton.setMessage(label("gui.ascendant.catalog.read_only", "Archive entry"));
             return;
         }
         boolean toggled = isToggled(selected);
@@ -398,20 +444,35 @@ public class PowerCatalogScreen extends Screen {
     }
 
     private boolean isAuthorizedAndReady(Entry entry) {
-        CatalogInteraction.ActionType action = entry.action().type();
-        if (action == CatalogInteraction.ActionType.EQUIP_SUIT) {
-            return true;
-        }
-        if (!CatalogClientState.isInitialized()) {
+        if (entry.type() == EntryType.LORE) {
             return false;
         }
-        boolean authorized = entry.type() == EntryType.POWER
-                ? CatalogClientState.hasPower(entry.id())
-                : entry.type() == EntryType.ABILITY && CatalogClientState.hasAbility(entry.id());
-        if (authorized && isToggled(entry)) {
-            return true;
-        }
-        return authorized && CatalogClientState.getCooldown(entry.id()) <= 0;
+        return assessment(entry).actionable();
+    }
+
+    private CatalogEntryState.Facts factsFor(Entry entry) {
+        CatalogEntryState.ContentKind kind = switch (entry.type()) {
+            case POWER -> CatalogEntryState.ContentKind.POWER;
+            case ABILITY -> CatalogEntryState.ContentKind.ABILITY;
+            case SUIT -> CatalogEntryState.ContentKind.SUIT;
+            case PACK, LORE -> CatalogEntryState.ContentKind.PACK;
+        };
+        boolean owned = switch (entry.type()) {
+            case POWER -> CatalogClientState.hasPower(entry.id());
+            case ABILITY -> CatalogClientState.hasAbility(entry.id());
+            default -> true;
+        };
+        boolean equipped = entry.type() == EntryType.SUIT
+                && entry.id().equals(CatalogClientState.getEquippedSuit());
+        boolean packLoaded = entry.packId() != null
+                && PackManager.getLoadedPackIds().contains(entry.packId());
+        return new CatalogEntryState.Facts(kind, entry.functional(), CatalogClientState.isInitialized(),
+                owned, isToggled(entry), CatalogClientState.getCooldown(entry.id()),
+                entry.action().type() != CatalogInteraction.ActionType.NONE, equipped, packLoaded);
+    }
+
+    private CatalogEntryState.Assessment assessment(Entry entry) {
+        return CatalogEntryState.assess(factsFor(entry));
     }
 
     private static boolean isToggle(CatalogInteraction.ActionType action) {
@@ -456,6 +517,15 @@ public class PowerCatalogScreen extends Screen {
             return;
         }
         CatalogInteraction.Action action = selected.action();
+        if (selected.type() == EntryType.LORE) {
+            boolean unlocked = isLoreUnlocked(selected);
+            setFeedback(unlocked
+                            ? text("gui.ascendant.catalog.lore_read_only",
+                            "Archive entry: read-only. Its text is already available.")
+                            : loreRequirementText(selected),
+                    unlocked ? 0xFFB9F4FF : 0xFFFFC060);
+            return;
+        }
         boolean isToggle = isToggle(action.type());
         if (toggleOnly != null && toggleOnly != isToggle) {
             setFeedback(toggleOnly
@@ -502,32 +572,31 @@ public class PowerCatalogScreen extends Screen {
     }
 
     private String unavailableReason(Entry entry) {
-        if (!CatalogClientState.isInitialized()) {
-            return text("gui.ascendant.catalog.loading_state", "Waiting for authoritative server state.");
+        if (entry.type() == EntryType.LORE) {
+            return isLoreUnlocked(entry)
+                    ? text("gui.ascendant.catalog.lore_read_only",
+                    "Archive entry: read-only. Its text is already available.")
+                    : loreRequirementText(entry);
         }
-        if (!entry.functional()) {
-            return text("gui.ascendant.catalog.template_reason", "Template only; no working executor.");
+        CatalogEntryState.Assessment assessment = assessment(entry);
+        if (assessment.reasonKey() == null) {
+            return text("gui.ascendant.catalog.unavailable_reason", "This entry is unavailable.");
         }
-        if (entry.type() == EntryType.PACK) {
-            return text("gui.ascendant.catalog.pack_not_actionable", "Packs describe content; select an entry to use it.");
+        if (assessment.state() == CatalogEntryState.State.COOLDOWN) {
+            return text(assessment.reasonKey(), "On cooldown: %s ticks")
+                    .formatted(assessment.reasonArg());
         }
-        if ((entry.type() == EntryType.POWER && !CatalogClientState.hasPower(entry.id()))
-                || (entry.type() == EntryType.ABILITY && !CatalogClientState.hasAbility(entry.id()))) {
-            return text("gui.ascendant.catalog.not_owned",
-                    "Not available from current powers or equipped suit.");
-        }
-        int cooldown = CatalogClientState.getCooldown(entry.id());
-        if (cooldown > 0) {
-            return text("gui.ascendant.catalog.cooldown_remaining", "On cooldown: %s ticks").formatted(cooldown);
-        }
-        if (entry.type() == EntryType.POWER) {
-            return text("gui.ascendant.catalog.power_type_reason",
-                    "This power type is passive or not manually supported.");
-        }
-        if (entry.type() == EntryType.ABILITY) {
-            return text("gui.ascendant.catalog.ability_trigger_reason", "This ability uses an automatic trigger.");
-        }
-        return text("gui.ascendant.catalog.unavailable_reason", "This entry is unavailable.");
+        String fallback = switch (assessment.state()) {
+            case TEMPLATE -> "Template only; no working executor.";
+            case LOADING -> "Waiting for authoritative server state.";
+            case LOCKED -> "Not available from current powers or equipped suit.";
+            case PASSIVE -> "This power type is passive or not manually supported.";
+            case AUTOMATIC -> "This ability uses an automatic trigger.";
+            case METADATA -> "Packs describe content; select an entry to use it.";
+            case EQUIPPED -> "This loadout is currently equipped.";
+            default -> "This entry is unavailable.";
+        };
+        return text(assessment.reasonKey(), fallback);
     }
 
     private Entry selectedEntry() {
@@ -762,7 +831,10 @@ public class PowerCatalogScreen extends Screen {
         cursor += 18;
 
         cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
-                text("gui.ascendant.catalog.mechanics", "Mechanics"), mechanicsText(entry));
+                entry.type() == EntryType.LORE
+                        ? text("gui.ascendant.catalog.archive_text", "Archive entry")
+                        : text("gui.ascendant.catalog.mechanics", "Mechanics"),
+                mechanicsText(entry), entry.type() == EntryType.LORE ? 6 : 4);
         cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
                 text("gui.ascendant.catalog.activation", "Activation"), activationHint(entry, true));
         cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
@@ -775,6 +847,8 @@ public class PowerCatalogScreen extends Screen {
         } else if (entry.type() == EntryType.PACK) {
             cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
                     text("gui.ascendant.catalog.pack_status", "Pack status"), packStatus(entry));
+        } else if (entry.type() == EntryType.LORE) {
+            cursor = renderLoreDetails(graphics, theme, entry, contentX, cursor, contentWidth);
         } else {
             cursor = detailSection(graphics, theme, contentX, cursor, contentWidth,
                     text("gui.ascendant.catalog.source", "Source"), sourceText(entry));
@@ -804,15 +878,63 @@ public class PowerCatalogScreen extends Screen {
                 suit.getUniverse() + " · " + suit.getRarity().name() + " · " + suit.getAuthor());
     }
 
+    private int renderLoreDetails(GuiGraphics graphics, CatalogTheme theme, Entry entry, int x, int y,
+                                  int width) {
+        LoreEntry lore = LoreRegistry.get(entry.id());
+        if (lore == null) {
+            return y;
+        }
+        y = detailSection(graphics, theme, x, y, width,
+                text("gui.ascendant.catalog.lore_requirement", "Archive requirement"),
+                isLoreUnlocked(entry)
+                        ? text("gui.ascendant.catalog.req.lore_unlocked", "Requirement met: %s")
+                        .formatted(loreUnlockText(lore.unlock()))
+                        : text("gui.ascendant.catalog.req.lore_locked", "Locked until: %s")
+                        .formatted(loreUnlockText(lore.unlock())));
+        if (!lore.relatedPowers().isEmpty()) {
+            y = detailSection(graphics, theme, x, y, width,
+                    text("gui.ascendant.catalog.related_powers", "Related powers"),
+                    joinContent(lore.relatedPowers(), false));
+        }
+        if (!lore.relatedSuits().isEmpty()) {
+            y = detailSection(graphics, theme, x, y, width,
+                    text("gui.ascendant.catalog.related_suits", "Related suits"),
+                    joinContent(lore.relatedSuits(), true));
+        }
+        return y;
+    }
+
+    private String joinContent(List<ResourceLocation> ids, boolean suits) {
+        StringBuilder builder = new StringBuilder();
+        for (ResourceLocation id : ids) {
+            if (builder.length() > 0) {
+                builder.append(", ");
+            }
+            if (suits) {
+                SuitDefinition suit = SuitRegistry.get(id);
+                builder.append(suit == null ? id.getPath() : displayName(suit.getNameKey(), id));
+            } else {
+                PowerDefinition power = PowerRegistry.get(id);
+                builder.append(power == null ? id.getPath() : displayName(power.getNameKey(), id));
+            }
+        }
+        return builder.length() == 0 ? text("gui.ascendant.catalog.none", "none") : builder.toString();
+    }
+
     private int detailSection(GuiGraphics graphics, CatalogTheme theme, int x, int y, int width,
                               String heading, String body) {
+        return detailSection(graphics, theme, x, y, width, heading, body, 4);
+    }
+
+    private int detailSection(GuiGraphics graphics, CatalogTheme theme, int x, int y, int width,
+                              String heading, String body, int maxLines) {
         if (y > height - BOTTOM_RESERVED - 26) {
             return y;
         }
         graphics.drawString(font, heading.toUpperCase(Locale.ROOT), x, y, theme.accent(), false);
         y += 11;
-        ComicUi.wrapped(graphics, font, body == null ? "" : body, x, y, width, 4, 10, 0xFFD8E2EE);
-        int lines = Math.min(4, font.split(Component.literal(body == null ? "" : body), width).size());
+        ComicUi.wrapped(graphics, font, body == null ? "" : body, x, y, width, maxLines, 10, 0xFFD8E2EE);
+        int lines = Math.min(maxLines, font.split(Component.literal(body == null ? "" : body), width).size());
         return y + lines * 10 + 6;
     }
 
@@ -881,6 +1003,10 @@ public class PowerCatalogScreen extends Screen {
             return text("gui.ascendant.catalog.mechanics.suit",
                     "Loadout metadata only: equipping grants the listed powers and abilities. No character profile is inferred.");
         }
+        if (entry.type() == EntryType.LORE) {
+            return text("gui.ascendant.catalog.lore_missing_body",
+                    "This archive entry has no localized body available yet.");
+        }
         return text("gui.ascendant.catalog.mechanics.pack",
                 "Content pack metadata: counts and origins only. Its powers, abilities and suits appear in their own tabs.");
     }
@@ -898,6 +1024,10 @@ public class PowerCatalogScreen extends Screen {
             case SUIT -> {
                 SuitDefinition suit = SuitRegistry.get(entry.id());
                 yield suit == null ? "" : suit.getDescriptionKey();
+            }
+            case LORE -> {
+                LoreEntry lore = LoreRegistry.get(entry.id());
+                yield lore == null ? "" : lore.getBodyKey();
             }
             case PACK -> "";
         };
@@ -947,10 +1077,25 @@ public class PowerCatalogScreen extends Screen {
                     "Equip from this catalog. The server records the loadout and grants its powers while equipped.")
                     : text("gui.ascendant.catalog.hint.suit", "Click · equip");
             case PACK -> text("gui.ascendant.catalog.hint.pack", "Metadata only");
+            case LORE -> detailed
+                    ? text("gui.ascendant.catalog.hint.lore_long",
+                    "Read-only archive entry. It unlocks automatically from the powers, abilities or suit you already have; nothing is sent to the server.")
+                    : text("gui.ascendant.catalog.hint.lore", "Read-only");
         };
     }
 
     private String requirementsText(Entry entry) {
+        if (entry.type() == EntryType.LORE) {
+            LoreEntry lore = LoreRegistry.get(entry.id());
+            if (lore == null) {
+                return text("gui.ascendant.catalog.unavailable_reason", "This entry is unavailable.");
+            }
+            return isLoreUnlocked(entry)
+                    ? text("gui.ascendant.catalog.req.lore_unlocked", "Requirement met: %s")
+                    .formatted(loreUnlockText(lore.unlock()))
+                    : text("gui.ascendant.catalog.req.lore_locked", "Locked until: %s")
+                    .formatted(loreUnlockText(lore.unlock()));
+        }
         if (entry.type() == EntryType.POWER) {
             boolean owned = CatalogClientState.hasPower(entry.id());
             return owned
@@ -991,6 +1136,12 @@ public class PowerCatalogScreen extends Screen {
     }
 
     private String runtimeStatus(Entry entry) {
+        if (entry.type() == EntryType.LORE) {
+            return isLoreUnlocked(entry)
+                    ? text("gui.ascendant.catalog.lore_unlocked_reason",
+                    "Unlocked by your current powers, abilities or equipped suit.")
+                    : loreRequirementText(entry);
+        }
         if (!CatalogClientState.isInitialized()) {
             return text("gui.ascendant.catalog.loading_state", "Waiting for authoritative server state.");
         }
@@ -1002,59 +1153,48 @@ public class PowerCatalogScreen extends Screen {
                     ? text("gui.ascendant.catalog.suit_equipped", "Equipped")
                     : text("gui.ascendant.catalog.suit_available", "Available loadout");
         }
-        boolean accessible = entry.type() == EntryType.POWER
-                ? CatalogClientState.hasPower(entry.id()) : CatalogClientState.hasAbility(entry.id());
-        if (!accessible) {
-            return text("gui.ascendant.catalog.not_owned",
+        CatalogEntryState.Assessment assessment = assessment(entry);
+        return switch (assessment.state()) {
+            case ACTIVE -> text("gui.ascendant.catalog.active", "Active");
+            case COOLDOWN -> text("gui.ascendant.catalog.cooldown_remaining",
+                    "On cooldown: %s ticks").formatted(assessment.reasonArg());
+            case READY -> text("gui.ascendant.catalog.ready", "Ready");
+            case LOCKED -> text("gui.ascendant.catalog.not_owned",
                     "Not available from current powers or equipped suit.");
-        }
-        if (isToggled(entry)) {
-            return text("gui.ascendant.catalog.active", "Active");
-        }
-        int cooldown = CatalogClientState.getCooldown(entry.id());
-        if (cooldown > 0) {
-            return text("gui.ascendant.catalog.cooldown_remaining", "On cooldown: %s ticks").formatted(cooldown);
-        }
-        if (entry.action().type() == CatalogInteraction.ActionType.NONE) {
-            return text("gui.ascendant.catalog.automatic", "Automatic / passive");
-        }
-        return text("gui.ascendant.catalog.ready", "Ready");
+            case TEMPLATE -> text("gui.ascendant.catalog.template_reason",
+                    "Template only; no working executor.");
+            case PASSIVE, AUTOMATIC -> text("gui.ascendant.catalog.automatic", "Automatic / passive");
+            default -> text("gui.ascendant.catalog.loading_state",
+                    "Waiting for authoritative server state.");
+        };
     }
 
     private String shortState(Entry entry) {
-        if (!entry.functional()) {
-            return text("gui.ascendant.catalog.template_short", "Template");
+        if (entry.type() == EntryType.LORE) {
+            return isLoreUnlocked(entry)
+                    ? text("gui.ascendant.catalog.lore_unlocked", "Unlocked")
+                    : text("gui.ascendant.catalog.lore_locked", "Locked");
         }
-        if (entry.type() == EntryType.POWER && !CatalogClientState.isInitialized()) {
-            return text("gui.ascendant.catalog.loading_short", "Syncing");
+        CatalogEntryState.Assessment assessment = assessment(entry);
+        if (assessment.state() == CatalogEntryState.State.COOLDOWN) {
+            return assessment.reasonArg() + "t";
         }
-        if (isToggled(entry)) {
-            return text("gui.ascendant.catalog.active", "Active");
-        }
-        int cooldown = CatalogClientState.getCooldown(entry.id());
-        if (cooldown > 0) {
-            return cooldown + "t";
-        }
-        if (entry.action().type() == CatalogInteraction.ActionType.NONE) {
-            return text("gui.ascendant.catalog.passive_short", "Passive");
-        }
-        return text("gui.ascendant.catalog.ready_short", "Ready");
+        return text(assessment.labelKey(), assessment.labelFallback());
     }
 
     private int stateColor(Entry entry, CatalogTheme theme) {
-        if (!entry.functional()) {
-            return 0xFFFFA060;
+        if (entry.type() == EntryType.LORE) {
+            return isLoreUnlocked(entry) ? 0xFF7CE38B : 0xFFB0A0A0;
         }
-        if (isToggled(entry)) {
-            return theme.accentBright();
-        }
-        if (CatalogClientState.getCooldown(entry.id()) > 0) {
-            return 0xFFFFC060;
-        }
-        if (entry.action().type() == CatalogInteraction.ActionType.NONE) {
-            return 0xFF9AA8B8;
-        }
-        return 0xFF7CE38B;
+        return switch (assessment(entry).state()) {
+            case TEMPLATE -> 0xFFFFA060;
+            case ACTIVE -> theme.accentBright();
+            case COOLDOWN -> 0xFFFFC060;
+            case LOCKED -> 0xFF9AA8B8;
+            case PASSIVE, AUTOMATIC, METADATA, EQUIPPED -> 0xFF9AA8B8;
+            case READY, AVAILABLE -> 0xFF7CE38B;
+            case LOADING -> 0xFF9AA8B8;
+        };
     }
 
     private int categoryAccent(Entry entry, CatalogTheme theme) {
@@ -1066,6 +1206,9 @@ public class PowerCatalogScreen extends Screen {
         }
         if (entry.type() == EntryType.ABILITY) {
             return 0xFF7CE3C0;
+        }
+        if (entry.type() == EntryType.LORE) {
+            return 0xFFB6E3FF;
         }
         try {
             PowerCategory category = PowerCategory.valueOf(entry.category());
@@ -1097,6 +1240,9 @@ public class PowerCatalogScreen extends Screen {
         if (entry.type() == EntryType.ABILITY) {
             return AbilityCategory.valueOf(entry.category()).getDisplayName();
         }
+        if (entry.type() == EntryType.LORE) {
+            return LoreCategory.valueOf(entry.category()).getDisplayName();
+        }
         return entry.category();
     }
 
@@ -1106,7 +1252,45 @@ public class PowerCatalogScreen extends Screen {
             case ABILITY -> text("gui.ascendant.catalog.type.ability", "Ability");
             case SUIT -> text("gui.ascendant.catalog.type.suit", "Suit");
             case PACK -> text("gui.ascendant.catalog.type.pack", "Pack");
+            case LORE -> text("gui.ascendant.catalog.type.lore", "Lore");
         };
+    }
+
+    private boolean isLoreUnlocked(Entry entry) {
+        LoreEntry lore = LoreRegistry.get(entry.id());
+        return lore != null && lore.isUnlocked(CATALOG_ACCESS);
+    }
+
+    private String loreRequirementText(Entry entry) {
+        LoreEntry lore = LoreRegistry.get(entry.id());
+        if (lore == null) {
+            return text("gui.ascendant.catalog.unavailable_reason", "This entry is unavailable.");
+        }
+        return text("gui.ascendant.catalog.req.lore_locked", "Locked until: %s")
+                .formatted(loreUnlockText(lore.unlock()));
+    }
+
+    private String loreUnlockText(LoreUnlock unlock) {
+        if (unlock.type() == LoreUnlock.Type.ALWAYS) {
+            return text("lore.ascendant.requires.always", "Always available");
+        }
+        ResourceLocation id = unlock.id();
+        String label = switch (unlock.type()) {
+            case POWER -> {
+                PowerDefinition power = id == null ? null : PowerRegistry.get(id);
+                yield power == null ? String.valueOf(id) : displayName(power.getNameKey(), id);
+            }
+            case ABILITY -> {
+                AbilityDefinition ability = id == null ? null : AbilityRegistry.get(id);
+                yield ability == null ? String.valueOf(id) : displayName(ability.getNameKey(), id);
+            }
+            case SUIT -> {
+                SuitDefinition suit = id == null ? null : SuitRegistry.get(id);
+                yield suit == null ? String.valueOf(id) : displayName(suit.getNameKey(), id);
+            }
+            case ALWAYS -> "";
+        };
+        return text(unlock.requirementKey(), "%s").formatted(label);
     }
 
     private String joinIds(List<ResourceLocation> ids, int limit) {

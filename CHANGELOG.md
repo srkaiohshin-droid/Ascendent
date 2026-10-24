@@ -151,3 +151,27 @@
   `kinetic_sprint` pelo runtime (mesmo caminho do catalogo/radial) inicia a
   supervelocidade, aplica +0,15 de movement_speed, move mais que um passo vanilla e
   restaura o atributo base ao desligar. Suite passa a 63/63 GameTests.
+
+## 0.1.0 - Estados reais do catalogo, arquivo de lore e traducao (2026-10-23)
+- `CatalogEntryState`: classificacao compartilhada de entrada (READY, ACTIVE, COOLDOWN,
+  LOCKED, TEMPLATE, LOADING, PASSIVE, AUTOMATIC, METADATA, EQUIPPED, AVAILABLE) com
+  motivo de recusa e ticks restantes. O catalogo aplica o mesmo resultado em selo, cor,
+  botao de execucao, detalhe e feedback.
+- Detalhe da entrada passa a mostrar mecanica, ativacao, tecla, cooldown, requisitos,
+  estado de runtime, origem e conteudo relacionado; packs continuam apenas metadados.
+- `LoreRegistry`, `LoreEntry`, `LoreUnlock`, `LoreAccess`, `LoreCategory` e
+  `NativeLoreData`: 12 entradas originais com desbloqueio derivado de poder, habilidade
+  ou traje realmente acessivel. Aba LORE somente leitura, com filtro e requisito visivel.
+- `ContentValidator` valida trajes concedentes, lore e cobertura de traducao.
+  `BuiltinContentManifest` define os seis trajes internos cuja traducao e obrigatoria;
+  conteudo de GameTest/pack e validado estruturalmente, sem exigir traducao da base.
+- 127 chaves novas por idioma (316 em `en_us.json` e `pt_br.json`): UI, categorias,
+  seis trajes, 18 poderes e 7 habilidades concedidos e 12 entradas de lore.
+- Transparencia: 379 poderes e 389 habilidades permanecem templates; o relatorio declara
+  482 descricoes de poderes e 493 de habilidades ausentes em vez de fingir cobertura.
+- Testes: `catalogEntryStateExplainsRefusalReasons` e
+  `loreRegistryUnlocksAndTranslationCoverage`; suite em 70/70.
+- Validacao: `compileJava` BUILD SUCCESSFUL; `runGameTestServer` "All 70 required tests
+  passed"; `build` BUILD SUCCESSFUL; `git diff --check` sem erros; smoke de `runClient`
+  entrou no mundo integrado e encerrou com BUILD SUCCESSFUL. Sem inspecao visual humana.
+- Fronteira: nenhum arquivo de voo/animacao/camera/render foi alterado neste lote.

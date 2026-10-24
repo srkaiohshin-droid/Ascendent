@@ -180,3 +180,30 @@ ATUALIZACAO DE ESTADO EM 2026-10-23 (OVERHAUL DE GAMEPLAY, CATALOGO E ANIMACOES)
   confirma o modificador de movement_speed +0.15, exige deslocamento real acima do
   passo vanilla e restaura o atributo base ao desligar. `runGameTestServer` passou
   com "All 63 required tests passed" e `build` com BUILD SUCCESSFUL.
+
+ESTADO VERIFICADO EM 2026-10-23 (CATALOGO, LORE E COBERTURA DE TRADUCAO)
+- Baseline real medido pelo ContentValidator durante o GameTest: 500 poderes
+  (121 funcionais, 379 templates), 500 habilidades (111 funcionais, 389 templates),
+  6 trajes e 12 entradas de lore. Nenhum template e apresentado como mecanica pronta.
+- `CatalogEntryState` centraliza o estado de cada entrada: READY, ACTIVE, COOLDOWN,
+  LOCKED, TEMPLATE, LOADING, PASSIVE, AUTOMATIC, METADATA, EQUIPPED e AVAILABLE.
+  O mesmo modelo alimenta selo, cor, botao de execucao, painel de detalhes e motivo
+  de recusa, evitando divergencia entre cartao e acao.
+- `LoreRegistry`/`NativeLoreData`: 12 entradas originais (ORIGIN, FACTION, THREAT,
+  ARCHIVE, DOSSIER) com desbloqueio derivado de poder, habilidade ou traje realmente
+  acessivel. A aba LORE e somente leitura e nao envia pacotes ao servidor.
+- `ContentValidator` valida trajes (poderes/habilidades concedidos), lore (IDs, chaves,
+  referencias e desbloqueios) e cobertura de traducao. `BuiltinContentManifest` define
+  os seis trajes internos cujo conteudo curado deve estar localizado; conteudo
+  registrado em runtime (GameTests/packs) e validado estruturalmente, sem exigir
+  traducao da base.
+- Cobertura curada: 107 chaves presentes em en_us e pt_br, zero ausentes. O relatorio
+  continua declarando o gap real do catalogo: 482 descricoes de poderes e 493 de
+  habilidades ainda ausentes, porque 379/389 entradas sao templates nao implementados.
+- Validacao deste lote: compileJava BUILD SUCCESSFUL; runGameTestServer "All 70
+  required tests passed"; build BUILD SUCCESSFUL; git diff --check sem erros; smoke de
+  runClient entrou no mundo integrado e encerrou com BUILD SUCCESSFUL. Nao houve
+  inspecao visual humana.
+- Fronteira: nenhum arquivo de voo, animacao, pose, rig, camera ou render foi alterado
+  neste lote. O commit f0226b9 do agente de animacao (pitch de trajetoria e idle de
+  hover) permanece intacto e e publicado junto por estar no mesmo historico local.

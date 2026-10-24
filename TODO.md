@@ -102,3 +102,19 @@
 - [ ] Homologacao visual humana em cliente grafico (telas, poses, camera e manobra).
 - [x] Confirmar SHA remoto apos o push normal deste lote (codigo/assets em `b2e1c97`,
   teste/documentacao em `5d9f22e`; `git ls-remote` conferido).
+
+## Estados reais do catalogo, lore e traducao (2026-10-23)
+- [x] Criar `CatalogEntryState` e unificar selo, cor, botao, detalhe e motivo de recusa
+  para READY/ACTIVE/COOLDOWN/LOCKED/TEMPLATE/LOADING/PASSIVE/AUTOMATIC/METADATA/
+  EQUIPPED/AVAILABLE.
+- [x] Exibir mecanica, ativacao, tecla, cooldown, requisitos, estado e origem no detalhe.
+- [x] Adicionar `LoreRegistry` e 12 entradas originais com desbloqueio derivado de acesso
+  real a poder, habilidade ou traje; aba LORE somente leitura.
+- [x] Validar trajes concedentes, referencias/desbloqueios de lore e cobertura de traducao.
+- [x] Restringir traducao obrigatoria aos trajes internos via `BuiltinContentManifest`.
+- [x] Adicionar GameTests de estados/recusas e de lore/cobertura de traducao.
+- [x] Validar `compileJava`, `runGameTestServer` (70/70), `build` e `git diff --check`.
+- [x] Smoke de `runClient`: entrou no mundo integrado e encerrou sem crash.
+- [ ] Homologacao visual humana da aba LORE, selos e motivos de recusa.
+- [ ] Descrever os 379 poderes e 389 habilidades restantes apenas quando virarem mecanicas
+  reais; o relatorio de cobertura deve continuar expondo esse gap ate la.

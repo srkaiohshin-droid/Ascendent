@@ -3,11 +3,16 @@ package br.com.ascendant.test;
 import br.com.ascendant.animation.AnimationCoverageValidator;
 import br.com.ascendant.animation.AnimationProfile;
 import br.com.ascendant.animation.AnimationRegistry;
+import br.com.ascendant.catalog.CatalogEntryState;
 import br.com.ascendant.catalog.CatalogInteraction;
 import br.com.ascendant.core.AbilityCategory;
 import br.com.ascendant.core.AbilityTrigger;
 import br.com.ascendant.flight.FlightController;
 import br.com.ascendant.flight.FlightState;
+import br.com.ascendant.lore.LoreAccess;
+import br.com.ascendant.lore.LoreEntry;
+import br.com.ascendant.lore.LoreRegistry;
+import br.com.ascendant.lore.LoreUnlock;
 import br.com.ascendant.pack.PackManifest;
 import br.com.ascendant.pack.PackSecurity;
 import br.com.ascendant.power.AbilityDefinition;
@@ -146,6 +151,174 @@ public final class FrameworkGameTests {
                         && CatalogInteraction.radialSector(0.0D, 0.0D, 8, 12.0D) == -1
                         && CatalogInteraction.radialSector(100.0D, 0.0D, 9, 12.0D) == -1,
                 "Radial selection must map clockwise sectors and reject the dead zone and invalid counts");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void catalogEntryStateExplainsRefusalReasons(GameTestHelper helper) {
+        CatalogEntryState.ContentKind power = CatalogEntryState.ContentKind.POWER;
+        CatalogEntryState.ContentKind ability = CatalogEntryState.ContentKind.ABILITY;
+
+        CatalogEntryState.Assessment ready = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                power, true, true, true, false, 0, true, false, false));
+        helper.assertTrue(ready.state() == CatalogEntryState.State.READY && ready.actionable()
+                        && !ready.hasReason(),
+                "An owned manual power with no cooldown must be ready and actionable");
+
+        CatalogEntryState.Assessment template = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                power, false, true, true, false, 0, false, false, false));
+        helper.assertTrue(template.state() == CatalogEntryState.State.TEMPLATE && !template.actionable()
+                        && "gui.ascendant.catalog.template_reason".equals(template.reasonKey()),
+                "Template entries must be refused with the template reason instead of pretending to work");
+
+        CatalogEntryState.Assessment loading = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                power, true, false, true, false, 0, true, false, false));
+        helper.assertTrue(loading.state() == CatalogEntryState.State.LOADING && !loading.actionable()
+                        && "gui.ascendant.catalog.loading_state".equals(loading.reasonKey()),
+                "Entries must not be usable before authoritative state arrives");
+
+        CatalogEntryState.Assessment locked = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                power, true, true, false, false, 0, true, false, false));
+        helper.assertTrue(locked.state() == CatalogEntryState.State.LOCKED && !locked.actionable()
+                        && "gui.ascendant.catalog.not_owned".equals(locked.reasonKey()),
+                "Unowned powers must report the ownership requirement");
+
+        CatalogEntryState.Assessment cooling = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                ability, true, true, true, false, 40, true, false, false));
+        helper.assertTrue(cooling.state() == CatalogEntryState.State.COOLDOWN && !cooling.actionable()
+                        && cooling.reasonArg() == 40
+                        && "gui.ascendant.catalog.cooldown_remaining".equals(cooling.reasonKey()),
+                "Cooldowns must expose the remaining ticks in the refusal reason");
+
+        CatalogEntryState.Assessment active = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                power, true, true, true, true, 120, true, false, false));
+        helper.assertTrue(active.state() == CatalogEntryState.State.ACTIVE && active.actionable()
+                        && active.reasonKey() == null,
+                "An enabled toggle must remain usable even while its next activation cools down");
+
+        CatalogEntryState.Assessment passive = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                power, true, true, true, false, 0, false, false, false));
+        CatalogEntryState.Assessment automatic = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                ability, true, true, true, false, 0, false, false, false));
+        helper.assertTrue(passive.state() == CatalogEntryState.State.PASSIVE
+                        && passive.reasonKey().equals("gui.ascendant.catalog.power_type_reason")
+                        && automatic.state() == CatalogEntryState.State.AUTOMATIC
+                        && automatic.reasonKey().equals("gui.ascendant.catalog.ability_trigger_reason"),
+                "Passive powers and automatic abilities must be distinguished from manual actions");
+
+        CatalogEntryState.Assessment equipped = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                CatalogEntryState.ContentKind.SUIT, true, true, true, false, 0, true, true, false));
+        CatalogEntryState.Assessment available = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                CatalogEntryState.ContentKind.SUIT, true, true, true, false, 0, true, false, false));
+        helper.assertTrue(equipped.state() == CatalogEntryState.State.EQUIPPED && !equipped.actionable()
+                        && available.state() == CatalogEntryState.State.AVAILABLE && available.actionable(),
+                "Suit cards must distinguish the equipped loadout from an available one");
+
+        CatalogEntryState.Assessment metadata = CatalogEntryState.assess(new CatalogEntryState.Facts(
+                CatalogEntryState.ContentKind.PACK, true, true, true, false, 0, false, false, true));
+        helper.assertTrue(metadata.state() == CatalogEntryState.State.METADATA && !metadata.actionable()
+                        && metadata.reasonKey().equals("gui.ascendant.catalog.pack_not_actionable"),
+                "Pack cards must stay metadata-only");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void loreRegistryUnlocksAndTranslationCoverage(GameTestHelper helper) {
+        helper.assertTrue(LoreRegistry.size() >= 12,
+                "The native lore collection must stay a substantial archive, found: " + LoreRegistry.size());
+
+        LoreEntry protocol = LoreRegistry.get(new ResourceLocation("ascendant", "ascendant_protocol"));
+        LoreEntry firstFlight = LoreRegistry.get(new ResourceLocation("ascendant", "first_flight"));
+        LoreEntry speedsterBrief = LoreRegistry.get(
+                new ResourceLocation("ascendant", "kinetic_dynamics_brief"));
+        helper.assertTrue(protocol != null && firstFlight != null && speedsterBrief != null,
+                "Native lore ids must be registered");
+
+        LoreAccess none = LoreAccess.none();
+        helper.assertTrue(protocol.isUnlocked(none),
+                "Always entries must be readable without any power");
+        helper.assertTrue(!firstFlight.isUnlocked(none),
+                "Power-gated lore must stay locked without the power");
+        helper.assertTrue(!speedsterBrief.isUnlocked(none),
+                "Suit-gated lore must stay locked without the suit");
+
+        LoreAccess flightOnly = new LoreAccess() {
+            @Override
+            public boolean hasPower(ResourceLocation powerId) {
+                return new ResourceLocation("ascendant", "flight").equals(powerId);
+            }
+
+            @Override
+            public boolean hasAbility(ResourceLocation abilityId) {
+                return false;
+            }
+
+            @Override
+            public boolean hasSuit(ResourceLocation suitId) {
+                return false;
+            }
+        };
+        LoreAccess speedsterSuit = new LoreAccess() {
+            @Override
+            public boolean hasPower(ResourceLocation powerId) {
+                return false;
+            }
+
+            @Override
+            public boolean hasAbility(ResourceLocation abilityId) {
+                return false;
+            }
+
+            @Override
+            public boolean hasSuit(ResourceLocation suitId) {
+                return new ResourceLocation("ascendant", "speedster_mk1").equals(suitId);
+            }
+        };
+        helper.assertTrue(firstFlight.isUnlocked(flightOnly)
+                        && !speedsterBrief.isUnlocked(flightOnly)
+                        && speedsterBrief.isUnlocked(speedsterSuit)
+                        && !firstFlight.isUnlocked(speedsterSuit),
+                "Lore unlocks must follow the exact power or suit requirement");
+
+        for (LoreEntry entry : LoreRegistry.getAll()) {
+            helper.assertTrue(!entry.getTitleKey().isBlank() && !entry.getSummaryKey().isBlank()
+                            && !entry.getBodyKey().isBlank(),
+                    "Lore entry " + entry.id() + " must derive non-empty translation keys");
+            for (ResourceLocation powerId : entry.relatedPowers()) {
+                helper.assertTrue(PowerRegistry.contains(powerId),
+                        "Lore " + entry.id() + " references unknown power " + powerId);
+            }
+            for (ResourceLocation suitId : entry.relatedSuits()) {
+                helper.assertTrue(SuitRegistry.contains(suitId),
+                        "Lore " + entry.id() + " references unknown suit " + suitId);
+            }
+            if (entry.unlock().type() == LoreUnlock.Type.POWER) {
+                helper.assertTrue(PowerRegistry.contains(entry.unlock().id()),
+                        "Lore " + entry.id() + " unlocks through an unknown power");
+            }
+            if (entry.unlock().type() == LoreUnlock.Type.ABILITY) {
+                helper.assertTrue(AbilityRegistry.contains(entry.unlock().id()),
+                        "Lore " + entry.id() + " unlocks through an unknown ability");
+            }
+            if (entry.unlock().type() == LoreUnlock.Type.SUIT) {
+                helper.assertTrue(SuitRegistry.contains(entry.unlock().id()),
+                        "Lore " + entry.id() + " unlocks through an unknown suit");
+            }
+        }
+
+        ContentValidator.ValidationReport report = ContentValidator.validate();
+        helper.assertTrue(report.isValid(), "Content validation must stay error-free: " + report.errors());
+        helper.assertTrue(report.totalLore() == LoreRegistry.size(),
+                "The validation report must count every registered lore entry");
+        helper.assertTrue(report.translations().enUsAvailable() && report.translations().ptBrAvailable(),
+                "Translation resources must be readable for coverage validation");
+        helper.assertTrue(report.translations().curatedKeys() >= 100,
+                "Curated coverage must include suits, their granted content and lore, found: "
+                        + report.translations().curatedKeys());
+        helper.assertTrue(report.translations().missingCuratedKeys().isEmpty(),
+                "Curated content must be fully localized: " + report.translations().missingCuratedKeys());
+        helper.assertTrue(report.translations().missingPowerDescriptions() > 0,
+                "The report must keep disclosing catalog descriptions that are still missing");
         helper.succeed();
     }
 

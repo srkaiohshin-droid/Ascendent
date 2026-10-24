@@ -287,3 +287,25 @@ Criterios:
 - Publicacao: codigo e assets em `b2e1c97e6e33285ff05c98de1f8cc8e093ec635f`; teste de
   ciclo de vida e documentacao em `5d9f22ee55fa11699156781c8c6c1e6b1a4d1c47`; ambos
   publicados na mesma branch, com SHA remoto conferido por `git ls-remote`.
+
+ASC-014
+Titulo: Estados reais do catalogo, arquivo de lore e cobertura de traducao
+Status: REVIEW
+Prioridade: ALTA
+Dependencia: ASC-013
+Arquivos principais: catalog/CatalogEntryState.java, lore/*, tools/ContentValidator.java,
+  tools/BuiltinContentManifest.java, ui/client/PowerCatalogScreen.java,
+  resources/assets/ascendant/lang/en_us.json, resources/assets/ascendant/lang/pt_br.json,
+  test/FrameworkGameTests.java, Ascendant.java.
+Arquivos NAO tocados: flight/*, animation/*, poses/rigs, camera, render mixins.
+Criterios:
+- [x] Distinguir desbloqueado/equipado/ativo/toggle/cooldown/template/bloqueado por
+  requisito/conteudo de pack, com motivo de recusa traduzido.
+- [x] Mostrar mecanica, ativacao, tecla, cooldown, requisitos, estado e origem no detalhe.
+- [x] Adicionar aba LORE com categorias, leitura e desbloqueio derivado de acesso real.
+- [x] Validar trajes concedentes, lore e traducao curada; manter o gap de templates visivel.
+- [x] Adicionar GameTests de estados/recusas e de lore/cobertura.
+- Validacao: compileJava BUILD SUCCESSFUL; runGameTestServer 70/70; build BUILD SUCCESSFUL;
+  git diff --check sem erros; runClient smoke entrou no mundo e encerrou sem crash.
+- Pendente: homologacao visual humana da aba LORE e dos novos selos/motivos de recusa.
+- Publicacao: ver AGENT_LOG.txt apos o push deste lote.
