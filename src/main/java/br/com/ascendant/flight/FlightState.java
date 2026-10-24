@@ -21,10 +21,24 @@ public interface FlightState {
     int MANEUVER_NONE = 0;
     /** Aileron roll: one complete rotation about the longitudinal (travel) axis. */
     int MANEUVER_ROLL_360 = 1;
-    /** Vertical loop: one complete rotation in the vertical travel plane. */
+    /**
+     * Reserved for a true vertical trajectory loop. Not currently requested or
+     * rendered: the flight physics has no collision-checked circular path, so a
+     * visual-only loop would be a fake mechanic.
+     */
     int MANEUVER_LOOP = 2;
-    /** Half aileron roll: ends with the body inverted until the command is repeated. */
+    /**
+     * Reserved for a true 180-degree trajectory reversal. Not currently
+     * requested or rendered for the same collision/safety reason.
+     */
     int MANEUVER_ROLL_180 = 3;
+
+    /** Why the last flight session ended. Presentation uses this to pick landing or exit. */
+    int END_NONE = 0;
+    int END_LANDED = 1;
+    int END_MANUAL = 2;
+    int END_REVOKED = 3;
+    int END_LIFECYCLE = 4;
 
     boolean isActive();
 
@@ -44,6 +58,16 @@ public interface FlightState {
     boolean hasLeftGround();
 
     void setHasLeftGround(boolean hasLeftGround);
+
+    /** True when this flight session started from a grounded activation. */
+    boolean wasLaunchedFromGround();
+
+    void setLaunchedFromGround(boolean launchedFromGround);
+
+    /** One of the {@code END_*} constants. */
+    int getLastEndReason();
+
+    void setLastEndReason(int reason);
 
     boolean hadNoGravity();
 

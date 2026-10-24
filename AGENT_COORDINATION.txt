@@ -310,3 +310,45 @@ Criterios:
 - Pendente: homologacao visual humana da aba LORE e dos novos selos/motivos de recusa.
 - Publicacao: commit `2542676b27b44aca97ee80a39213871c33626bd9` publicado com push normal;
   `git ls-remote` confirmou o SHA remoto.
+
+ASC-015
+Titulo: Overhaul de voo, fisica aerea, animacao procedural, manobras e camera
+Status: REVIEW
+Prioridade: ALTA
+Dependencia: ASC-013, ASC-014
+Arquivos principais: flight/FlightMotionSample.java, flight/FlightAnimationSelector.java,
+  flight/FlightPoseLibrary.java, flight/FlightPose.java, flight/FlightController.java,
+  flight/FlightNetwork.java, flight/FlightClientPackets.java, flight/FlightState.java,
+  flight/PlayerFlightState.java, flight/FlightTuning.java, flight/FlightGameTests.java,
+  flight/client/FlightAnimationController.java, flight/client/FlightPoseRenderer.java,
+  flight/client/FlightCameraController.java; FlightRenderEvents.java removido.
+Arquivos NAO tocados: catalogo, trajes, packs, poderes, locomocao terrestre e speedster.
+Criterios:
+- [x] Preservar voo 3D guiado pela camera, inercia, aceleracao/desaceleracao, frenagem,
+  subida/mergulho, colisao, limites, autoridade do servidor e restauracao de gravidade.
+- [x] Decolagem com antecipacao, impulso autoritativo, extensao e estabilizacao, com
+  duracao diferente no solo e no ar.
+- [x] Hover com estabilidade real e pose viva (corpo, bracos, pernas e cabeca).
+- [x] Pouso com aproximacao, contato e recuperacao; motivo de fim sincronizado.
+- [x] Banco derivado da trajetoria real e camera usando o mesmo banco, sem roll duplo.
+- [x] Pitch local da cabeca derivado do torso, limitado, com yaw/roll e sem deslocamento
+  artificial; pivo no centro do tronco.
+- [x] Estados com histerese/dwell e cobertura de aceleracao, boost, frenagem, subida,
+  mergulho, curva, manobra e pouso.
+- [x] FOV suavizado por tick e interpolado por partialTick; opcoes restauraveis.
+- [x] Protocolo "3" com payload completo e correcao da velocidade remota.
+- [x] Roll de 360 graus preservado; loop vertical e reversao de 180 graus avaliados e
+  bloqueados por falta de trajetoria segura com colisao verificada.
+- [x] GameTests de transicoes, limites, fisica, rede e ciclo de vida; 80/80 aprovados.
+- Validacao final (arvore estavel, sobre `e870892`): `compileJava` e `build`
+  BUILD SUCCESSFUL; `runGameTestServer` "All 80 required tests passed"; `runClient`
+  smoke entrou no mundo com protocolo "3", mixins de jogador aplicados e sem crash;
+  `git diff --check` sem erros de conteudo.
+- [ ] Homologacao visual humana em cliente grafico.
+- [ ] Autorizacao do dono do projeto para publicar.
+- Nota: o agente do speedster commitou o proprio lote como `e870892` antes da
+  validacao final; esse trabalho nao pertence a este lote e foi preservado.
+- Pos-validacao: outro agente iniciou um novo lote de speedster/UI as 22:19; a arvore
+  compartilhada pode ficar temporariamente vermelha em `PowerCatalogScreen.java`, fora
+  do escopo e dos arquivos deste lote.
+- Publicacao: pendente de autorizacao; nenhum commit/push do lote de voo.

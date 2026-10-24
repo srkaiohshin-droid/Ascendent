@@ -6,6 +6,8 @@ final class PlayerFlightState implements FlightState {
     private long lastInputGameTick = Long.MIN_VALUE;
     private boolean hasLeftGround;
     private boolean hadNoGravity;
+    private boolean launchedFromGround;
+    private int lastEndReason = END_NONE;
     private int maneuverKind = MANEUVER_NONE;
     private int maneuverDirection;
     private int maneuverTicksRemaining;
@@ -24,6 +26,8 @@ final class PlayerFlightState implements FlightState {
         if (active && !this.active) {
             inputMask = 0;
             lastInputGameTick = Long.MIN_VALUE;
+            launchedFromGround = false;
+            lastEndReason = END_NONE;
         }
         this.active = active;
         if (!active) {
@@ -83,6 +87,26 @@ final class PlayerFlightState implements FlightState {
     @Override
     public void setHasLeftGround(boolean hasLeftGround) {
         this.hasLeftGround = hasLeftGround;
+    }
+
+    @Override
+    public boolean wasLaunchedFromGround() {
+        return launchedFromGround;
+    }
+
+    @Override
+    public void setLaunchedFromGround(boolean launchedFromGround) {
+        this.launchedFromGround = launchedFromGround;
+    }
+
+    @Override
+    public int getLastEndReason() {
+        return lastEndReason;
+    }
+
+    @Override
+    public void setLastEndReason(int reason) {
+        lastEndReason = isValidEndReason(reason) ? reason : END_NONE;
     }
 
     @Override
@@ -207,6 +231,8 @@ final class PlayerFlightState implements FlightState {
         lastInputGameTick = Long.MIN_VALUE;
         hasLeftGround = false;
         hadNoGravity = false;
+        launchedFromGround = false;
+        lastEndReason = END_NONE;
         inverted = false;
         clearManeuver();
         maneuverCooldownTicks = 0;
@@ -216,5 +242,9 @@ final class PlayerFlightState implements FlightState {
 
     private static boolean isValidKind(int kind) {
         return kind == MANEUVER_ROLL_360 || kind == MANEUVER_LOOP || kind == MANEUVER_ROLL_180;
+    }
+
+    private static boolean isValidEndReason(int reason) {
+        return reason >= END_NONE && reason <= END_LIFECYCLE;
     }
 }

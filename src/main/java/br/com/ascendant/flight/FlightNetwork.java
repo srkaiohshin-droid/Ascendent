@@ -13,7 +13,8 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import java.util.function.Supplier;
 
 public final class FlightNetwork {
-    private static final String PROTOCOL = "2";
+    /** Bumped whenever the state payload changes so mismatched peers fail fast. */
+    private static final String PROTOCOL = "3";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(Ascendant.MOD_ID, "flight"), () -> PROTOCOL,
             PROTOCOL::equals, PROTOCOL::equals);
@@ -51,20 +52,26 @@ public final class FlightNetwork {
     }
 
     static void syncState(ServerPlayer player) {
-        FlightState state = FlightController.getState(player);
-        boolean active = state != null && state.isActive();
-        CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player),
-                new FlightStateUpdate(player.getId(), active, player.isNoGravity(),
-                        state == null ? 0 : state.getManeuverDirection(),
-                        state == null ? 0 : state.getManeuverTicksRemaining()));
+        CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player), stateUpdate(player));
     }
 
     static void syncTrackedPlayer(ServerPlayer recipient, ServerPlayer target) {
-        FlightState state = FlightController.getState(target);
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> recipient),
-                new FlightStateUpdate(target.getId(), state != null && state.isActive(), target.isNoGravity(),
-                        state == null ? 0 : state.getManeuverDirection(),
-                        state == null ? 0 : state.getManeuverTicksRemaining()));
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> recipient), stateUpdate(target));
+    }
+
+    private static FlightStateUpdate stateUpdate(ServerPlayer player) {
+        FlightState state = FlightController.getState(player);
+        boolean active = state != null && state.isActive();
+        int kind = state == null ? FlightState.MANEUVER_NONE : state.getManeuverKind();
+        int direction = state == null ? 0 : state.getManeuverDirection();
+        int ticks = state == null ? 0 : state.getManeuverTicksRemaining();
+        boolean inverted = state != null && state.isInverted();
+        boolean groundLaunch = state != null && state.wasLaunchedFromGround();
+        int endReason = state == null ? FlightState.END_NONE : state.getLastEndReason();
+        float impulse = active && groundLaunch
+                ? (float) (double) FlightTuning.TAKEOFF_IMPULSE.get() : 0.0F;
+        return new FlightStateUpdate(player.getId(), active, player.isNoGravity(), kind,
+                direction, ticks, inverted, groundLaunch, endReason, impulse);
     }
 
     private static void handleToggle(ToggleRequest message, Supplier<NetworkEvent.Context> context) {
@@ -104,8 +111,10 @@ public final class FlightNetwork {
         NetworkEvent.Context ctx = context.get();
         ctx.enqueueWork(() -> net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(
                 net.minecraftforge.api.distmarker.Dist.CLIENT,
-                () -> () -> FlightClientPackets.update(message.entityId(), message.active(), message.noGravity(),
-                        message.maneuverDirection(), message.maneuverTicksRemaining())));
+                () -> () -> FlightClientPackets.update(message.entityId(), message.active(),
+                        message.noGravity(), message.maneuverKind(), message.maneuverDirection(),
+                        message.maneuverTicksRemaining(), message.inverted(), message.launchedFromGround(),
+                        message.endReason(), message.takeoffImpulse())));
         ctx.setPacketHandled(true);
     }
 
@@ -151,19 +160,29 @@ public final class FlightNetwork {
         }
     }
 
-    private record FlightStateUpdate(int entityId, boolean active, boolean noGravity,
-                                     int maneuverDirection, int maneuverTicksRemaining) {
-        private static void encode(FlightStateUpdate message, FriendlyByteBuf buffer) {
+    /** Package-visible so the GameTests can round-trip the real payload. */
+    record FlightStateUpdate(int entityId, boolean active, boolean noGravity,
+                             int maneuverKind, int maneuverDirection, int maneuverTicksRemaining,
+                             boolean inverted, boolean launchedFromGround, int endReason,
+                             float takeoffImpulse) {
+        static void encode(FlightStateUpdate message, FriendlyByteBuf buffer) {
             buffer.writeVarInt(message.entityId());
             buffer.writeBoolean(message.active());
             buffer.writeBoolean(message.noGravity());
+            buffer.writeByte(message.maneuverKind());
             buffer.writeByte(message.maneuverDirection());
             buffer.writeByte(message.maneuverTicksRemaining());
+            buffer.writeBoolean(message.inverted());
+            buffer.writeBoolean(message.launchedFromGround());
+            buffer.writeByte(message.endReason());
+            buffer.writeFloat(message.takeoffImpulse());
         }
 
-        private static FlightStateUpdate decode(FriendlyByteBuf buffer) {
+        static FlightStateUpdate decode(FriendlyByteBuf buffer) {
             return new FlightStateUpdate(buffer.readVarInt(), buffer.readBoolean(), buffer.readBoolean(),
-                    buffer.readByte(), buffer.readUnsignedByte());
+                    buffer.readUnsignedByte(), buffer.readByte(), buffer.readUnsignedByte(),
+                    buffer.readBoolean(), buffer.readBoolean(), buffer.readUnsignedByte(),
+                    buffer.readFloat());
         }
 
         private static void handle(FlightStateUpdate message, Supplier<NetworkEvent.Context> context) {

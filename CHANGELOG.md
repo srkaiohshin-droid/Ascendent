@@ -175,3 +175,43 @@
   passed"; `build` BUILD SUCCESSFUL; `git diff --check` sem erros; smoke de `runClient`
   entrou no mundo integrado e encerrou com BUILD SUCCESSFUL. Sem inspecao visual humana.
 - Fronteira: nenhum arquivo de voo/animacao/camera/render foi alterado neste lote.
+
+## 0.1.0 - Overhaul de voo, animacao, manobras e camera (2026-10-23)
+- `FlightMotionSample` centraliza a telemetria de um tick (velocidade, aceleracao,
+  heading real, erro de mira, banco, frenagem, boost, manobra e pouso).
+- `FlightAnimationSelector` classifica o estado com histerese e dwell minimo de 3 ticks;
+  manobra, pouso, decolagem e frenagem tem prioridade sobre estados comuns.
+- Novas poses/estados: SLOW_FLIGHT, CRUISE, ACCELERATING, DECELERATING e LANDING, alem
+  do hover com respiracao real de corpo, bracos, pernas e cabeca.
+- Decolagem com antecipacao, impulso vertical autoritativo
+  (`takeoffImpulse=0.32`), extensao e estabilizacao; 14 ticks no solo e 8 no ar.
+- Pouso com sonda de solo, aproximacao, contato e recuperacao de 12 ticks; motivo
+  `END_LANDED` distingue pouso de saida manual/revogacao/ciclo de vida.
+- Corpo rotacionado no centro do tronco (`FLIGHT_BODY_PIVOT_Y=1.0`) em vez do pivo de
+  joelho; cabeca usa angulo local derivado (`0.52 * bodyPitch`, limite -75..0), sem
+  copiar o pitch do torso nem deslocar a cabeca do pescoco.
+- Banco calculado pela mudanca real de heading horizontal, com suavizacao por tick;
+  camera usa o mesmo banco e o roll duplo de `FlightRenderEvents` foi removido.
+- FOV suavizado por tick cliente e interpolado por `partialTick`.
+- Protocolo de voo "3": estado sincroniza tipo/direcao/ticks da manobra, invertido,
+  decolagem do solo, motivo de fim e impulso. O cliente remoto usa o passo real de
+  posicao, sem multiplicador 3x.
+- Roll de 360 graus preservado. Loop vertical e reversao de 180 graus foram avaliados e
+  permanecem bloqueados: nao existe trajetoria circular/inversao com colisao verificada,
+  e um efeito visual isolado seria mecanica falsa.
+- Testes: 10 novos e 1 atualizado em `FlightGameTests`, incluindo pivo/cabeca, histerese,
+  prioridades, decolagem solo/ar, pouso, hover vivo, boost, motivo de fim e round-trip
+  do pacote completo; suite em 80/80 GameTests.
+- Validacao final (arvore estavel, sobre `e870892`): `compileJava` BUILD SUCCESSFUL;
+  `runGameTestServer` "All 80 required tests passed"; `build` BUILD SUCCESSFUL;
+  `git diff --check` sem erros de conteudo (avisos LF/CRLF).
+- Smoke de `runClient` (quickPlay em "New World"): entrou no mundo, mixins de jogador
+  aplicados, protocolo de voo "3" aceito nos dois lados e nenhum crash-report. Isso nao
+  substitui a inspecao visual humana.
+- Robustez final: offset de pescoco zerado fora do voo, picos de camera/FOV da manobra
+  comecam e terminam em zero, boost exige velocidade real e a sonda de pouso nao dispara
+  em hover baixo.
+- Sem homologacao visual humana; o smoke de `runClient` nao substitui essa inspecao.
+- O agente do speedster commitou o proprio lote como `e870892`; ele nao faz parte deste
+  lote de voo.
+- Publicacao: pendente de autorizacao do dono do projeto; nenhum commit/push deste lote.

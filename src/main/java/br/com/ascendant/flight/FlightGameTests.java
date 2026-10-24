@@ -5,10 +5,12 @@ import br.com.ascendant.powers.IPlayerPowerData;
 import br.com.ascendant.powers.PlayerPowerDataProvider;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
+import io.netty.buffer.Unpooled;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
@@ -346,12 +348,19 @@ public final class FlightGameTests {
                 "Legs must trail behind the horizontal body");
         helper.assertTrue(Math.abs(heroic.bodyRollDegrees) < 0.001F,
                 "Straight flight must not bank");
-        helper.assertTrue(heroic.headXRotDegrees <= heroic.bodyPitchDegrees,
-                "The head must counter-rotate the pitched body so the face looks forward");
-        helper.assertTrue(heroic.headXRotDegrees < -70.0F,
-                "The neck must extend enough to lift the face off the ground");
-        helper.assertTrue(heroic.headXRotDegrees >= -110.0F,
-                "The neck extension must stay within a limited range");
+        helper.assertTrue(heroic.headXRotDegrees > heroic.bodyPitchDegrees,
+                "The local neck angle must be less extreme than the torso pitch instead of copying it");
+        helper.assertTrue(heroic.headXRotDegrees <= -30.0F && heroic.headXRotDegrees >= -55.0F,
+                "A horizontal body should use the vanilla-style local neck angle, not fold the head into the chest");
+        helper.assertTrue(heroic.headXRotDegrees >= FlightPoseLibrary.MIN_HEAD_PITCH
+                        && heroic.headXRotDegrees <= FlightPoseLibrary.MAX_HEAD_PITCH,
+                "The local head pitch must stay inside the configured neck limit");
+        helper.assertTrue(heroic.headYRotDegrees >= -FlightPoseLibrary.MAX_HEAD_YAW
+                        && heroic.headYRotDegrees <= FlightPoseLibrary.MAX_HEAD_YAW,
+                "The local head yaw must stay bounded");
+        helper.assertTrue(heroic.headZRotDegrees >= -FlightPoseLibrary.MAX_HEAD_ROLL
+                        && heroic.headZRotDegrees <= FlightPoseLibrary.MAX_HEAD_ROLL,
+                "The local head roll must stay bounded");
         helper.succeed();
     }
 
@@ -509,6 +518,221 @@ public final class FlightGameTests {
                 "Exit must target vanilla arm rotations");
         helper.assertTrue(exit.rightLegXRot == 0.0F && exit.leftLegXRot == 0.0F,
                 "Exit must target vanilla leg rotations");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void flightPivotIsAtTheTorsoAndHeadUsesALocalNeckAngle(GameTestHelper helper) {
+        helper.assertTrue(FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y > FlightPoseLibrary.BODY_PIVOT_Y + 0.2F,
+                "Flight must pivot above the locomotion knee-height pivot");
+        helper.assertTrue(FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y >= 0.9F
+                        && FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y <= 1.1F,
+                "The flight pivot should sit at the vanilla torso centre");
+
+        float horizontalHead = FlightPoseLibrary.headPitchForBody(-90.0F);
+        helper.assertTrue(horizontalHead >= -50.0F && horizontalHead <= -40.0F,
+                "A horizontal torso must use the vanilla-style local neck angle near -45 degrees");
+        helper.assertTrue(horizontalHead > -90.0F,
+                "The head must not copy the full torso rotation");
+        helper.assertTrue(horizontalHead >= FlightPoseLibrary.MIN_HEAD_PITCH
+                        && horizontalHead <= FlightPoseLibrary.MAX_HEAD_PITCH,
+                "The derived head pitch must respect the neck limit");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void selectorUsesHysteresisAndMinimumDwell(GameTestHelper helper) {
+        FlightMotionSample hoverBand = FlightMotionSample.builder()
+                .active(true).activeTicks(20).speed(0.10F).build();
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HOVER, 5, hoverBand)
+                        == FlightAnimationState.HOVER,
+                "Hover must survive inside the exit band instead of flickering at the enter threshold");
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.SLOW_FLIGHT, 5,
+                        hoverBand.withBank(0.0F)) == FlightAnimationState.SLOW_FLIGHT
+                        || hoverBand.speed() >= FlightAnimationSelector.SLOW_EXIT_SPEED,
+                "Hysteresis must keep the prior state while the sample remains in its band");
+
+        FlightMotionSample cruiseBand = FlightMotionSample.builder()
+                .active(true).activeTicks(20).speed(0.47F).build();
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.CRUISE, 5, cruiseBand)
+                        == FlightAnimationState.CRUISE,
+                "Cruise must survive above its lower exit threshold");
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HEROIC_FLIGHT, 5, cruiseBand)
+                        == FlightAnimationState.HEROIC_FLIGHT,
+                "Heroic flight must not enter cruise below the higher enter threshold");
+
+        FlightMotionSample slow = FlightMotionSample.builder()
+                .active(true).activeTicks(20).speed(0.02F).build();
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HEROIC_FLIGHT, 1, slow)
+                        == FlightAnimationState.HEROIC_FLIGHT,
+                "A lower-priority state must not replace the current state before the dwell expires");
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HEROIC_FLIGHT, 3, slow)
+                        == FlightAnimationState.HOVER,
+                "The state may change once the minimum dwell has elapsed");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void criticalStatesInterruptOrdinaryOnes(GameTestHelper helper) {
+        FlightMotionSample maneuver = FlightMotionSample.builder()
+                .active(true).activeTicks(2).speed(0.60F).maneuvering(true).build();
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.TAKEOFF, 1, maneuver)
+                        == FlightAnimationState.MANEUVER,
+                "A server-authorised maneuver must override takeoff and ordinary poses");
+
+        FlightMotionSample landing = FlightMotionSample.builder()
+                .active(true).activeTicks(30).speed(0.60F).braking(true)
+                .landing(0.8F, 0.6F).build();
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.BRAKING, 1, landing)
+                        == FlightAnimationState.LANDING,
+                "Ground approach must override braking when the landing pose is active");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void groundAndAirTakeoffUseDifferentDurationsAndBothReachHeroic(GameTestHelper helper) {
+        FlightMotionSample groundFirst = FlightMotionSample.builder()
+                .active(true).activeTicks(1).launchedFromGround(true).speed(0.20F).build();
+        FlightMotionSample groundLast = FlightMotionSample.builder()
+                .active(true).activeTicks(FlightPoseLibrary.TAKEOFF_GROUND_TICKS)
+                .launchedFromGround(true).speed(0.20F).build();
+        FlightMotionSample airFirst = FlightMotionSample.builder()
+                .active(true).activeTicks(1).launchedFromGround(false).speed(0.20F).build();
+
+        helper.assertTrue(FlightAnimationSelector.takeoffTicks(groundFirst)
+                        == FlightPoseLibrary.TAKEOFF_GROUND_TICKS,
+                "A grounded launch must use the longer anticipation window");
+        helper.assertTrue(FlightAnimationSelector.takeoffTicks(airFirst)
+                        == FlightPoseLibrary.TAKEOFF_AIR_TICKS,
+                "An airborne activation must use the shorter extension window");
+
+        FlightPose first = FlightPoseLibrary.target(FlightAnimationState.TAKEOFF, groundFirst);
+        FlightPose last = FlightPoseLibrary.target(FlightAnimationState.TAKEOFF, groundLast);
+        FlightPose heroic = FlightPoseLibrary.target(FlightAnimationState.HEROIC_FLIGHT, groundLast);
+        helper.assertTrue(last.bodyPitchDegrees < first.bodyPitchDegrees,
+                "Ground takeoff must progressively lower the torso towards horizontal");
+        helper.assertTrue(Math.abs(last.bodyPitchDegrees - heroic.bodyPitchDegrees) < 0.001F,
+                "Ground takeoff must finish exactly on the heroic body pitch");
+        helper.assertTrue(airFirst.launchedFromGround()
+                        == false,
+                "The air sample must remain tagged as an airborne activation");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void landingApproachAndRecoveryEndAtVanillaExactly(GameTestHelper helper) {
+        FlightMotionSample approach = FlightMotionSample.builder()
+                .active(false).landing(0.0F, 0.4F).build();
+        FlightMotionSample contact = FlightMotionSample.builder()
+                .active(false).landing(1.0F, 0.8F).build();
+        FlightMotionSample recovered = FlightMotionSample.builder()
+                .active(false).landing(1.0F, 0.8F).recovery(1.0F).build();
+
+        FlightPose approachPose = FlightPoseLibrary.target(FlightAnimationState.LANDING, approach);
+        FlightPose contactPose = FlightPoseLibrary.target(FlightAnimationState.LANDING, contact);
+        FlightPose recoveredPose = FlightPoseLibrary.target(FlightAnimationState.LANDING, recovered);
+
+        helper.assertTrue(contactPose.bodyPitchDegrees > approachPose.bodyPitchDegrees,
+                "Contact must raise the body from the descending approach");
+        helper.assertTrue(contactPose.bodyPitchDegrees > -20.0F,
+                "The contact pose must be nearly upright");
+        helper.assertTrue(recoveredPose.bodyPitchDegrees == 0.0F
+                        && recoveredPose.bodyRollDegrees == 0.0F
+                        && recoveredPose.rightArmXRot == 0.0F
+                        && recoveredPose.leftLegXRot == 0.0F,
+                "A completed landing recovery must target vanilla exactly, with no exit snap");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void hoverIdleArticulatesLimbsAndHeadWithoutAccumulating(GameTestHelper helper) {
+        FlightMotionSample early = FlightMotionSample.builder()
+                .active(true).activeTicks(10).speed(0.01F).build();
+        FlightMotionSample later = FlightMotionSample.builder()
+                .active(true).activeTicks(40).speed(0.01F).build();
+        FlightPose first = FlightPoseLibrary.target(FlightAnimationState.HOVER, early);
+        FlightPose second = FlightPoseLibrary.target(FlightAnimationState.HOVER, later);
+
+        helper.assertTrue(Math.abs(first.bodyPitchDegrees - second.bodyPitchDegrees) > 0.2F
+                        || Math.abs(first.headYRotDegrees - second.headYRotDegrees) > 0.2F
+                        || Math.abs(first.rightArmXRot - second.rightArmXRot) > 0.2F,
+                "Hover must keep breathing with the body and limbs instead of freezing");
+        helper.assertTrue(first.rightArmXRot >= -40.0F && first.rightArmXRot <= 20.0F,
+                "Hover arms must remain in a relaxed bounded range");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void boostPoseAndSelectorReflectRealSprintSpeed(GameTestHelper helper) {
+        FlightMotionSample boost = FlightMotionSample.builder()
+                .active(true).activeTicks(30).speed(0.90F).horizontalSpeed(0.90F)
+                .acceleration(0.05F).boosting(true).build();
+        FlightPose pose = FlightPoseLibrary.target(FlightAnimationState.ACCELERATING, boost);
+
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HEROIC_FLIGHT, 5, boost)
+                        == FlightAnimationState.ACCELERATING,
+                "Sprint boost must select the acceleration pose");
+        helper.assertTrue(pose.bodyPitchDegrees < -80.0F,
+                "Boost must stretch the body more horizontal than cruise");
+        helper.assertTrue(pose.rightArmXRot > -30.0F && pose.leftArmXRot > -30.0F,
+                "Boost must sweep the arms back along the body instead of pointing forward");
+        helper.assertTrue(Math.abs(pose.rightLegXRot) < 6.0F && Math.abs(pose.leftLegXRot) < 6.0F,
+                "Boost legs must trail close to the body");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void flightStatePreservesGroundLaunchAndEndReason(GameTestHelper helper) {
+        PlayerFlightState state = new PlayerFlightState();
+        state.setActive(true);
+        state.setLaunchedFromGround(true);
+        state.setLastEndReason(FlightState.END_LANDED);
+        helper.assertTrue(state.wasLaunchedFromGround(),
+                "The ground-launch flag must survive until the session ends");
+        helper.assertTrue(state.getLastEndReason() == FlightState.END_LANDED,
+                "The landing reason must be exposed to the presentation layer");
+
+        state.clear();
+        helper.assertTrue(!state.wasLaunchedFromGround(),
+                "Clearing the session must forget the previous launch origin");
+        helper.assertTrue(state.getLastEndReason() == FlightState.END_NONE,
+                "Clearing the session must reset the stored end reason");
+        state.setLastEndReason(FlightState.END_LIFECYCLE);
+        helper.assertTrue(state.getLastEndReason() == FlightState.END_LIFECYCLE,
+                "The controller must be able to record a reason after clearing");
+        state.setLastEndReason(99);
+        helper.assertTrue(state.getLastEndReason() == FlightState.END_NONE,
+                "Unknown end reasons must be ignored");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void flightStatePacketRoundTripsEveryField(GameTestHelper helper) {
+        FlightNetwork.FlightStateUpdate original = new FlightNetwork.FlightStateUpdate(
+                321, true, true, FlightState.MANEUVER_ROLL_360, -1,
+                FlightPoseLibrary.MANEUVER_TICKS - 2, true, true,
+                FlightState.END_LANDED, 0.32F);
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            FlightNetwork.FlightStateUpdate.encode(original, buffer);
+            FlightNetwork.FlightStateUpdate decoded = FlightNetwork.FlightStateUpdate.decode(buffer);
+            helper.assertTrue(decoded.equals(original),
+                    "The flight state packet must preserve activation, maneuver, launch and landing fields exactly");
+            helper.assertTrue(buffer.readableBytes() == 0,
+                    "The decoder must consume the complete state payload");
+        } finally {
+            buffer.release();
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void angleInterpolationTakesTheShortestArc(GameTestHelper helper) {
+        float wrapped = FlightPose.lerpAngleDegrees(350.0F, 10.0F, 0.5F);
+        helper.assertTrue(wrapped > 355.0F && wrapped < 365.0F,
+                "Interpolating across the wrap must continue forward instead of unwinding");
+        helper.assertTrue(FlightPose.lerpAngleDegrees(0.0F, 360.0F, 0.5F) == 0.0F,
+                "A full turn is the same orientation and must not interpolate backwards");
         helper.succeed();
     }
 }

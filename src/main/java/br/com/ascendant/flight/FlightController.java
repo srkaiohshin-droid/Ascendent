@@ -22,22 +22,27 @@ public final class FlightController {
             return false;
         }
         if (!requestedActive) {
-            deactivate(player, state);
+            deactivate(player, state, FlightState.END_MANUAL);
             FlightNetwork.syncState(player);
             return true;
         }
         if (!canActivate(player)) {
-            deactivate(player, state);
+            deactivate(player, state, state.isActive() ? FlightState.END_REVOKED : FlightState.END_NONE);
             FlightNetwork.syncState(player);
             return false;
         }
         SpeedsterController.deactivateForFlight(player);
         if (!state.isActive()) {
+            boolean groundLaunch = player.onGround();
             state.setHadNoGravity(player.isNoGravity());
             state.setActive(true);
-            state.setHasLeftGround(!player.onGround());
+            state.setLaunchedFromGround(groundLaunch);
+            state.setHasLeftGround(!groundLaunch);
             player.setNoGravity(true);
             player.resetFallDistance();
+            if (groundLaunch) {
+                applyTakeoffImpulse(player, FlightTuning.TAKEOFF_IMPULSE.get());
+            }
             FlightNetwork.syncState(player);
         }
         return true;
@@ -57,7 +62,7 @@ public final class FlightController {
         FlightState state = getState(player);
         if (state == null || !state.isActive() || !canMaintainFlight(player)) {
             if (state != null && state.isActive()) {
-                deactivate(player, state);
+                deactivate(player, state, FlightState.END_REVOKED);
                 FlightNetwork.syncState(player);
             }
             return;
@@ -93,7 +98,7 @@ public final class FlightController {
         ServerPlayer serverPlayer = player instanceof ServerPlayer server ? server : null;
         if (serverPlayer == null || !canMaintainFlight(player)) {
             if (serverPlayer != null) {
-                deactivate(player, state);
+                deactivate(player, state, FlightState.END_REVOKED);
                 FlightNetwork.syncState(serverPlayer);
             }
             return;
@@ -122,7 +127,7 @@ public final class FlightController {
                 && (state.getInputMask() & FlightState.ASCEND) == 0
                 && player.getXRot() >= -10.0F
                 && Math.abs(player.getDeltaMovement().y) <= FlightTuning.LANDING_SPEED.get()) {
-            deactivate(player, state);
+            deactivate(player, state, FlightState.END_LANDED);
             FlightNetwork.syncState(serverPlayer);
             return;
         }
@@ -142,7 +147,7 @@ public final class FlightController {
     public static void deactivateForLifecycle(Player player) {
         FlightState state = getState(player);
         if (state != null && state.isActive()) {
-            deactivate(player, state);
+            deactivate(player, state, FlightState.END_LIFECYCLE);
         }
     }
 
@@ -151,7 +156,10 @@ public final class FlightController {
      * Used when a power is revoked externally (e.g. via command).
      */
     public static void stopAndSyncForRevoke(ServerPlayer player) {
-        deactivateForLifecycle(player);
+        FlightState state = getState(player);
+        if (state != null && state.isActive()) {
+            deactivate(player, state, FlightState.END_REVOKED);
+        }
         FlightNetwork.syncState(player);
     }
 
@@ -165,6 +173,19 @@ public final class FlightController {
 
     public static FlightState getState(Player player) {
         return player.getCapability(FlightStateProvider.CAPABILITY).orElse(null);
+    }
+
+    /**
+     * Applies the shared vertical takeoff impulse. The server uses it for its
+     * own copy of the player and the owning client applies the same value from
+     * the synced state packet, so dedication servers and prediction agree.
+     */
+    public static void applyTakeoffImpulse(Player player, double impulse) {
+        if (impulse <= 0.0D || !player.onGround()) {
+            return;
+        }
+        Vec3 current = player.getDeltaMovement();
+        player.setDeltaMovement(current.x, Math.max(current.y, impulse), current.z);
     }
 
     public static boolean canMaintainFlight(Player player) {
@@ -192,9 +213,12 @@ public final class FlightController {
         );
     }
 
-    private static void deactivate(Player player, FlightState state) {
+    private static void deactivate(Player player, FlightState state, int reason) {
         boolean restoreNoGravity = state.hadNoGravity();
         state.clear();
+        // clear() wipes the session, so the presentation reason is recorded
+        // afterwards and travels in the same state packet as the deactivation.
+        state.setLastEndReason(reason);
         player.setNoGravity(restoreNoGravity);
         player.resetFallDistance();
 

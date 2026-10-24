@@ -15,6 +15,7 @@ public final class FlightTuning {
     public static final ForgeConfigSpec.DoubleValue BRAKING;
     public static final ForgeConfigSpec.DoubleValue HOVER_STABILITY;
     public static final ForgeConfigSpec.DoubleValue LANDING_SPEED;
+    public static final ForgeConfigSpec.DoubleValue TAKEOFF_IMPULSE;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -39,6 +40,8 @@ public final class FlightTuning {
                 .defineInRange("hoverStability", 0.12D, 0.02D, 0.5D);
         LANDING_SPEED = builder.comment("Maximum vertical speed for automatic shutdown after a flight landing.")
                 .defineInRange("landingSpeed", 0.12D, 0.01D, 0.4D);
+        TAKEOFF_IMPULSE = builder.comment("Initial server-authoritative upward impulse when flight starts from the ground, in blocks per tick.")
+                .defineInRange("takeoffImpulse", 0.32D, 0.0D, 0.8D);
         builder.pop();
         SPEC = builder.build();
     }

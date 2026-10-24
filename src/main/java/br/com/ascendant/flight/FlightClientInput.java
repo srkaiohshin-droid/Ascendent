@@ -128,15 +128,19 @@ public final class FlightClientInput {
         }
     }
 
+    /**
+     * Resets request latches after the authoritative packet has already applied
+     * the state. Applying {@code setActive} here as well would clear the end
+     * reason and the ground-launch flag that the same packet just carried.
+     */
     static void onServerState(boolean active) {
         requestPending = false;
         lastSentInput = -1;
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player != null) {
-            FlightState state = FlightController.getState(minecraft.player);
-            if (state != null) {
-                state.setActive(active);
-                if (!active) {
+        if (!active) {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null) {
+                FlightState state = FlightController.getState(minecraft.player);
+                if (state != null) {
                     state.clearInput();
                 }
             }

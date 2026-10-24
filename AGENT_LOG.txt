@@ -580,3 +580,77 @@ CATALOGO COM ESTADO REAL, ARQUIVO DE LORE E COBERTURA DE TRADUCAO (AGENTE 01, 20
   para `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o mesmo SHA
   no remoto. O push tambem publicou `f0226b9` e `3f51d41`, que ja estavam no historico
   local (trabalho do agente de animacao), sem alteracao de conteudo por este lote.
+
+OVERHAUL DE VOO, ANIMACAO, MANOBRAS E CAMERA (AGENTE DE VOO, 2026-10-23)
+- Auditoria antes de alterar: branch `srkaiohshin-droid-ascendant-gameplay-ui`, HEAD
+  `a2175b2`, nenhuma operacao destrutiva. O `.gitignore` ja estava modificado por outro
+  agente e foi preservado fora do lote.
+- Achados concretos:
+  1. O corpo girava em torno de um pivo na altura dos joelhos (`6/16`) em vez do tronco.
+  2. O pitch local da cabeca quase copiava o pitch do corpo (heroic -78/-80), em vez da
+     referencia vanilla de corpo horizontal com cabeca local perto de -45.
+  3. Dois handlers de camera somavam roll, produzindo roll duplo.
+  4. A selecao de estado nao tinha histerese nem dwell; varios estados nunca eram
+     escolhidos e o resultado podia piscar nos limiares.
+  5. A decolagem nao distinguia solo de ar e nao tinha impulso; o estado de rede fixava
+     roll-360 e omitia tipo, invertido, origem e motivo de fim.
+  6. O FOV era suavizado por frame, dependendo de FPS.
+  7. A velocidade remota era multiplicada por 3, acelerando a animacao de terceiros.
+  8. O hover nao articulava membros/cabeca e o pivo/pose de pouso nao existiam.
+- Implementado:
+  - `FlightMotionSample`: telemetria imutavel por tick, com velocidade horizontal,
+    pitch de trajetoria, aceleracao, heading real, erro de mira, banco, frenagem, boost,
+    manobra, pouso e recuperacao.
+  - `FlightAnimationSelector`: histerese de hover/slow/cruise, limiares de curva/subida/
+    mergulho, dwell minimo de 3 ticks e prioridade para manobra/pouso/decolagem/frenagem.
+  - `FlightPoseLibrary` reescrita: poses de hover vivo, slow, cruise, aceleracao,
+    desaceleracao, boost, frenagem, subida, mergulho, curva, manobra, decolagem solo/ar e
+    pouso. Pivo `FLIGHT_BODY_PIVOT_Y=1.0`; cabeca local `0.52*bodyPitch` limitada a
+    -75..0, yaw +/-18, roll +/-12 e pescoco limitado a 0.35 px.
+  - `FlightController`: impulso `takeoffImpulse=0.32` quando a ativacao ocorre no solo,
+    flag de origem, motivo `END_LANDED` e aplicacao do impulso no cliente dono pelo
+    pacote sincronizado.
+  - `FlightNetwork` protocolo "3" e payload com kind/direction/ticks, inverted,
+    launchedFromGround, endReason e takeoffImpulse. `FlightClientPackets` nao limpa mais
+    o motivo/origem recem-chegados.
+  - `FlightAnimationController`: telemetria real, banco suavizado da trajetoria, pouso
+    com sonda, recuperacao de 12 ticks, roll de manobra por arco mais curto e correcao
+    da velocidade remota (passo real, sem 3x).
+  - `FlightPoseRenderer`/mixins: pivo no tronco, roll combinado com manobra, cabeca local
+    em X/Y/Z, `hat` copiado e retorno seguro para vanilla.
+  - `FlightCameraController` unico dono de camera/FOV; `FlightRenderEvents` removido;
+    FOV suavizado por tick e interpolado por partialTick.
+  - Loop vertical e reversao de 180 graus avaliados e mantidos bloqueados por falta de
+    fisica de trajetoria com colisao verificada; roll de 360 graus preservado.
+- GameTests novos/atualizados: pivo/cabeca, histerese/dwell, prioridades, decolagem
+  solo/ar, pouso/recuperacao, hover vivo, boost, motivo/fim e round-trip do pacote.
+- Ajustes finais apos a revisao:
+  - O offset de pescoco e calculado diretamente do sample interpolado e zerado quando a
+    pose de voo termina; antes ele podia depender do FPS e ficar preso no modelo.
+  - O pico de FOV e o roll de camera da manobra comecam e terminam em zero, sem pop no
+    ultimo tick.
+  - A pose de boost so e escolhida com velocidade real; segurar sprint parado mantem o
+    hover em vez de simular um voo em alta velocidade.
+  - A sonda de pouso nao dispara em hover baixo e estavel normal.
+- Validacao final (arvore estavel, sobre o commit speedster `e870892`):
+  - `compileJava`: BUILD SUCCESSFUL.
+  - `runGameTestServer`: "All 80 required tests passed" (BUILD SUCCESSFUL).
+  - `build`: BUILD SUCCESSFUL.
+  - `runClient` smoke com quickPlay em "New World": entrou no mundo,
+    `HumanoidModelMixin`/`PlayerRendererMixin` aplicados, canal `ascendant:flight`
+    versao "3" aceito nos dois lados, sem crash-report e sem erro de voo no log.
+  - `git diff --check`: sem erros de conteudo (apenas avisos LF/CRLF).
+- Limitacoes e honestidade:
+  - Nenhuma homologacao visual humana de decolagem, hover, voo, boost, frenagem, pouso,
+    manobra, cabeca/torso ou camera/FOV. O smoke de cliente nao substitui essa inspecao.
+  - O agente do speedster commitou o proprio lote como `e870892` durante este trabalho;
+    esse commit ja esta no historico e nao faz parte do overhaul de voo.
+  - Loop/reversao continuam pendentes de fisica segura; nao foi entregue efeito visual
+    apresentado como mecanica real.
+- Git: alteracoes de voo e documentacao nao commitadas; o `.gitignore` modificado por
+  outro agente foi preservado. Commit/push deste lote aguardam autorizacao do dono.
+- Pos-validacao: as 22:19-22:21 outro agente iniciou um novo lote de speedster/UI
+  (`Ascendant.java`, `PowerCatalogScreen.java`, keybinds de speedster). Uma rechecagem
+  de `compileJava` nesse intervalo falhou apenas em `PowerCatalogScreen.java`, que ainda
+  estava sendo editado; esses arquivos nao pertencem ao lote de voo e nao foram tocados.
+- Proximo passo: homologacao visual humana e autorizacao do dono para publicar.

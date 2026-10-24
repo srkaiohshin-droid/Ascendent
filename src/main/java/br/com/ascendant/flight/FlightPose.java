@@ -16,10 +16,10 @@ package br.com.ascendant.flight;
  *       larger negative values dive, values closer to 0 climb.</li>
  *   <li>{@code bodyRollDegrees > 0} banks to the player's right.</li>
  *   <li>{@code headXRotDegrees} is the absolute local head rotation. A
- *       horizontal body needs roughly -90 degrees so the face looks along the
- *       flight direction instead of at the ground. {@code headYRotDegrees}
- *       looks into a turn and {@code headZRotDegrees} keeps the head level
- *       while the body banks.</li>
+ *       horizontal body needs roughly -45 degrees so the face looks along the
+ *       flight direction instead of at the ground, matching the vanilla elytra
+ *       reference. {@code headYRotDegrees} looks into a turn and
+ *       {@code headZRotDegrees} keeps the head level while the body banks.</li>
  *   <li>{@code bodyLift} is measured in the pre-flip model frame of
  *       {@code setupRotations}; positive values lower the horizontal body.</li>
  * </ul>
@@ -126,11 +126,11 @@ public final class FlightPose {
         }
         return new FlightPose(
                 lerp(from.bodyPitchDegrees, to.bodyPitchDegrees, delta),
-                lerpAngle(from.bodyRollDegrees, to.bodyRollDegrees, delta),
+                lerpAngleDegrees(from.bodyRollDegrees, to.bodyRollDegrees, delta),
                 lerp(from.bodyLift, to.bodyLift, delta),
                 lerp(from.headXRotDegrees, to.headXRotDegrees, delta),
-                lerpAngle(from.headYRotDegrees, to.headYRotDegrees, delta),
-                lerpAngle(from.headZRotDegrees, to.headZRotDegrees, delta),
+                lerpAngleDegrees(from.headYRotDegrees, to.headYRotDegrees, delta),
+                lerpAngleDegrees(from.headZRotDegrees, to.headZRotDegrees, delta),
                 lerp(from.rightArmXRot, to.rightArmXRot, delta),
                 lerp(from.rightArmYRot, to.rightArmYRot, delta),
                 lerp(from.rightArmZRot, to.rightArmZRot, delta),
@@ -150,11 +150,11 @@ public final class FlightPose {
     }
 
     /**
-     * Interpolates a whole-body roll along the shortest arc. This keeps a
-     * 360-degree maneuver from unwinding backwards when it ends and the target
-     * returns to the ordinary bank angle.
+     * Interpolates an angle along the shortest arc. This keeps a 360-degree
+     * maneuver from unwinding backwards when it ends and the target returns to
+     * the ordinary bank angle.
      */
-    private static float lerpAngle(float from, float to, float delta) {
+    public static float lerpAngleDegrees(float from, float to, float delta) {
         float difference = (to - from) % 360.0F;
         if (difference > 180.0F) {
             difference -= 360.0F;

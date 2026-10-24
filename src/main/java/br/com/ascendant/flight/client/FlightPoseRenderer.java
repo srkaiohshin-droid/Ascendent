@@ -15,12 +15,19 @@ import net.minecraft.world.entity.player.Player;
  * <p>The whole-body rotation is applied at the tail of {@code setupRotations},
  * inside the renderer's own pose-stack scope. This keeps the rotation entirely
  * visual: the entity position, hitbox, camera yaw, pitch and collision shape are
- * untouched. The injection point is before the renderer flips the model, so the
- * pitch sign is expressed in the model's own frame and the body is pivoted around
- * the torso instead of the feet.</p>
+ * untouched. The pivot is the torso centre ({@link
+ * FlightPoseLibrary#FLIGHT_BODY_PIVOT_Y}) rather than the old knee-height pivot,
+ * which is what kept the chest and legs from moving as one rigid plank.</p>
+ *
+ * <p>Head values are local neck angles. They are intentionally much smaller than
+ * the torso pitch, following the vanilla horizontal-flight reference, and are
+ * applied on all three axes so the head can look into a bank without detaching
+ * from the shoulders.</p>
  */
 public final class FlightPoseRenderer {
     private static final float DEG_TO_RAD = (float) (Math.PI / 180.0D);
+    /** Maximum forward neck shift in model pixels; purely cosmetic and bounded. */
+    private static final float MAX_NECK_SHIFT = 0.35F;
 
     private FlightPoseRenderer() {
     }
@@ -43,12 +50,13 @@ public final class FlightPoseRenderer {
         // bodyLift is expressed in this pre-flip frame: positive values lower the
         // horizontal body into the middle of the player bounding box.
         poseStack.translate(0.0F, pose.bodyLift * weight, 0.0F);
-        poseStack.translate(0.0F, FlightPoseLibrary.BODY_PIVOT_Y, 0.0F);
-        // PoseStack post-multiplies: the Y rotation is applied to vertices first,
-        // so it banks around the body's long axis before the body is pitched.
+        poseStack.translate(0.0F, FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y, 0.0F);
+        // PoseStack post-multiplies, so the Y rotation is applied to vertices
+        // first and banks around the torso's long axis before the body pitches.
         poseStack.mulPose(Axis.XP.rotationDegrees(pose.bodyPitchDegrees * weight));
-        poseStack.mulPose(Axis.YP.rotationDegrees(pose.bodyRollDegrees * weight));
-        poseStack.translate(0.0F, -FlightPoseLibrary.BODY_PIVOT_Y, 0.0F);
+        float bank = pose.bodyRollDegrees + sample.maneuverRollDegrees();
+        poseStack.mulPose(Axis.YP.rotationDegrees(bank * weight));
+        poseStack.translate(0.0F, -FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y, 0.0F);
         return true;
     }
 
@@ -59,10 +67,12 @@ public final class FlightPoseRenderer {
         }
         FlightPoseSample sample = FlightAnimationController.sample(player, partialTick);
         if (sample == null) {
+            resetNeckOffset(model);
             return false;
         }
         float weight = sample.weight();
         if (weight <= 1.0E-4F) {
+            resetNeckOffset(model);
             return false;
         }
         FlightPose pose = sample.pose();
@@ -81,15 +91,29 @@ public final class FlightPoseRenderer {
         model.leftLeg.yRot = lerp(model.leftLeg.yRot, radians(pose.leftLegYRot), weight);
         model.leftLeg.zRot = lerp(model.leftLeg.zRot, radians(pose.leftLegZRot), weight);
 
-        // A horizontal body would otherwise point the face at the ground. The
-        // head counter-rotates with the body; the small forward/up shift is the
-        // neck extension that keeps the rotated head clear of the chest.
+        // Local neck angles, not a copy of the torso pitch. The small forward
+        // shift is capped below half a model pixel so the head cannot slide off
+        // the chest or leave a gap.
         model.head.xRot = lerp(model.head.xRot, radians(pose.headXRotDegrees), weight);
-        float neckExtension = Math.min(1.0F, Math.max(0.0F, -pose.headXRotDegrees / 90.0F));
-        model.head.z = lerp(model.head.z, -2.5F * neckExtension, weight);
-        model.head.y = lerp(model.head.y, -1.0F * neckExtension, weight);
+        model.head.yRot = lerp(model.head.yRot, radians(pose.headYRotDegrees), weight);
+        model.head.zRot = lerp(model.head.zRot, radians(pose.headZRotDegrees), weight);
+        float neckExtension = Math.min(1.0F, Math.max(0.0F, -pose.headXRotDegrees / 75.0F));
+        // Set the offset directly from the interpolated tick sample. Lerping the
+        // previous value would make this cosmetic offset depend on the render
+        // frame rate and would leave it stuck after flight ends.
+        model.head.z = -MAX_NECK_SHIFT * neckExtension * weight;
         model.hat.copyFrom(model.head);
         return true;
+    }
+
+    /**
+     * Vanilla never resets {@code head.z}, so the flight offset must be cleared
+     * when the pose stops. The hat is a sibling part in 1.20.1 and needs the
+     * same reset or it would stay detached from the head.
+     */
+    private static void resetNeckOffset(HumanoidModel<?> model) {
+        model.head.z = 0.0F;
+        model.hat.z = 0.0F;
     }
 
     private static boolean isPoseVisible(Player player) {

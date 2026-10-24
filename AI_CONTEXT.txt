@@ -210,3 +210,53 @@ ESTADO VERIFICADO EM 2026-10-23 (CATALOGO, LORE E COBERTURA DE TRADUCAO)
 - Publicacao: commit `2542676b27b44aca97ee80a39213871c33626bd9` na branch
   `srkaiohshin-droid-ascendant-gameplay-ui`, com push normal e SHA remoto conferido por
   `git ls-remote`.
+
+ESTADO VERIFICADO EM 2026-10-23 (OVERHAUL DE VOO, ANIMACAO, MANOBRAS E CAMERA)
+- Escopo: apenas `flight/*`, `flight/client/*`, `FlightGameTests` e documentacao.
+  Catalogo, trajes, packs, poderes, locomocao terrestre e speedster nao foram
+  redesenhados por este lote.
+- Arquitetura: `FlightMotionSample` (telemetria imutavel por tick) alimenta
+  `FlightAnimationSelector` (histerese e dwell minimo de 3 ticks) e
+  `FlightPoseLibrary` (pose alvo). O controller cliente avanca uma vez por tick e o
+  render interpola por `partialTick`; nao ha animacao dependente de FPS nem rotacao
+  acumulada.
+- Corpo: pivo de voo em `FLIGHT_BODY_PIVOT_Y=1.0` (centro do tronco), separado do pivo
+  legado de locomocao `6/16`. Cabeca usa angulo local derivado do corpo
+  (`0.52 * bodyPitch`, limitado a -75..0), yaw/roll limitados e deslocamento de pescoco
+  maximo de 0.35 px; o hat copia a cabeca. Referencia horizontal vanilla: corpo ~-90 e
+  cabeca local ~-45; heroic usa corpo -78 e cabeca local ~-42.6.
+- Estados: HOVER, SLOW_FLIGHT, CRUISE, HEROIC_FLIGHT, TAKEOFF, CLIMB, DIVE, TURNING,
+  ACCELERATING, DECELERATING, BRAKING, MANEUVER e LANDING. Histerese de velocidade,
+  curva e subida/mergulho; prioridade para manobra, pouso, decolagem e frenagem.
+- Decolagem: origem no solo detectada no servidor; impulso vertical autoritativo
+  `takeoffImpulse=0.32`, sincronizado e aplicado pelo cliente dono; pose de
+  antecipacao/extensao/estabilizacao de 14 ticks no solo e 8 ticks no ar.
+- Pouso: sonda de solo, aproximacao/contato/recuperacao de 12 ticks; `END_LANDED`
+  escolhe a recuperacao em vez do blend simples de saida.
+- Banco: derivado da mudanca real de heading horizontal por tick, nao do yaw da camera.
+  A camera usa o mesmo banco suavizado do corpo; `FlightRenderEvents` foi removido para
+  eliminar o roll duplo.
+- Camera/FOV: `FlightCameraController` e o unico dono; FOV suavizado por tick cliente e
+  interpolado por `partialTick`; as opcoes continuam restauraveis.
+- Rede: protocolo de voo "3"; `FlightStateUpdate` envia tipo/direcao/ticks da manobra,
+  invertido, decolagem do solo, motivo de fim e impulso. Cliente remoto usa o passo real
+  de posicao, sem multiplicador 3x.
+- Manobras: roll de 360 graus preservado, autoritativo, com cooldown e interpolacao por
+  arco mais curto. Loop vertical e reversao de 180 graus NAO foram implementados: nao ha
+  trajetoria circular/inversao com colisao verificada, e um efeito visual isolado seria
+  mecanica falsa. As constantes permanecem reservadas e documentadas como bloqueadas.
+- Testes: `FlightGameTests` cobre pivo/cabeca, histerese/dwell, prioridades, decolagem
+  solo/ar, pouso/recuperacao, hover vivo, boost, motivo/fim de sessao, arco mais curto e
+  round-trip do pacote completo. `runGameTestServer`: "All 80 required tests passed".
+- Robustez: o offset de pescoco e recalculado por sample e zerado fora do voo; os picos
+  de FOV e roll de camera da manobra comecam/terminam em zero; a pose de boost exige
+  velocidade real; a sonda de pouso nao dispara em hover baixo estavel.
+- Validacao final (arvore estavel, sobre o commit speedster `e870892`): `compileJava` e
+  `build` BUILD SUCCESSFUL; `runGameTestServer` 80/80; `runClient` smoke com quickPlay em
+  "New World" entrou no mundo, aplicou os dois mixins de jogador, aceitou o canal
+  `ascendant:flight` versao "3" nos dois lados e nao gerou crash-report; `git diff
+  --check` sem erros de conteudo (avisos LF/CRLF).
+- Homologacao visual humana: nao realizada. Nao houve inspecao interativa de decolagem,
+  hover, boost, frenagem, pouso, manobra, cabeca/torso ou camera/FOV.
+- Publicacao: pendente de autorizacao do dono do projeto; nenhum commit/push deste lote.
+  O `.gitignore` modificado e os artefatos de outros agentes nao pertencem a este lote.

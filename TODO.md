@@ -120,3 +120,31 @@
   reais; o relatorio de cobertura deve continuar expondo esse gap ate la.
 - [x] Publicar o lote com push normal e confirmar o SHA remoto
   (`2542676b27b44aca97ee80a39213871c33626bd9`) via `git ls-remote`.
+
+## Overhaul de voo, animacao, manobras e camera (2026-10-23)
+- [x] Auditar fisica, estados, poses, pivo do corpo, cabeca, rede, camera e testes antes
+  de alterar; preservar voo 3D, inercia, frenagem, boost, colisao e autoridade do servidor.
+- [x] Criar `FlightMotionSample` e `FlightAnimationSelector` com histerese e dwell minimo.
+- [x] Reescrever a biblioteca de poses: hover vivo, slow/cruise/aceleracao/desaceleracao,
+  decolagem solo/ar, subida, mergulho, curva, boost, frenagem, manobra e pouso.
+- [x] Corrigir pivo para o centro do tronco e pitch local da cabeca (sem copiar o torso,
+  sem deslocamento e com yaw/roll/limites).
+- [x] Implementar impulso de decolagem autoritativo e sincronizado, com pose de
+  antecipacao/extensao/estabilizacao.
+- [x] Implementar aproximacao/contato/recuperacao de pouso e motivo `END_LANDED`.
+- [x] Derivar banco da trajetoria real; unificar camera/FOV em um unico controller e
+  eliminar o roll duplo.
+- [x] Elevar o protocolo para "3" e sincronizar manobra, invertido, solo, motivo e impulso.
+- [x] Corrigir a velocidade remota de animacao (sem multiplicador 3x).
+- [x] Adicionar/atualizar GameTests de estados, limites, fisica, rede e ciclo de vida;
+  suite em 80/80.
+- [x] Validar `compileJava`, `runGameTestServer` (80/80), `build` e `git diff --check`.
+- [x] Executar smoke de `runClient` (quickPlay em "New World"): mundo carregado,
+  protocolo "3" aceito nos dois lados, mixins de jogador aplicados, sem crash.
+- [x] Avaliar loop vertical e reversao de 180 graus: bloqueados por ausencia de trajetoria
+  segura com colisao verificada; roll de 360 graus preservado.
+- [ ] Homologacao visual humana de decolagem, hover, voo, boost, frenagem, pouso, manobra,
+  cabeca/torso e camera/FOV.
+- [ ] Implementar loop/reversao somente quando houver fisica de trajetoria segura e
+  testes de colisao; nao aceitar efeito visual como mecanica.
+- [ ] Autorizacao do dono do projeto para commit/push deste lote.
