@@ -23,6 +23,8 @@ import br.com.ascendant.suit.SuitManager;
 import br.com.ascendant.speedster.SpeedsterEvents;
 import br.com.ascendant.speedster.SpeedsterGameTests;
 import br.com.ascendant.speedster.SpeedsterTuning;
+import br.com.ascendant.speedster.client.SpeedsterClientInput;
+import br.com.ascendant.speedster.client.SpeedsterKeyBindings;
 import br.com.ascendant.test.FrameworkGameTests;
 import br.com.ascendant.tools.ContentValidator;
 import net.minecraftforge.common.MinecraftForge;
@@ -31,6 +33,7 @@ import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
@@ -62,6 +65,10 @@ public final class Ascendant {
         MinecraftForge.EVENT_BUS.register(PowerRuntimeEngine.class);
         MinecraftForge.EVENT_BUS.register(SuitManager.class);
         MinecraftForge.EVENT_BUS.register(SpeedsterEvents.class);
+        if (FMLEnvironment.dist.isClient()) {
+            FMLJavaModLoadingContext.get().getModEventBus().register(SpeedsterKeyBindings.class);
+            FMLJavaModLoadingContext.get().getModEventBus().register(SpeedsterClientInput.class);
+        }
 
         // Catalogs Initialization (500 powers, 500 abilities, modular suits)
         PowerCatalogData.registerAll();

@@ -16,6 +16,9 @@ import br.com.ascendant.power.AbilityDefinition;
 import br.com.ascendant.power.AbilityRegistry;
 import br.com.ascendant.power.PowerDefinition;
 import br.com.ascendant.power.PowerRegistry;
+import br.com.ascendant.speedster.SpeedsterLevel;
+import br.com.ascendant.speedster.SpeedsterState;
+import br.com.ascendant.speedster.SpeedsterStateProvider;
 import br.com.ascendant.suit.SuitDefinition;
 import br.com.ascendant.suit.SuitRegistry;
 import net.minecraft.client.Minecraft;
@@ -675,6 +678,9 @@ public class PowerCatalogScreen extends Screen {
                 "Server-authoritative powers, abilities and suits");
         graphics.drawString(font, ComicUi.fit(font, subtitle, width - 220), MARGIN, 30, theme.muted(), false);
 
+        // Speedster status line: level, kinetic energy, and cooldown readiness
+        renderSpeedsterStatus(graphics, theme, MARGIN, 42);
+
         String themeLabel = localized(theme.labelKey(), theme.id());
         int badgeWidth = font.width(themeLabel) + 8;
         int badgeX = width - MARGIN - badgeWidth;
@@ -699,6 +705,38 @@ public class PowerCatalogScreen extends Screen {
                     x + tabWidth / 2, TAB_Y + 5, selected ? theme.ink() : theme.muted());
             x += tabWidth + 4;
         }
+    }
+
+    private void renderSpeedsterStatus(GuiGraphics graphics, CatalogTheme theme, int x, int y) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            return;
+        }
+        SpeedsterState state = minecraft.player.getCapability(SpeedsterStateProvider.CAPABILITY).orElse(null);
+        if (state == null || state.getLevel() == SpeedsterLevel.NONE) {
+            return;
+        }
+        SpeedsterLevel level = state.getLevel();
+        String levelLabel = localized(level.translationKey(), level.key());
+        String activeText = state.isActive()
+                ? text("gui.ascendant.speedster.active", "Active")
+                : text("gui.ascendant.speedster.inactive", "Inactive");
+        String line = levelLabel + "  ·  " + activeText
+                + "  ·  KE " + Math.round(state.getKineticEnergy() * 100) + "%";
+        int dashCd = state.getDashCooldown();
+        if (dashCd > 0) {
+            line += "  ·  Dash " + dashCd + "t";
+        }
+        int percCd = state.getPerceptionCooldown();
+        if (percCd > 0) {
+            line += "  ·  Percep " + percCd + "t";
+        }
+        int ovlCd = state.getOverloadCooldown();
+        if (ovlCd > 0) {
+            line += "  ·  Overload " + ovlCd + "t";
+        }
+        graphics.drawString(font, ComicUi.fit(font, line, width - x - 100), x, y,
+                state.isActive() ? theme.accentBright() : theme.muted(), false);
     }
 
     private void renderSearchAndFilters(GuiGraphics graphics, CatalogTheme theme, int mouseX, int mouseY) {
