@@ -75,7 +75,7 @@ public final class SpeedsterEvents {
                 && event.getEntity() instanceof ServerPlayer recipient) {
             SpeedsterState state = SpeedsterController.getState(target);
             if (state != null) {
-                AscendantNetwork.syncSpeedsterState(recipient, target.getId(), state.isActive(), state.getLevel());
+                AscendantNetwork.syncSpeedsterState(recipient, target.getId(), state.isActive(), state.getLevel().id());
             }
         }
     }

@@ -1,5 +1,6 @@
 package br.com.ascendant.speedster.client;
 
+import br.com.ascendant.speedster.SpeedsterLevel;
 import br.com.ascendant.speedster.SpeedsterState;
 import br.com.ascendant.speedster.SpeedsterStateProvider;
 import net.minecraft.client.Minecraft;
@@ -18,7 +19,7 @@ public final class SpeedsterClientPackets {
         Entity entity = minecraft.level.getEntity(entityId);
         if (entity instanceof Player player) {
             player.getCapability(SpeedsterStateProvider.CAPABILITY).ifPresent(state -> {
-                state.setLevel(level);
+                state.setLevel(SpeedsterLevel.byId(level));
                 state.setActive(active);
             });
         }

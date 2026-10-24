@@ -2,10 +2,17 @@ package br.com.ascendant.speedster;
 
 final class PlayerSpeedsterState implements SpeedsterState {
     private boolean active;
-    private int level = MIN_LEVEL;
+    private SpeedsterLevel level = MIN_LEVEL;
     private int inputMask;
     private long lastInputGameTick = Long.MIN_VALUE;
     private long lastControlGameTick = Long.MIN_VALUE;
+    private double kineticEnergy;
+    private int dashCooldown;
+    private boolean dashing;
+    private boolean perceptionActive;
+    private int perceptionCooldown;
+    private boolean overloadActive;
+    private int overloadCooldown;
 
     @Override
     public boolean isActive() {
@@ -17,17 +24,21 @@ final class PlayerSpeedsterState implements SpeedsterState {
         this.active = active;
         if (!active) {
             clearInput();
+            setDashing(false);
         }
     }
 
     @Override
-    public int getLevel() {
+    public SpeedsterLevel getLevel() {
         return level;
     }
 
     @Override
-    public void setLevel(int level) {
-        this.level = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
+    public void setLevel(SpeedsterLevel level) {
+        this.level = level;
+        if (level == SpeedsterLevel.NONE) {
+            setKineticEnergy(0.0D);
+        }
     }
 
     @Override
@@ -72,10 +83,87 @@ final class PlayerSpeedsterState implements SpeedsterState {
     }
 
     @Override
+    public double getKineticEnergy() {
+        return kineticEnergy;
+    }
+
+    @Override
+    public void setKineticEnergy(double kinetic) {
+        this.kineticEnergy = Math.max(0.0D, Math.min(1.0D, kinetic));
+    }
+
+    @Override
+    public int getDashCooldown() {
+        return dashCooldown;
+    }
+
+    @Override
+    public void setDashCooldown(int ticks) {
+        this.dashCooldown = Math.max(0, ticks);
+    }
+
+    @Override
+    public boolean isDashing() {
+        return dashing;
+    }
+
+    @Override
+    public void setDashing(boolean dashing) {
+        this.dashing = dashing;
+    }
+
+    @Override
     public void clear() {
         active = false;
         level = MIN_LEVEL;
+        kineticEnergy = 0.0D;
+        dashCooldown = 0;
+        dashing = false;
+        perceptionActive = false;
+        perceptionCooldown = 0;
+        overloadActive = false;
+        overloadCooldown = 0;
         clearInput();
         lastControlGameTick = Long.MIN_VALUE;
+    }
+
+    @Override
+    public boolean isPerceptionActive() {
+        return perceptionActive;
+    }
+
+    @Override
+    public void setPerceptionActive(boolean active) {
+        this.perceptionActive = active;
+    }
+
+    @Override
+    public int getPerceptionCooldown() {
+        return perceptionCooldown;
+    }
+
+    @Override
+    public void setPerceptionCooldown(int ticks) {
+        this.perceptionCooldown = Math.max(0, ticks);
+    }
+
+    @Override
+    public boolean isOverloadActive() {
+        return overloadActive;
+    }
+
+    @Override
+    public void setOverloadActive(boolean active) {
+        this.overloadActive = active;
+    }
+
+    @Override
+    public int getOverloadCooldown() {
+        return overloadCooldown;
+    }
+
+    @Override
+    public void setOverloadCooldown(int ticks) {
+        this.overloadCooldown = Math.max(0, ticks);
     }
 }

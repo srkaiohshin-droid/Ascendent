@@ -80,7 +80,7 @@ public final class SpeedsterGameTests {
     public static void inputAndControlStateRejectReplayAndClearOnDeactivation(GameTestHelper helper) {
         PlayerSpeedsterState state = new PlayerSpeedsterState();
         state.setActive(true);
-        state.setLevel(11);
+            state.setLevel(SpeedsterLevel.TRANSCENDENTAL);
         helper.assertTrue(state.getLevel() == SpeedsterState.MAX_LEVEL,
                 "Speed level must be clamped to its supported range");
         helper.assertTrue(state.acceptInput(SpeedsterState.FORWARD | SpeedsterState.BOOST, 5L),
@@ -219,7 +219,7 @@ public final class SpeedsterGameTests {
             Vec3 stride = Vec3.ZERO;
             for (int tick = 0; tick < 40; tick++) {
                 stride = SpeedsterPhysics.nextVelocity(stride, 0.0F, SpeedsterState.FORWARD,
-                        state.getLevel(), 0.22D, 1.0D, 0.035D, 0.16D, 0.94D, 0.18D, 1.12D);
+                        state.getLevel().id(), 0.22D, 1.0D, 0.035D, 0.16D, 0.94D, 0.18D, 1.12D);
             }
             double startX = player.getX();
             double startZ = player.getZ();
