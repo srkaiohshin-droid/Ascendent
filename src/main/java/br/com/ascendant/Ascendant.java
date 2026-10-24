@@ -9,6 +9,7 @@ import br.com.ascendant.flight.FlightEvents;
 import br.com.ascendant.flight.FlightGameTests;
 import br.com.ascendant.flight.FlightNetwork;
 import br.com.ascendant.flight.FlightTuning;
+import br.com.ascendant.flight.client.FlightCaptureHarness;
 import br.com.ascendant.lore.NativeLoreData;
 import br.com.ascendant.network.AscendantNetwork;
 import br.com.ascendant.pack.PackManager;
@@ -68,6 +69,9 @@ public final class Ascendant {
         if (FMLEnvironment.dist.isClient()) {
             FMLJavaModLoadingContext.get().getModEventBus().register(SpeedsterKeyBindings.class);
             FMLJavaModLoadingContext.get().getModEventBus().register(SpeedsterClientInput.class);
+            if (FlightCaptureHarness.enabled()) {
+                MinecraftForge.EVENT_BUS.register(FlightCaptureHarness.class);
+            }
         }
 
         // Catalogs Initialization (500 powers, 500 abilities, modular suits)

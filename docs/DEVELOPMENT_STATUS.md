@@ -2,8 +2,8 @@
 
 > **Target Platform:** Minecraft Java 1.20.1 | Forge 47.3.0 | Java 17 (Temurin 17.0.20.1)  
 > **Package Base:** `br.com.ascendant`  
-> **Status Date:** 2026-10-20  
-> **Build Status:** BUILD SUCCESSFUL (Gradle 8.8, 32/32 GameTests Passing)
+> **Status Date:** 2026-10-23
+> **Build Status:** BUILD SUCCESSFUL (Gradle 8.8, 83/83 GameTests Passing)
 
 ---
 
@@ -306,3 +306,45 @@ o historico anterior.
   em `origin/srkaiohshin-droid-ascendant-gameplay-ui`.
 - SHA local e remoto conferidos como iguais em 2026-10-22.
 - Pendente apenas a inspecao visual humana da UI/radial em cliente grafico.
+
+---
+
+## 10. Loop vertical, reversao 180 e captura de voo (2026-10-23)
+
+### Mecanica
+- Loop vertical: circulo de 28 ticks no plano do heading de entrada, fechando no ponto e
+  na velocidade iniciais. Reversao: semicirculo horizontal de 18 ticks que termina um
+  diametro ao lado, virado para o heading oposto.
+- As duas manobras sao trajetorias analiticas do servidor. Nao existe camera ou pose
+  isolada apresentada como movimento; o deslocamento e o delta real da curva.
+- Entrada: velocidade minima 0.50 (loop) ou 0.40 (reversao), maxima 1.25, pitch <= 24
+  graus, erro de mira <= 32 graus e cooldown de 24 ticks.
+- Teclas G (loop) e H (reversao); A/D escolhe o lado da reversao, com direita como padrao.
+
+### Colisao e rede
+- `FlightManeuverSafety` varre a curva antes de iniciar com caixa `Pose.STANDING`,
+  clearance de 0.35 e 4 subpassos; bloco, fluido, borda, altura ou chunk nao carregado
+  recusam a manobra.
+- O servidor revalida o passo e aborta em contato, sem teleporte nem atravessar blocos.
+- Protocolo "4" sincroniza kind/direcao/ticks, yaw/velocidade de base e aborto. O cliente
+  so reproduz depois da autorizacao e usa progresso por tick, sem acumulo por frame.
+- O input vanilla e zerado nos dois lados durante a trajetoria para o caminho real
+  coincidir com o caminho verificado.
+
+### Apresentacao
+- O pitch do loop (0..360) e o banco da reversao (ate 30 graus) entram na pose; a camera
+  usa o mesmo banco, sem roll duplo. O fim normal converge para a pose de voo e o aborto
+  limpa a manobra imediatamente.
+- Traducoes en_us/pt_br cobrem teclas e recusas.
+
+### Captura e validacao
+- Harness dev-only ativado por `-Dascendant.flightCapture=true`, registrado apenas em
+  cliente de desenvolvimento; captura em terceira pessoa, GUI oculta, survival em y=220,
+  noon/clear.
+- Sessao `20261023-233605`: 16 PNGs e relatorio
+  `run/screenshots/ascendant-flight-capture.html`. Telemetria do loop
+  47.6/109.3/189.8/262.0/320.7 graus e da reversao 16.1/28.8/26.4/7.6 graus de banco.
+- `compileJava` e `build` BUILD SUCCESSFUL; `runGameTestServer` "All 83 required tests
+  passed"; `git diff --check` sem erros de conteudo (avisos LF/CRLF).
+- Limitacao: nao houve inspecao visual interativa humana. O pack de captura e evidencia
+  para homologacao, nao a substitui.

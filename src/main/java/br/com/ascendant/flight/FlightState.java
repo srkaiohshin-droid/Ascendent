@@ -22,16 +22,20 @@ public interface FlightState {
     /** Aileron roll: one complete rotation about the longitudinal (travel) axis. */
     int MANEUVER_ROLL_360 = 1;
     /**
-     * Reserved for a true vertical trajectory loop. Not currently requested or
-     * rendered: the flight physics has no collision-checked circular path, so a
-     * visual-only loop would be a fake mechanic.
+     * Vertical pull-up loop. The server owns a collision-checked circular
+     * trajectory, so this is a real flight path and not a render-only effect.
      */
     int MANEUVER_LOOP = 2;
     /**
-     * Reserved for a true 180-degree trajectory reversal. Not currently
-     * requested or rendered for the same collision/safety reason.
+     * Reserved half-roll. It is kept as a distinct kind so it is never confused
+     * with the 180-degree heading reversal below.
      */
     int MANEUVER_ROLL_180 = 3;
+    /**
+     * Horizontal 180-degree U-turn. Like {@link #MANEUVER_LOOP}, the heading
+     * change comes from a collision-checked server trajectory.
+     */
+    int MANEUVER_REVERSAL = 4;
 
     /** Why the last flight session ended. Presentation uses this to pick landing or exit. */
     int END_NONE = 0;
@@ -100,8 +104,8 @@ public interface FlightState {
     /**
      * Starts a typed aerial maneuver.
      *
-     * @param kind one of {@link #MANEUVER_ROLL_360}, {@link #MANEUVER_LOOP} or
-     *             {@link #MANEUVER_ROLL_180}
+     * @param kind one of {@link #MANEUVER_ROLL_360}, {@link #MANEUVER_LOOP},
+     *             {@link #MANEUVER_ROLL_180} or {@link #MANEUVER_REVERSAL}
      */
     boolean startManeuver(int kind, int direction, int durationTicks);
 
@@ -109,9 +113,18 @@ public interface FlightState {
     void setManeuver(int kind, int direction, int ticksRemaining);
 
     /**
-     * Stores the launch basis of a loop. The loop must keep flying along the
-     * direction it started with, even after the body has rotated past the top of
-     * the circle where the instantaneous velocity points backwards.
+     * True when the last trajectory maneuver was stopped by the safety sweep
+     * instead of finishing its planned path. Clients use it to end playback
+     * immediately; a normal completion lets playback run to its final pose.
+     */
+    boolean wasManeuverAborted();
+
+    void setManeuverAborted(boolean aborted);
+
+    /**
+     * Stores the entry heading and speed shared by trajectory maneuvers. The
+     * analytic path is built from this basis, so the server, the owning client
+     * and the animation all compute the same curve.
      */
     void setManeuverBasis(float yawDegrees, float speed);
 

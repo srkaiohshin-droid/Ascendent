@@ -141,11 +141,19 @@
 - [x] Validar `compileJava`, `runGameTestServer` (80/80), `build` e `git diff --check`.
 - [x] Executar smoke de `runClient` (quickPlay em "New World"): mundo carregado,
   protocolo "3" aceito nos dois lados, mixins de jogador aplicados, sem crash.
-- [x] Avaliar loop vertical e reversao de 180 graus: bloqueados por ausencia de trajetoria
-  segura com colisao verificada; roll de 360 graus preservado.
-- [ ] Homologacao visual humana de decolagem, hover, voo, boost, frenagem, pouso, manobra,
-  cabeca/torso e camera/FOV.
-- [ ] Implementar loop/reversao somente quando houver fisica de trajetoria segura e
-  testes de colisao; nao aceitar efeito visual como mecanica.
+- [x] Implementar loop vertical (28 ticks) e reversao horizontal de 180 graus (18 ticks)
+  como trajetorias analiticas server-authoritative, com sweep de colisao completo,
+  aborto seguro, entrada validada e sem teleporte; roll de 360 graus preservado.
+- [x] Elevar o protocolo para "4" e sincronizar yaw/velocidade de base e flag de aborto.
+- [x] Adicionar teclas G/H, poses de pitch/banco e supressao de input vanilla durante a
+  trajetoria nos dois lados.
+- [x] Adicionar testes de caminho fechado/invertido, entrada nivelada e sweep obstruido;
+  suite em 83/83.
+- [x] Adicionar harness de captura dev-only e gerar 16 frames com relatorio HTML
+  (`run/screenshots/ascendant-flight-capture.html`, sessao 20261023-233605).
+- [x] Validar `compileJava`, `runGameTestServer` (83/83), `build`, captura e
+  `git diff --check`.
+- [ ] Homologacao visual humana do loop, reversao, banco, pitch, camera, FOV, decolagem,
+  hover, boost, frenagem, pouso e cabeca/torso.
 - [x] Autorizacao do dono, commit `df49ac6` publicado com push normal e SHA remoto
   confirmado via `git ls-remote`.

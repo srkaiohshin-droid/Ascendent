@@ -659,3 +659,48 @@ OVERHAUL DE VOO, ANIMACAO, MANOBRAS E CAMERA (AGENTE DE VOO, 2026-10-23)
 - Revalidacao pos-publicacao em `c1f0ece` (inclui o lote de keybinds do speedster
   `e1319eb`): `runGameTestServer` "All 80 required tests passed" e `build`
   BUILD SUCCESSFUL.
+
+LOOP VERTICAL, REVERSAO 180 E CAPTURA VISUAL DE VOO (2026-10-23)
+- Tarefa: implementar as duas manobras antes bloqueadas sem efeito visual falso, e
+  produzir evidencia visual para homologacao humana. Base: `418038e`.
+- Arquivos novos: `flight/FlightManeuvers.java`, `flight/FlightManeuverSafety.java` e
+  `flight/client/FlightCaptureHarness.java` (dev-only).
+- Arquivos alterados: `FlightController`, `FlightState`, `PlayerFlightState`,
+  `FlightNetwork`, `FlightClientPackets`, `FlightClientInput`,
+  `FlightAnimationController`, `FlightPoseRenderer`, `FlightCameraController`,
+  `FlightGameTests`, `Ascendant`, `lang/en_us.json` e `lang/pt_br.json`.
+- Geometria e seguranca:
+  - Loop de 28 ticks: circulo vertical no plano do heading de entrada, fechando no ponto
+    e na velocidade iniciais.
+  - Reversao de 18 ticks: semicirculo horizontal que termina um diametro ao lado,
+    virado para o heading oposto; A/D escolhe o lado e o padrao e direita.
+  - `FlightManeuvers.entryProblem` exige velocidade 0.50 (loop) ou 0.40 (reversao), no
+    maximo 1.25, pitch <= 24 graus e erro de mira <= 32 graus; cooldown de 24 ticks.
+  - `FlightManeuverSafety` varre a curva analitica completa antes de iniciar, com caixa
+    `Pose.STANDING`, clearance 0.35 e 4 subpassos, recusando bloco, fluido, borda,
+    altura e chunk nao carregado. O servidor revalida durante o passo e aborta em
+    contato, sem teleporte.
+  - O input vanilla e zerado no servidor e no cliente (`MovementInputUpdateEvent`)
+    durante a trajetoria, para o caminho real coincidir com o caminho varrido.
+- Rede e apresentacao:
+  - Protocolo de voo "4": kind/direcao/ticks, yaw/velocidade de base e flag de aborto.
+  - O cliente so inicia o playback depois da autorizacao; o progresso vem do estado
+    sincronizado, sem acumulo dependente de FPS.
+  - Pitch do loop (0..360) e banco da reversao (ate 30) entram na pose; a camera usa o
+    mesmo banco, sem roll duplo. G solicita loop e H solicita reversao.
+- Harness: registrado por `Ascendant` apenas em cliente de desenvolvimento e com
+  `-Dascendant.flightCapture=true`; nao usa `@Mod.EventBusSubscriber`. Captura em
+  terceira pessoa, GUI oculta, survival em y=220, noon/clear. Sessao `20261023-233605`
+  gerou 16 PNGs mais `run/screenshots/ascendant-flight-capture.html` e `.txt`.
+- Telemetria de pose: loop 47.6 -> 109.3 -> 189.8 -> 262.0 -> 320.7 graus com peso 1.00;
+  reversao 16.1 -> 28.8 -> 26.4 -> 7.6 graus de banco.
+- Validacao final apos a supressao de input:
+  - `compileJava`: BUILD SUCCESSFUL.
+  - `runGameTestServer`: "All 83 required tests passed" (BUILD SUCCESSFUL).
+  - `build`: BUILD SUCCESSFUL.
+  - Captura dev-only concluida, 16 imagens, sem crash.
+  - `git diff --check`: sem erros de conteudo (apenas avisos LF/CRLF).
+- Limitacoes: nao houve inspecao interativa humana nem homologacao visual final do
+  loop/reversao/camera. O pack automatico e evidencia, nao substitui essa aprovacao.
+- Proximo passo: revisar o pack de captura, publicar o lote com push normal e confirmar
+  o SHA remoto; aguardar homologacao humana.

@@ -12,6 +12,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
@@ -709,9 +710,9 @@ public final class FlightGameTests {
     @GameTest(template = "empty", templateNamespace = "ascendant")
     public static void flightStatePacketRoundTripsEveryField(GameTestHelper helper) {
         FlightNetwork.FlightStateUpdate original = new FlightNetwork.FlightStateUpdate(
-                321, true, true, FlightState.MANEUVER_ROLL_360, -1,
-                FlightPoseLibrary.MANEUVER_TICKS - 2, true, true,
-                FlightState.END_LANDED, 0.32F);
+                321, true, true, FlightState.MANEUVER_LOOP, -1,
+                FlightManeuvers.LOOP_TICKS - 2, true, true,
+                FlightState.END_LANDED, 0.32F, 47.5F, 0.62F, true);
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         try {
             FlightNetwork.FlightStateUpdate.encode(original, buffer);
@@ -733,6 +734,137 @@ public final class FlightGameTests {
                 "Interpolating across the wrap must continue forward instead of unwinding");
         helper.assertTrue(FlightPose.lerpAngleDegrees(0.0F, 360.0F, 0.5F) == 0.0F,
                 "A full turn is the same orientation and must not interpolate backwards");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void trajectoryManeuversUseClosedAndReversedPaths(GameTestHelper helper) {
+        helper.assertTrue(FlightManeuvers.duration(FlightState.MANEUVER_LOOP)
+                        == FlightManeuvers.LOOP_TICKS,
+                "The loop must own a fixed, server-timed duration");
+        helper.assertTrue(FlightManeuvers.duration(FlightState.MANEUVER_REVERSAL)
+                        == FlightManeuvers.REVERSAL_TICKS,
+                "The reversal must own a fixed, server-timed duration");
+
+        float yaw = 90.0F;
+        double speed = 0.60D;
+        double loopRadius = FlightManeuvers.radius(FlightState.MANEUVER_LOOP, speed);
+        Vec3 loopStart = FlightManeuvers.offset(
+                FlightState.MANEUVER_LOOP, 1, yaw, speed, 0.0D);
+        Vec3 loopTop = FlightManeuvers.offset(
+                FlightState.MANEUVER_LOOP, 1, yaw, speed, 0.5D);
+        Vec3 loopEnd = FlightManeuvers.offset(
+                FlightState.MANEUVER_LOOP, 1, yaw, speed, 1.0D);
+        helper.assertTrue(loopStart.length() < 1.0E-6D && loopEnd.length() < 1.0E-6D,
+                "A full loop must return exactly to its entry point");
+        helper.assertTrue(Math.abs(loopTop.y - loopRadius * 2.0D) < 1.0E-6D,
+                "The top of the loop must sit one diameter above the entry point");
+
+        Vec3 loopSum = Vec3.ZERO;
+        for (int step = 0; step < FlightManeuvers.LOOP_TICKS; step++) {
+            loopSum = loopSum.add(FlightManeuvers.stepDelta(FlightState.MANEUVER_LOOP,
+                    1, yaw, speed, step, FlightManeuvers.LOOP_TICKS));
+        }
+        helper.assertTrue(loopSum.length() < 1.0E-6D,
+                "The per-tick loop steps must close the circle");
+
+        double reversalRadius = FlightManeuvers.radius(FlightState.MANEUVER_REVERSAL, speed);
+        Vec3 side = FlightManeuvers.right(yaw);
+        Vec3 reversalEnd = FlightManeuvers.offset(
+                FlightState.MANEUVER_REVERSAL, 1, yaw, speed, 1.0D);
+        helper.assertTrue(reversalEnd.distanceTo(side.scale(reversalRadius * 2.0D)) < 1.0E-6D,
+                "A right reversal must finish one diameter to the right");
+        Vec3 lastStep = FlightManeuvers.stepDelta(FlightState.MANEUVER_REVERSAL, 1, yaw,
+                speed, FlightManeuvers.REVERSAL_TICKS - 1, FlightManeuvers.REVERSAL_TICKS);
+        helper.assertTrue(lastStep.dot(FlightManeuvers.forward(yaw)) < 0.0D,
+                "The last reversal step must point opposite the entry heading");
+        float reversalYaw = FlightManeuvers.yawAt(
+                FlightState.MANEUVER_REVERSAL, 1, yaw, 1.0F);
+        helper.assertTrue(Math.abs(Mth.wrapDegrees(reversalYaw - (yaw + 180.0F))) < 1.0E-4F,
+                "A right reversal must finish facing 180 degrees from entry");
+
+        helper.assertTrue(FlightManeuvers.bodyPitchOffset(FlightState.MANEUVER_LOOP, 0.0F) == 0.0F
+                        && FlightManeuvers.bodyPitchOffset(FlightState.MANEUVER_LOOP, 0.5F) == 180.0F
+                        && FlightManeuvers.bodyPitchOffset(FlightState.MANEUVER_LOOP, 1.0F) == 360.0F,
+                "The rendered body must complete one full loop pitch");
+        helper.assertTrue(FlightManeuvers.bodyRollOffset(
+                        FlightState.MANEUVER_REVERSAL, 1, 0.5F)
+                        == FlightManeuvers.REVERSAL_BANK_DEGREES,
+                "The reversal must bank into its turn");
+        helper.assertTrue(Math.abs(FlightManeuvers.bodyRollOffset(
+                        FlightState.MANEUVER_REVERSAL, 1, 1.0F)) < 1.0E-4F,
+                "The reversal must level out at the exit");
+
+        PlayerFlightState state = new PlayerFlightState();
+        state.setActive(true);
+        helper.assertTrue(state.startManeuver(FlightState.MANEUVER_REVERSAL, 1,
+                        FlightManeuvers.REVERSAL_TICKS),
+                "The reversal must be a startable maneuver kind, not only a duration");
+        state.clearManeuver();
+        state.setManeuverAborted(true);
+        state.clear();
+        helper.assertTrue(!state.wasManeuverAborted(),
+                "Clearing the session must forget a stale abort flag");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void trajectoryEntriesRequireLevelAlignedSpeed(GameTestHelper helper) {
+        Player player = helper.makeMockPlayer();
+        player.setPos(0.5D, 8.0D, 0.5D);
+        player.setYRot(0.0F);
+        player.setXRot(0.0F);
+
+        player.setDeltaMovement(new Vec3(0.0D, 0.0D, 0.30D));
+        helper.assertTrue(FlightManeuvers.entryProblem(player, FlightState.MANEUVER_LOOP)
+                        == FlightManeuvers.PROBLEM_TOO_SLOW,
+                "A loop must refuse a hover-speed entry");
+
+        player.setDeltaMovement(new Vec3(0.0D, 0.0D, 0.80D));
+        helper.assertTrue(FlightManeuvers.entryProblem(player, FlightState.MANEUVER_LOOP)
+                        == FlightManeuvers.PROBLEM_NONE,
+                "A level, aligned, fast enough entry must be accepted");
+
+        player.setYRot(90.0F);
+        helper.assertTrue(FlightManeuvers.entryProblem(player, FlightState.MANEUVER_LOOP)
+                        == FlightManeuvers.PROBLEM_AIM,
+                "A crosshair far from the trajectory must be refused");
+        player.setYRot(0.0F);
+
+        player.setDeltaMovement(new Vec3(0.0D, 0.40D, 0.50D));
+        helper.assertTrue(FlightManeuvers.entryProblem(player, FlightState.MANEUVER_LOOP)
+                        == FlightManeuvers.PROBLEM_PITCH,
+                "A steeply climbing trajectory must be refused");
+
+        player.setDeltaMovement(new Vec3(0.0D, 0.0D, 1.50D));
+        helper.assertTrue(FlightManeuvers.entryProblem(player, FlightState.MANEUVER_LOOP)
+                        == FlightManeuvers.PROBLEM_TOO_FAST,
+                "An entry above the reviewed speed must be refused");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void trajectorySweepRejectsObstructedAirspace(GameTestHelper helper) {
+        Player player = helper.makeMockPlayer();
+        BlockPos start = helper.absolutePos(new BlockPos(3, 6, 3));
+        player.setPos(start.getX() + 0.5D, start.getY(), start.getZ() + 0.5D);
+        player.setYRot(0.0F);
+
+        int clear = FlightManeuverSafety.sweepProblem(
+                player, FlightState.MANEUVER_LOOP, 1, 0.0F, 0.60D);
+        helper.assertTrue(clear == FlightManeuvers.PROBLEM_NONE,
+                "A loop in empty air must pass the pre-flight sweep, got " + clear);
+
+        // At a quarter of the loop the path is one radius forward and one
+        // radius above the entry point. With speed 0.60 the radius is 2.67, so
+        // the quarter point lands in the block cell relative (3, 8, 6). The
+        // helper resolves relative coordinates itself; passing an absolute
+        // position here would offset the block twice.
+        helper.setBlock(new BlockPos(3, 8, 6), Blocks.STONE);
+        int blocked = FlightManeuverSafety.sweepProblem(
+                player, FlightState.MANEUVER_LOOP, 1, 0.0F, 0.60D);
+        helper.assertTrue(blocked == FlightManeuvers.PROBLEM_OBSTRUCTED,
+                "A block on the loop must fail the sweep, got " + blocked);
         helper.succeed();
     }
 }

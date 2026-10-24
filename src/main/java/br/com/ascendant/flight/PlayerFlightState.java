@@ -12,6 +12,7 @@ final class PlayerFlightState implements FlightState {
     private int maneuverDirection;
     private int maneuverTicksRemaining;
     private int maneuverCooldownTicks;
+    private boolean maneuverAborted;
     private boolean inverted;
     private float maneuverYaw;
     private float maneuverSpeed;
@@ -35,6 +36,7 @@ final class PlayerFlightState implements FlightState {
             hasLeftGround = false;
             clearManeuver();
             maneuverCooldownTicks = 0;
+            maneuverAborted = false;
             inverted = false;
             maneuverYaw = 0.0F;
             maneuverSpeed = 0.0F;
@@ -170,7 +172,18 @@ final class PlayerFlightState implements FlightState {
         maneuverKind = kind;
         maneuverDirection = direction;
         maneuverTicksRemaining = durationTicks;
+        maneuverAborted = false;
         return true;
+    }
+
+    @Override
+    public boolean wasManeuverAborted() {
+        return maneuverAborted;
+    }
+
+    @Override
+    public void setManeuverAborted(boolean aborted) {
+        maneuverAborted = aborted;
     }
 
     @Override
@@ -212,6 +225,9 @@ final class PlayerFlightState implements FlightState {
                 maneuverDirection = 0;
             }
         }
+        if (maneuverKind == MANEUVER_NONE && maneuverTicksRemaining == 0) {
+            maneuverAborted = false;
+        }
         if (maneuverCooldownTicks > 0) {
             maneuverCooldownTicks--;
         }
@@ -236,12 +252,14 @@ final class PlayerFlightState implements FlightState {
         inverted = false;
         clearManeuver();
         maneuverCooldownTicks = 0;
+        maneuverAborted = false;
         maneuverYaw = 0.0F;
         maneuverSpeed = 0.0F;
     }
 
     private static boolean isValidKind(int kind) {
-        return kind == MANEUVER_ROLL_360 || kind == MANEUVER_LOOP || kind == MANEUVER_ROLL_180;
+        return kind == MANEUVER_ROLL_360 || kind == MANEUVER_LOOP
+                || kind == MANEUVER_ROLL_180 || kind == MANEUVER_REVERSAL;
     }
 
     private static boolean isValidEndReason(int reason) {

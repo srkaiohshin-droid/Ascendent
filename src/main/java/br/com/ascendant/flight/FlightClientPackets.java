@@ -10,7 +10,8 @@ final class FlightClientPackets {
 
     static void update(int entityId, boolean active, boolean noGravity, int maneuverKind,
                        int maneuverDirection, int maneuverTicksRemaining, boolean inverted,
-                       boolean launchedFromGround, int endReason, float takeoffImpulse) {
+                       boolean launchedFromGround, int endReason, float takeoffImpulse,
+                       float maneuverYaw, float maneuverSpeed, boolean maneuverAborted) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
             return;
@@ -19,15 +20,40 @@ final class FlightClientPackets {
         if (entity instanceof Player player) {
             player.getCapability(FlightStateProvider.CAPABILITY).ifPresent(state -> {
                 boolean wasActive = state.isActive();
+                int previousKind = state.getManeuverKind();
+                int previousDirection = state.getManeuverDirection();
+                int previousRemaining = state.getManeuverTicksRemaining();
                 state.setActive(active);
                 state.setLastEndReason(endReason);
                 if (active) {
                     state.setLaunchedFromGround(launchedFromGround);
                     state.setManeuver(maneuverKind, maneuverDirection, maneuverTicksRemaining);
+                    state.setManeuverBasis(maneuverYaw, maneuverSpeed);
                     state.setInverted(inverted);
+                    state.setManeuverAborted(maneuverAborted);
+                    if (player == minecraft.player) {
+                        boolean newManeuver = maneuverKind != FlightState.MANEUVER_NONE
+                                && (previousKind != maneuverKind
+                                || previousDirection != maneuverDirection
+                                || previousRemaining <= 0);
+                        if (newManeuver) {
+                            // Local prediction only starts after the server has
+                            // authorised the trajectory. A normal completion is
+                            // allowed to play out; an abort clears it at once.
+                            FlightController.startClientManeuver(maneuverKind,
+                                    maneuverDirection, maneuverYaw, maneuverSpeed,
+                                    maneuverTicksRemaining);
+                        }
+                        if (maneuverAborted) {
+                            FlightController.abortClientManeuver();
+                        }
+                    }
                 } else {
                     state.setLaunchedFromGround(false);
                     state.clearInput();
+                    if (player == minecraft.player) {
+                        FlightController.abortClientManeuver();
+                    }
                 }
                 if (!wasActive && active && launchedFromGround && takeoffImpulse > 0.0F
                         && player == minecraft.player) {

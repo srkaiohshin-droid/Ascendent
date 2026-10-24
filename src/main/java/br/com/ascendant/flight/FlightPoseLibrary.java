@@ -154,11 +154,20 @@ public final class FlightPoseLibrary {
      * rotation without any client-side authority over the maneuver.
      */
     public static float maneuverRoll(int direction, int ticksRemaining) {
+        float progress = 1.0F - clamp(ticksRemaining / (float) MANEUVER_TICKS, 0.0F, 1.0F);
+        return maneuverRollProgress(direction, progress);
+    }
+
+    /**
+     * Progress-based version used by deterministic client playback. Kept
+     * separate from the tick-count helper so a maneuver can be replayed from a
+     * synced phase without depending on local authority.
+     */
+    public static float maneuverRollProgress(int direction, float progress) {
         if (direction != -1 && direction != 1) {
             return 0.0F;
         }
-        float progress = 1.0F - clamp(ticksRemaining / (float) MANEUVER_TICKS, 0.0F, 1.0F);
-        return direction * 360.0F * smoothstep(progress);
+        return direction * 360.0F * smoothstep(clamp(progress, 0.0F, 1.0F));
     }
 
     private static FlightPose hover(FlightMotionSample sample) {

@@ -3,7 +3,6 @@ package br.com.ascendant.flight.client;
 import br.com.ascendant.Ascendant;
 import br.com.ascendant.flight.FlightClientTuning;
 import br.com.ascendant.flight.FlightController;
-import br.com.ascendant.flight.FlightPoseLibrary;
 import br.com.ascendant.flight.FlightState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -31,6 +30,8 @@ public final class FlightCameraController {
     private static final float MAX_BANK_DEGREES = 18.0F;
     private static final float MAX_PITCH_DEGREES = 7.0F;
     private static final float MAX_MANEUVER_CAMERA_ROLL = 12.0F;
+    private static final float MAX_REVERSAL_CAMERA_ROLL = 10.0F;
+    private static final float MAX_LOOP_CAMERA_PITCH = 6.0F;
     private static final float FOV_SMOOTHING = 0.20F;
 
     private static float previousFovOffset;
@@ -88,18 +89,24 @@ public final class FlightCameraController {
         float pitch = Mth.clamp((float) player.getDeltaMovement().y * -24.0F,
                 -MAX_PITCH_DEGREES, MAX_PITCH_DEGREES) * strength;
 
-        FlightState state = FlightController.getState(player);
-        if (state != null && state.getManeuverTicksRemaining() > 0
-                && state.getManeuverKind() == FlightState.MANEUVER_ROLL_360
-                && state.getManeuverDirection() != 0) {
-            // A normalized bump that starts and ends at zero. Scaling the raw
-            // 0..360 roll would leave the camera tilted at the final tick and
-            // pop back to neutral on the next frame.
-            float progress = Mth.clamp((FlightPoseLibrary.MANEUVER_TICKS
-                    - state.getManeuverTicksRemaining())
-                    / (float) (FlightPoseLibrary.MANEUVER_TICKS - 1), 0.0F, 1.0F);
+        FlightAnimationController.ManeuverView view =
+                FlightAnimationController.maneuverView(player, (float) event.getPartialTick());
+        if (view != null) {
+            float progress = Mth.clamp(view.progress(), 0.0F, 1.0F);
             float bump = Mth.sin(progress * (float) Math.PI);
-            bank += state.getManeuverDirection() * MAX_MANEUVER_CAMERA_ROLL * bump * bump;
+            switch (view.kind()) {
+                case FlightState.MANEUVER_ROLL_360 ->
+                        bank += view.direction() * MAX_MANEUVER_CAMERA_ROLL * bump * bump;
+                case FlightState.MANEUVER_REVERSAL ->
+                        bank += view.direction() * MAX_REVERSAL_CAMERA_ROLL * bump;
+                case FlightState.MANEUVER_LOOP ->
+                        // A small nose-up/nose-down cue instead of rolling the
+                        // whole loop, which would be unreadable in third person.
+                        pitch -= MAX_LOOP_CAMERA_PITCH
+                                * Mth.sin(progress * (float) Math.PI * 2.0F) * bump;
+                default -> {
+                }
+            }
         }
 
         event.setRoll(event.getRoll() + Mth.clamp(bank * strength * 0.55F,
@@ -123,13 +130,13 @@ public final class FlightCameraController {
         if (player == null) {
             return;
         }
-        FlightState state = FlightController.getState(player);
-        if (state == null || state.getManeuverTicksRemaining() <= 0) {
+        FlightAnimationController.ManeuverView view =
+                FlightAnimationController.maneuverView(player, (float) event.getPartialTick());
+        if (view == null) {
             return;
         }
-        float progress = (FlightPoseLibrary.MANEUVER_TICKS - state.getManeuverTicksRemaining())
-                / (float) (FlightPoseLibrary.MANEUVER_TICKS - 1);
-        float pulse = (float) Math.sin(Mth.clamp(progress, 0.0F, 1.0F) * Math.PI) * 1.5F;
+        float progress = Mth.clamp(view.progress(), 0.0F, 1.0F);
+        float pulse = (float) Math.sin(progress * Math.PI) * 1.5F;
         event.setFOV(event.getFOV() + pulse);
     }
 

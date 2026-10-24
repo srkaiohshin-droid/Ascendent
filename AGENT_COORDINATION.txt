@@ -357,3 +357,44 @@ Criterios:
   que ja estavam na branch local.
 - Revalidacao pos-publicacao no HEAD `c1f0ece` (com o lote de keybinds do speedster
   `e1319eb`): `runGameTestServer` 80/80 e `build` BUILD SUCCESSFUL.
+
+ASC-016
+Titulo: Loop vertical, reversao 180 e captura visual de voo
+Status: REVIEW
+Prioridade: ALTA
+Dependencia: ASC-015
+Arquivos principais: flight/FlightManeuvers.java (novo),
+  flight/FlightManeuverSafety.java (novo), flight/FlightController.java,
+  flight/FlightState.java, flight/PlayerFlightState.java, flight/FlightNetwork.java,
+  flight/FlightClientPackets.java, flight/FlightClientInput.java,
+  flight/client/FlightAnimationController.java, flight/client/FlightPoseRenderer.java,
+  flight/client/FlightCameraController.java,
+  flight/client/FlightCaptureHarness.java (novo, dev-only), flight/FlightGameTests.java,
+  Ascendant.java, lang/en_us.json, lang/pt_br.json.
+Arquivos NAO tocados: catalogo, trajes, packs, poderes, locomocao terrestre e speedster.
+Criterios:
+- [x] Loop vertical e reversao 180 como trajetorias analiticas reais, nao efeito visual:
+  o servidor avanca o delta exato da curva e mantem autoridade, colisao e gravidade.
+- [x] Loop de 28 ticks no plano do heading; reversao horizontal de 18 ticks com lado
+  escolhido por A/D e banco scriptado.
+- [x] Sweep pre-voo da curva completa com caixa STANDING, clearance de 0.35 em 4
+  subpassos, bloqueio por bloco/fluido/borda/altura/chunk e aborto seguro em contato.
+- [x] Entrada limitada por velocidade (0.50/0.40 ate 1.25), pitch <= 24 graus e mira
+  <= 32 graus; cooldown de 24 ticks.
+- [x] Protocolo "4" com kind/direcao/ticks, yaw/velocidade de base e flag de aborto;
+  cliente inicia playback so depois da autorizacao.
+- [x] Input vanilla zerado nos dois lados durante a trajetoria, para o caminho real
+  coincidir com o caminho verificado.
+- [x] Animacao por progresso/tick, sem acumulo por frame; pitch do loop e banco da
+  reversao aplicados na pose; camera/FOV acompanham sem roll duplo.
+- [x] Teclas G (loop) e H (reversao), com traducoes en_us/pt_br.
+- [x] Harness de captura dev-only, ativado por `-Dascendant.flightCapture=true`, com
+  16 frames e relatorio HTML.
+- [x] GameTests de caminho fechado/invertido, entrada nivelada, sweep obstruido e
+  round-trip; suite em 83/83.
+- Validacao: `compileJava` e `build` BUILD SUCCESSFUL; `runGameTestServer` "All 83
+  required tests passed"; captura 20261023-233605 concluida sem crash; `git diff --check`
+  sem erros de conteudo.
+- [ ] Homologacao visual humana do loop, reversao, banco, pitch, camera e FOV pelo pack
+  `run/screenshots/ascendant-flight-capture.html` e por inspecao interativa.
+- Publicacao: pendente no momento deste registro.

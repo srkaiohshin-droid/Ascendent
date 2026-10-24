@@ -4,6 +4,7 @@ import br.com.ascendant.Ascendant;
 import br.com.ascendant.flight.FlightAnimationSelector;
 import br.com.ascendant.flight.FlightAnimationState;
 import br.com.ascendant.flight.FlightController;
+import br.com.ascendant.flight.FlightManeuvers;
 import br.com.ascendant.flight.FlightMotionSample;
 import br.com.ascendant.flight.FlightPose;
 import br.com.ascendant.flight.FlightPoseLibrary;
@@ -108,9 +109,25 @@ public final class FlightAnimationController {
             return null;
         }
         FlightPose pose = FlightPose.lerp(rig.previous, rig.current, delta);
+        float maneuverPitch = FlightPose.lerpAngleDegrees(
+                rig.previousManeuverPitch, rig.currentManeuverPitch, delta);
         float maneuverRoll = FlightPose.lerpAngleDegrees(
                 rig.previousManeuverRoll, rig.currentManeuverRoll, delta);
-        return new FlightPoseSample(pose, weight, 0.0F, maneuverRoll);
+        return new FlightPoseSample(pose, weight, maneuverPitch, maneuverRoll);
+    }
+
+    /** Snapshot used by the camera and FOV effects for the active maneuver. */
+    public record ManeuverView(int kind, int direction, float progress) {
+    }
+
+    public static ManeuverView maneuverView(Player player, float partialTick) {
+        Rig rig = RIGS.get(player);
+        if (rig == null || rig.maneuverKind == FlightState.MANEUVER_NONE) {
+            return null;
+        }
+        float progress = Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F),
+                rig.previousManeuverProgress, rig.currentManeuverProgress);
+        return new ManeuverView(rig.maneuverKind, rig.maneuverDirection, progress);
     }
 
     /**
@@ -134,6 +151,20 @@ public final class FlightAnimationController {
         private float weight;
         private float previousManeuverRoll;
         private float currentManeuverRoll;
+        private float previousManeuverPitch;
+        private float currentManeuverPitch;
+        private float previousManeuverProgress;
+        private float currentManeuverProgress;
+        private float maneuverRoll;
+        private float maneuverPitch;
+        private float maneuverProgress;
+        private int maneuverKind = FlightState.MANEUVER_NONE;
+        private int maneuverDirection;
+        private int maneuverDuration;
+        private int maneuverElapsed;
+        private int completedKind = FlightState.MANEUVER_NONE;
+        private int completedDirection;
+        private boolean finishAfterTick;
         private float previousBank;
         private float currentBank;
         private float smoothedBank;
@@ -165,8 +196,14 @@ public final class FlightAnimationController {
             float aimError = aimError(player, velocity, horizontalSpeed);
             float acceleration = speed - lastSpeed;
 
+            updateManeuver(state);
+            boolean maneuvering = maneuverKind != FlightState.MANEUVER_NONE;
+
             smoothedAcceleration += (acceleration - smoothedAcceleration) * ACCELERATION_SMOOTHING;
-            float bankTarget = state.isActive() && horizontalSpeed > 0.04F
+            // A scripted trajectory owns its own bank/pitch. Letting the
+            // measured turn rate add another bank here would double the roll
+            // and produce a false spike at the top of a loop.
+            float bankTarget = state.isActive() && !maneuvering && horizontalSpeed > 0.04F
                     ? Mth.clamp(turnRate * 2.4F,
                     -FlightPoseLibrary.MAX_BODY_ROLL, FlightPoseLibrary.MAX_BODY_ROLL)
                     : 0.0F;
@@ -181,9 +218,6 @@ public final class FlightAnimationController {
             // like a high-speed pass.
             boolean boosting = player.isSprinting()
                     && speed >= FlightAnimationSelector.SLOW_ENTER_SPEED * 0.5F;
-            boolean maneuvering = state.getManeuverTicksRemaining() > 0
-                    && state.getManeuverKind() != FlightState.MANEUVER_NONE
-                    && state.getManeuverDirection() != 0;
             int takeoffTicks = state.wasLaunchedFromGround()
                     ? FlightPoseLibrary.TAKEOFF_GROUND_TICKS : FlightPoseLibrary.TAKEOFF_AIR_TICKS;
 
@@ -233,8 +267,10 @@ public final class FlightAnimationController {
                         .verticalSpeed(verticalSpeed)
                         .trajectoryPitch(trajectoryPitch)
                         .acceleration(smoothedAcceleration)
-                        .turnRate(turnRate)
-                        .aimError(aimError)
+                        // The scripted path owns the heading; measured turn
+                        // and aim noise must not twist the neck during it.
+                        .turnRate(maneuvering ? 0.0F : turnRate)
+                        .aimError(maneuvering ? 0.0F : aimError)
                         .bank(smoothedBank)
                         .braking(braking)
                         .boosting(boosting)
@@ -251,13 +287,6 @@ public final class FlightAnimationController {
                     stateTicks++;
                 }
                 target = FlightPoseLibrary.target(animationState, sample);
-                float maneuverRoll = 0.0F;
-                if (maneuvering && state.getManeuverKind() == FlightState.MANEUVER_ROLL_360) {
-                    maneuverRoll = FlightPoseLibrary.maneuverRoll(
-                            state.getManeuverDirection(), state.getManeuverTicksRemaining());
-                }
-                previousManeuverRoll = currentManeuverRoll;
-                currentManeuverRoll = maneuverRoll;
 
                 previousWeight = weight;
                 weight = Math.min(1.0F, weight + WEIGHT_STEP);
@@ -270,9 +299,6 @@ public final class FlightAnimationController {
                     return;
                 }
 
-                previousManeuverRoll = currentManeuverRoll;
-                currentManeuverRoll = 0.0F;
-
                 if (exitMode == EXIT_MODE_LANDING) {
                     tickLandingRecovery(player);
                 } else {
@@ -280,9 +306,112 @@ public final class FlightAnimationController {
                 }
             }
 
+            previousManeuverRoll = currentManeuverRoll;
+            currentManeuverRoll = maneuverRoll;
+            previousManeuverPitch = currentManeuverPitch;
+            currentManeuverPitch = maneuverPitch;
+            previousManeuverProgress = currentManeuverProgress;
+            currentManeuverProgress = maneuverProgress;
+
             previous = current;
             current = FlightPose.lerp(current, target, POSE_SMOOTHING);
             lastSpeed = speed;
+            if (finishAfterTick) {
+                finishAfterTick = false;
+                finishPlayback(true);
+            }
+        }
+
+        /**
+         * Client-side playback of the server-authorised maneuver. It starts
+         * only from synced state, advances once per client tick and is
+         * independent of the frame rate. A normal completion packet lets the
+         * remaining local steps finish; an abort stops them immediately.
+         */
+        private void updateManeuver(FlightState state) {
+            if (!state.isActive()) {
+                completedKind = FlightState.MANEUVER_NONE;
+                completedDirection = 0;
+                stopManeuver();
+                return;
+            }
+            int kind = state.getManeuverKind();
+            int direction = kind == FlightState.MANEUVER_NONE
+                    ? 0 : state.getManeuverDirection();
+            boolean aborted = state.wasManeuverAborted();
+
+            if (kind == FlightState.MANEUVER_NONE) {
+                completedKind = FlightState.MANEUVER_NONE;
+                completedDirection = 0;
+                if (maneuverKind != FlightState.MANEUVER_NONE) {
+                    if (aborted) {
+                        finishPlayback(false);
+                    } else {
+                        advancePlayback();
+                    }
+                }
+                return;
+            }
+
+            if (maneuverKind == FlightState.MANEUVER_NONE) {
+                if (kind == completedKind && direction == completedDirection) {
+                    return;
+                }
+                maneuverKind = kind;
+                maneuverDirection = direction;
+                maneuverDuration = Math.max(1, FlightManeuvers.duration(kind));
+                int remaining = Mth.clamp(state.getManeuverTicksRemaining(),
+                        0, maneuverDuration);
+                maneuverElapsed = maneuverDuration - remaining;
+            }
+            if (aborted) {
+                finishPlayback(false);
+                return;
+            }
+            advancePlayback();
+        }
+
+        private void advancePlayback() {
+            if (maneuverKind == FlightState.MANEUVER_NONE) {
+                return;
+            }
+            if (maneuverElapsed > maneuverDuration) {
+                finishPlayback(true);
+                return;
+            }
+            maneuverProgress = Mth.clamp(maneuverElapsed / (float) maneuverDuration,
+                    0.0F, 1.0F);
+            maneuverPitch = FlightManeuvers.bodyPitchOffset(maneuverKind, maneuverProgress);
+            maneuverRoll = maneuverKind == FlightState.MANEUVER_ROLL_360
+                    ? FlightPoseLibrary.maneuverRollProgress(
+                    maneuverDirection, maneuverProgress)
+                    : FlightManeuvers.bodyRollOffset(
+                    maneuverKind, maneuverDirection, maneuverProgress);
+            if (maneuverElapsed >= maneuverDuration) {
+                // Render the exact end orientation once, then stop.
+                finishAfterTick = true;
+            } else {
+                maneuverElapsed++;
+            }
+        }
+
+        private void finishPlayback(boolean completed) {
+            if (completed && maneuverKind != FlightState.MANEUVER_NONE) {
+                completedKind = maneuverKind;
+                completedDirection = maneuverDirection;
+            }
+            stopManeuver();
+        }
+
+        private void stopManeuver() {
+            maneuverKind = FlightState.MANEUVER_NONE;
+            maneuverDirection = 0;
+            maneuverDuration = 0;
+            maneuverElapsed = 0;
+            maneuverProgress = 0.0F;
+            maneuverPitch = 0.0F;
+            maneuverRoll = 0.0F;
+            finishAfterTick = false;
         }
 
         private void beginExit(Player player, FlightState state) {
@@ -308,8 +437,6 @@ public final class FlightAnimationController {
                 exitTicks = FlightPoseLibrary.EXIT_TICKS;
                 target = FlightPose.VANILLA;
             }
-            previousManeuverRoll = currentManeuverRoll;
-            currentManeuverRoll = 0.0F;
             previousWeight = weight;
         }
 

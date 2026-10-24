@@ -217,3 +217,26 @@
 - Publicacao: commit `df49ac6ef4249d5d8339c8a2190bc6477aee6e30` enviado com push normal
   na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
   remoto.
+
+## 0.1.0 - Loop vertical, reversao 180 e captura de voo (2026-10-23)
+- Loop vertical e reversao horizontal de 180 graus implementados como trajetorias
+  analiticas reais, server-authoritative, sem efeito visual isolado.
+- Loop de 28 ticks no plano do heading de entrada; reversao de 18 ticks com lado
+  escolhido por A/D e banco scriptado de ate 30 graus.
+- `FlightManeuverSafety` varre a curva completa antes de iniciar: caixa STANDING,
+  clearance de 0.35, 4 subpassos, recusa de bloco, fluido, borda, altura e chunk nao
+  carregado; contato durante a manobra aborta sem teleporte.
+- Entrada limitada a velocidade 0.50/0.40 ate 1.25, pitch <= 24 graus, mira <= 32 graus e
+  cooldown de 24 ticks.
+- Protocolo de voo "4" com kind/direcao/ticks, yaw/velocidade de base e flag de aborto.
+- Input vanilla zerado nos dois lados durante a trajetoria, mantendo o caminho real igual
+  ao caminho verificado.
+- Teclas G (loop) e H (reversao); animacao por progresso com pitch do loop e banco da
+  reversao na pose, camera/FOV sincronizados.
+- Harness de captura dev-only (`-Dascendant.flightCapture=true`) com 16 frames e relatorio
+  HTML; sessao 20261023-233605. A telemetria confirma o pitch 47.6/109.3/189.8/262.0/320.7
+  do loop e o banco 16.1/28.8/26.4/7.6 da reversao.
+- Testes: caminho fechado/invertido, entrada nivelada, sweep obstruido e round-trip;
+  suite em 83/83 GameTests. `compileJava` e `build` BUILD SUCCESSFUL.
+- Sem homologacao visual humana; o pack automatico e evidencia para a revisao, nao a
+  substitui.

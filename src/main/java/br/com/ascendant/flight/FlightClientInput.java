@@ -5,6 +5,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraftforge.client.event.MovementInputUpdateEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
@@ -27,6 +28,12 @@ public final class FlightClientInput {
     private static final KeyMapping MANEUVER_RIGHT = new KeyMapping(
             "key.ascendant.flight_maneuver_right", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V,
             "key.categories.ascendant.flight");
+    private static final KeyMapping MANEUVER_LOOP = new KeyMapping(
+            "key.ascendant.flight_loop", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G,
+            "key.categories.ascendant.flight");
+    private static final KeyMapping MANEUVER_REVERSAL = new KeyMapping(
+            "key.ascendant.flight_reversal", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H,
+            "key.categories.ascendant.flight");
 
     private static boolean requestPending;
     private static int lastSentInput = -1;
@@ -41,8 +48,11 @@ public final class FlightClientInput {
         event.register(BRAKE);
         event.register(MANEUVER_LEFT);
         event.register(MANEUVER_RIGHT);
+        event.register(MANEUVER_LOOP);
+        event.register(MANEUVER_REVERSAL);
         MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onClientTick);
         MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onPlayerTick);
+        MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onMovementInput);
     }
 
     private static void onClientTick(TickEvent.ClientTickEvent event) {
@@ -79,10 +89,17 @@ public final class FlightClientInput {
 
         if (minecraft.screen == null) {
             while (MANEUVER_LEFT.consumeClick()) {
-                FlightNetwork.requestManeuver(-1);
+                FlightNetwork.requestManeuver(FlightState.MANEUVER_ROLL_360, -1);
             }
             while (MANEUVER_RIGHT.consumeClick()) {
-                FlightNetwork.requestManeuver(1);
+                FlightNetwork.requestManeuver(FlightState.MANEUVER_ROLL_360, 1);
+            }
+            while (MANEUVER_LOOP.consumeClick()) {
+                FlightNetwork.requestManeuver(FlightState.MANEUVER_LOOP, 1);
+            }
+            while (MANEUVER_REVERSAL.consumeClick()) {
+                FlightNetwork.requestManeuver(FlightState.MANEUVER_REVERSAL,
+                        heldTurnDirection(minecraft));
             }
         } else {
             drainManeuverClicks();
@@ -102,6 +119,16 @@ public final class FlightClientInput {
     private static void drainManeuverClicks() {
         while (MANEUVER_LEFT.consumeClick()) { }
         while (MANEUVER_RIGHT.consumeClick()) { }
+        while (MANEUVER_LOOP.consumeClick()) { }
+        while (MANEUVER_REVERSAL.consumeClick()) { }
+    }
+
+    /** Left turns left, right turns right, and an unheld key defaults to right. */
+    private static int heldTurnDirection(Minecraft minecraft) {
+        if (minecraft.options.keyLeft.isDown() && !minecraft.options.keyRight.isDown()) {
+            return -1;
+        }
+        return 1;
     }
 
     private static int readInput(Minecraft minecraft) {
@@ -114,6 +141,26 @@ public final class FlightClientInput {
         if (minecraft.options.keyShift.isDown()) input |= FlightState.DESCEND;
         if (BRAKE.isDown()) input |= FlightState.BRAKE;
         return input;
+    }
+
+    private static void onMovementInput(MovementInputUpdateEvent event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (event.getEntity() != minecraft.player) {
+            return;
+        }
+        FlightState state = FlightController.getState(event.getEntity());
+        if (state == null || !state.isActive()
+                || !FlightManeuvers.isTrajectory(state.getManeuverKind())
+                || state.getManeuverTicksRemaining() <= 0) {
+            return;
+        }
+        // The maneuver path was swept assuming no camera-relative input
+        // acceleration. Zero the vanilla impulses so the local move matches
+        // the authoritative step instead of widening the reviewed curve.
+        event.getInput().leftImpulse = 0.0F;
+        event.getInput().forwardImpulse = 0.0F;
+        event.getInput().jumping = false;
+        event.getInput().shiftKeyDown = false;
     }
 
     private static void onPlayerTick(TickEvent.PlayerTickEvent event) {

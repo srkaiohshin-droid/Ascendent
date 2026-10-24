@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 
 public final class FlightNetwork {
     /** Bumped whenever the state payload changes so mismatched peers fail fast. */
-    private static final String PROTOCOL = "3";
+    private static final String PROTOCOL = "4";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(Ascendant.MOD_ID, "flight"), () -> PROTOCOL,
             PROTOCOL::equals, PROTOCOL::equals);
@@ -47,8 +47,8 @@ public final class FlightNetwork {
         CHANNEL.sendToServer(new InputUpdate(inputMask));
     }
 
-    public static void requestManeuver(int direction) {
-        CHANNEL.sendToServer(new ManeuverRequest(direction));
+    public static void requestManeuver(int kind, int direction) {
+        CHANNEL.sendToServer(new ManeuverRequest(kind, direction));
     }
 
     static void syncState(ServerPlayer player) {
@@ -68,10 +68,14 @@ public final class FlightNetwork {
         boolean inverted = state != null && state.isInverted();
         boolean groundLaunch = state != null && state.wasLaunchedFromGround();
         int endReason = state == null ? FlightState.END_NONE : state.getLastEndReason();
+        float maneuverYaw = state == null ? 0.0F : state.getManeuverYaw();
+        float maneuverSpeed = state == null ? 0.0F : state.getManeuverSpeed();
+        boolean maneuverAborted = state != null && state.wasManeuverAborted();
         float impulse = active && groundLaunch
                 ? (float) (double) FlightTuning.TAKEOFF_IMPULSE.get() : 0.0F;
         return new FlightStateUpdate(player.getId(), active, player.isNoGravity(), kind,
-                direction, ticks, inverted, groundLaunch, endReason, impulse);
+                direction, ticks, inverted, groundLaunch, endReason, impulse,
+                maneuverYaw, maneuverSpeed, maneuverAborted);
     }
 
     private static void handleToggle(ToggleRequest message, Supplier<NetworkEvent.Context> context) {
@@ -101,7 +105,7 @@ public final class FlightNetwork {
         ctx.enqueueWork(() -> {
             ServerPlayer sender = ctx.getSender();
             if (sender != null) {
-                FlightController.requestManeuver(sender, message.direction());
+                FlightController.requestManeuver(sender, message.kind(), message.direction());
             }
         });
         ctx.setPacketHandled(true);
@@ -114,7 +118,8 @@ public final class FlightNetwork {
                 () -> () -> FlightClientPackets.update(message.entityId(), message.active(),
                         message.noGravity(), message.maneuverKind(), message.maneuverDirection(),
                         message.maneuverTicksRemaining(), message.inverted(), message.launchedFromGround(),
-                        message.endReason(), message.takeoffImpulse())));
+                        message.endReason(), message.takeoffImpulse(), message.maneuverYaw(),
+                        message.maneuverSpeed(), message.maneuverAborted())));
         ctx.setPacketHandled(true);
     }
 
@@ -146,13 +151,14 @@ public final class FlightNetwork {
         }
     }
 
-    private record ManeuverRequest(int direction) {
+    private record ManeuverRequest(int kind, int direction) {
         private static void encode(ManeuverRequest message, FriendlyByteBuf buffer) {
+            buffer.writeByte(message.kind());
             buffer.writeByte(message.direction());
         }
 
         private static ManeuverRequest decode(FriendlyByteBuf buffer) {
-            return new ManeuverRequest(buffer.readByte());
+            return new ManeuverRequest(buffer.readUnsignedByte(), buffer.readByte());
         }
 
         private static void handle(ManeuverRequest message, Supplier<NetworkEvent.Context> context) {
@@ -164,7 +170,8 @@ public final class FlightNetwork {
     record FlightStateUpdate(int entityId, boolean active, boolean noGravity,
                              int maneuverKind, int maneuverDirection, int maneuverTicksRemaining,
                              boolean inverted, boolean launchedFromGround, int endReason,
-                             float takeoffImpulse) {
+                             float takeoffImpulse, float maneuverYaw, float maneuverSpeed,
+                             boolean maneuverAborted) {
         static void encode(FlightStateUpdate message, FriendlyByteBuf buffer) {
             buffer.writeVarInt(message.entityId());
             buffer.writeBoolean(message.active());
@@ -176,13 +183,16 @@ public final class FlightNetwork {
             buffer.writeBoolean(message.launchedFromGround());
             buffer.writeByte(message.endReason());
             buffer.writeFloat(message.takeoffImpulse());
+            buffer.writeFloat(message.maneuverYaw());
+            buffer.writeFloat(message.maneuverSpeed());
+            buffer.writeBoolean(message.maneuverAborted());
         }
 
         static FlightStateUpdate decode(FriendlyByteBuf buffer) {
             return new FlightStateUpdate(buffer.readVarInt(), buffer.readBoolean(), buffer.readBoolean(),
                     buffer.readUnsignedByte(), buffer.readByte(), buffer.readUnsignedByte(),
                     buffer.readBoolean(), buffer.readBoolean(), buffer.readUnsignedByte(),
-                    buffer.readFloat());
+                    buffer.readFloat(), buffer.readFloat(), buffer.readFloat(), buffer.readBoolean());
         }
 
         private static void handle(FlightStateUpdate message, Supplier<NetworkEvent.Context> context) {

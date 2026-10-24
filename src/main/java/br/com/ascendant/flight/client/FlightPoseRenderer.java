@@ -53,7 +53,8 @@ public final class FlightPoseRenderer {
         poseStack.translate(0.0F, FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y, 0.0F);
         // PoseStack post-multiplies, so the Y rotation is applied to vertices
         // first and banks around the torso's long axis before the body pitches.
-        poseStack.mulPose(Axis.XP.rotationDegrees(pose.bodyPitchDegrees * weight));
+        float bodyPitch = pose.bodyPitchDegrees + sample.maneuverPitchDegrees();
+        poseStack.mulPose(Axis.XP.rotationDegrees(bodyPitch * weight));
         float bank = pose.bodyRollDegrees + sample.maneuverRollDegrees();
         poseStack.mulPose(Axis.YP.rotationDegrees(bank * weight));
         poseStack.translate(0.0F, -FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y, 0.0F);

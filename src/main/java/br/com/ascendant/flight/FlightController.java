@@ -2,8 +2,10 @@ package br.com.ascendant.flight;
 
 import br.com.ascendant.power.runtime.PowerRuntimeEngine;
 import br.com.ascendant.speedster.SpeedsterController;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
@@ -12,6 +14,16 @@ public final class FlightController {
     public static final int MANEUVER_COOLDOWN_TICKS = 24;
     private static final long INPUT_TIMEOUT_TICKS = 20L;
     private static final double SAFE_TRANSITION_MAX_HORIZONTAL = 0.28D;
+
+    // Local playback of a server-authorised trajectory. Only the owning client
+    // advances it, and it never grants authority: the server owns the actual
+    // path and aborts it authoritatively.
+    private static int clientManeuverKind = FlightState.MANEUVER_NONE;
+    private static int clientManeuverDirection;
+    private static int clientManeuverDuration;
+    private static int clientManeuverStep;
+    private static float clientManeuverYaw;
+    private static float clientManeuverSpeed;
 
     private FlightController() {
     }
@@ -71,10 +83,15 @@ public final class FlightController {
     }
 
     /**
-     * Requests a server-authorised full-body roll. The maneuver changes only the
-     * rendered pose; position, velocity and collision remain untouched.
+     * Requests a server-authorised maneuver.
+     *
+     * <p>Rolls change only the rendered pose. Loops and reversals are real
+     * trajectories: the server validates the entry state, sweeps the complete
+     * path against collision and only then commits the maneuver. A refused
+     * trajectory never moves the player and reports the reason on the action
+     * bar.</p>
      */
-    public static boolean requestManeuver(ServerPlayer player, int direction) {
+    public static boolean requestManeuver(ServerPlayer player, int kind, int direction) {
         if (direction != -1 && direction != 1) {
             return false;
         }
@@ -82,9 +99,38 @@ public final class FlightController {
         if (state == null || !state.isActive() || !canMaintainFlight(player)) {
             return false;
         }
-        if (!state.startManeuver(direction, FlightPoseLibrary.MANEUVER_TICKS)) {
+        if (state.getManeuverKind() != FlightState.MANEUVER_NONE
+                || state.getManeuverTicksRemaining() > 0
+                || state.getManeuverCooldownTicks() > 0) {
             return false;
         }
+        int duration = FlightManeuvers.duration(kind);
+        if (duration <= 0) {
+            return false;
+        }
+
+        float basisYaw = player.getYRot();
+        double basisSpeed = player.getDeltaMovement().length();
+        if (FlightManeuvers.isTrajectory(kind)) {
+            int problem = FlightManeuvers.entryProblem(player, kind);
+            basisYaw = FlightManeuvers.basisYaw(player.getDeltaMovement(), player.getYRot());
+            basisSpeed = FlightManeuvers.horizontalSpeed(player.getDeltaMovement());
+            if (problem == FlightManeuvers.PROBLEM_NONE) {
+                problem = FlightManeuverSafety.sweepProblem(
+                        player, kind, direction, basisYaw, basisSpeed);
+            }
+            if (problem != FlightManeuvers.PROBLEM_NONE) {
+                player.displayClientMessage(
+                        Component.translatable(FlightManeuvers.problemKey(problem)), true);
+                return false;
+            }
+        }
+
+        if (!state.startManeuver(kind, direction, duration)) {
+            return false;
+        }
+        state.setManeuverBasis(basisYaw, (float) basisSpeed);
+        state.setManeuverAborted(false);
         state.setManeuverCooldownTicks(MANEUVER_COOLDOWN_TICKS);
         FlightNetwork.syncState(player);
         return true;
@@ -109,13 +155,44 @@ public final class FlightController {
         }
         player.resetFallDistance();
 
-        // The maneuver is visual-only, but the server owns its progress and
-        // broadcasts the remaining ticks so every client stays in sync.
-        boolean maneuverWasActive = state.getManeuverTicksRemaining() > 0;
-        state.tickManeuver();
-        if (maneuverWasActive) {
-            FlightNetwork.syncState(serverPlayer);
+        int kind = state.getManeuverKind();
+        int remaining = state.getManeuverTicksRemaining();
+        if (FlightManeuvers.isTrajectory(kind) && remaining > 0) {
+            int duration = FlightManeuvers.duration(kind);
+            int stepIndex = duration - remaining;
+            // A collision on the previous vanilla move means the swept path did
+            // not hold. Stop the script immediately instead of pushing through.
+            if (stepIndex > 0 && (player.horizontalCollision || player.verticalCollision)) {
+                abortManeuver(serverPlayer, state);
+                return;
+            }
+            Vec3 delta = FlightManeuvers.stepDelta(kind, state.getManeuverDirection(),
+                    state.getManeuverYaw(), state.getManeuverSpeed(), stepIndex, duration);
+            if (delta.lengthSqr() <= 1.0E-9D) {
+                abortManeuver(serverPlayer, state);
+                return;
+            }
+            // The swept path assumes the analytic step is the only horizontal
+            // acceleration. Server-side movement input arrives from the client
+            // and would otherwise shift the real path away from the reviewed
+            // one, so the script consumes and discards it while it runs.
+            player.xxa = 0.0F;
+            player.zza = 0.0F;
+            player.yya = 0.0F;
+            player.setSprinting(false);
+            if (kind == FlightState.MANEUVER_REVERSAL) {
+                float progress = (stepIndex + 1) / (float) duration;
+                float yaw = FlightManeuvers.yawAt(kind, state.getManeuverDirection(),
+                        state.getManeuverYaw(), progress);
+                player.setYRot(yaw);
+                player.setYHeadRot(yaw);
+            }
+            player.setDeltaMovement(delta);
+            advanceManeuver(serverPlayer, state);
+            return;
         }
+
+        advanceManeuver(serverPlayer, state);
 
         if (state.getLastInputGameTick() == Long.MIN_VALUE
                 || player.level().getGameTime() - state.getLastInputGameTick() > INPUT_TIMEOUT_TICKS) {
@@ -140,8 +217,92 @@ public final class FlightController {
         if (state != null && state.isActive() && player.isLocalPlayer()) {
             player.setNoGravity(true);
             player.resetFallDistance();
+            if (clientManeuverKind != FlightState.MANEUVER_NONE
+                    && !tickClientManeuver(player)) {
+                return;
+            }
             player.setDeltaMovement(nextVelocity(player, state.getInputMask()));
+        } else if (clientManeuverKind != FlightState.MANEUVER_NONE) {
+            clearClientManeuver();
         }
+    }
+
+    /**
+     * Starts local prediction for an already server-authorised trajectory. A
+     * normal completion lets the local playback run to its final pose even if
+     * the completion packet arrives first; an abort clears it immediately.
+     */
+    public static void startClientManeuver(int kind, int direction, float yawDegrees,
+                                           float speed, int remainingTicks) {
+        if (!FlightManeuvers.isTrajectory(kind)) {
+            return;
+        }
+        int duration = FlightManeuvers.duration(kind);
+        if (duration <= 0) {
+            return;
+        }
+        clientManeuverKind = kind;
+        clientManeuverDirection = direction;
+        clientManeuverDuration = duration;
+        clientManeuverStep = Mth.clamp(duration - remainingTicks, 0, duration);
+        clientManeuverYaw = yawDegrees;
+        clientManeuverSpeed = speed;
+    }
+
+    public static void abortClientManeuver() {
+        clearClientManeuver();
+    }
+
+    /** Returns false when this tick was already consumed by the local playback. */
+    private static boolean tickClientManeuver(Player player) {
+        int duration = FlightManeuvers.duration(clientManeuverKind);
+        if (duration <= 0 || clientManeuverStep >= duration) {
+            clearClientManeuver();
+            return true;
+        }
+        Vec3 delta = FlightManeuvers.stepDelta(clientManeuverKind, clientManeuverDirection,
+                clientManeuverYaw, clientManeuverSpeed, clientManeuverStep, duration);
+        if (clientManeuverKind == FlightState.MANEUVER_REVERSAL) {
+            float progress = (clientManeuverStep + 1) / (float) duration;
+            float yaw = FlightManeuvers.yawAt(clientManeuverKind, clientManeuverDirection,
+                    clientManeuverYaw, progress);
+            player.setYRot(yaw);
+            player.setYHeadRot(yaw);
+        }
+        player.setDeltaMovement(delta);
+        clientManeuverStep++;
+        return false;
+    }
+
+    private static void clearClientManeuver() {
+        clientManeuverKind = FlightState.MANEUVER_NONE;
+        clientManeuverDirection = 0;
+        clientManeuverDuration = 0;
+        clientManeuverStep = 0;
+        clientManeuverYaw = 0.0F;
+        clientManeuverSpeed = 0.0F;
+    }
+
+    private static void advanceManeuver(ServerPlayer player, FlightState state) {
+        boolean wasActive = state.getManeuverTicksRemaining() > 0;
+        state.tickManeuver();
+        if (wasActive && state.getManeuverTicksRemaining() == 0) {
+            // Completion is the only reliable signal for remote clients that
+            // the scripted path ended normally. Absence of a maneuver without
+            // this sync could also mean a disconnect, so send it explicitly.
+            FlightNetwork.syncState(player);
+        }
+    }
+
+    private static void abortManeuver(ServerPlayer player, FlightState state) {
+        state.clearManeuver();
+        state.setManeuverAborted(true);
+        state.setManeuverCooldownTicks(MANEUVER_COOLDOWN_TICKS);
+        Vec3 current = player.getDeltaMovement();
+        player.setDeltaMovement(current.scale(0.25D));
+        FlightNetwork.syncState(player);
+        player.displayClientMessage(
+                Component.translatable("message.ascendant.flight.maneuver_aborted"), true);
     }
 
     public static void deactivateForLifecycle(Player player) {
