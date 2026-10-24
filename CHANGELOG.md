@@ -214,4 +214,6 @@
 - Sem homologacao visual humana; o smoke de `runClient` nao substitui essa inspecao.
 - O agente do speedster commitou o proprio lote como `e870892`; ele nao faz parte deste
   lote de voo.
-- Publicacao: pendente de autorizacao do dono do projeto; nenhum commit/push deste lote.
+- Publicacao: commit `df49ac6ef4249d5d8339c8a2190bc6477aee6e30` enviado com push normal
+  na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
+  remoto.

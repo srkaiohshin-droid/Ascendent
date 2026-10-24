@@ -345,10 +345,13 @@ Criterios:
   smoke entrou no mundo com protocolo "3", mixins de jogador aplicados e sem crash;
   `git diff --check` sem erros de conteudo.
 - [ ] Homologacao visual humana em cliente grafico.
-- [ ] Autorizacao do dono do projeto para publicar.
+- [x] Autorizacao do dono do projeto para publicar.
 - Nota: o agente do speedster commitou o proprio lote como `e870892` antes da
   validacao final; esse trabalho nao pertence a este lote e foi preservado.
 - Pos-validacao: outro agente iniciou um novo lote de speedster/UI as 22:19; a arvore
   compartilhada pode ficar temporariamente vermelha em `PowerCatalogScreen.java`, fora
   do escopo e dos arquivos deste lote.
-- Publicacao: pendente de autorizacao; nenhum commit/push do lote de voo.
+- Publicacao: commit `df49ac6ef4249d5d8339c8a2190bc6477aee6e30` enviado com push normal
+  na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
+  remoto. O push tambem publicou os ancestrais `a45cef0` e `e870892`, de outros agentes,
+  que ja estavam na branch local.

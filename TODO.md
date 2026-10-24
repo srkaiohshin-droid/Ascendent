@@ -147,4 +147,5 @@
   cabeca/torso e camera/FOV.
 - [ ] Implementar loop/reversao somente quando houver fisica de trajetoria segura e
   testes de colisao; nao aceitar efeito visual como mecanica.
-- [ ] Autorizacao do dono do projeto para commit/push deste lote.
+- [x] Autorizacao do dono, commit `df49ac6` publicado com push normal e SHA remoto
+  confirmado via `git ls-remote`.

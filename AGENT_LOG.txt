@@ -647,10 +647,12 @@ OVERHAUL DE VOO, ANIMACAO, MANOBRAS E CAMERA (AGENTE DE VOO, 2026-10-23)
     esse commit ja esta no historico e nao faz parte do overhaul de voo.
   - Loop/reversao continuam pendentes de fisica segura; nao foi entregue efeito visual
     apresentado como mecanica real.
-- Git: alteracoes de voo e documentacao nao commitadas; o `.gitignore` modificado por
-  outro agente foi preservado. Commit/push deste lote aguardam autorizacao do dono.
+- Git: lote commitado como `df49ac6` e publicado com push normal; o `.gitignore`
+  modificado por outro agente foi preservado. O hook pos-commit nao existe neste clone,
+  entao o push foi executado manualmente e o SHA remoto foi conferido.
 - Pos-validacao: as 22:19-22:21 outro agente iniciou um novo lote de speedster/UI
   (`Ascendant.java`, `PowerCatalogScreen.java`, keybinds de speedster). Uma rechecagem
   de `compileJava` nesse intervalo falhou apenas em `PowerCatalogScreen.java`, que ainda
   estava sendo editado; esses arquivos nao pertencem ao lote de voo e nao foram tocados.
-- Proximo passo: homologacao visual humana e autorizacao do dono para publicar.
+- Proximo passo: homologacao visual humana. Publicacao concluida: `git ls-remote`
+  confirmou `df49ac6` na branch, incluindo os ancestrais `a45cef0` e `e870892`.
