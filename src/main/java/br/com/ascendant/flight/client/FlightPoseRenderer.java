@@ -51,8 +51,14 @@ public final class FlightPoseRenderer {
         // horizontal body into the middle of the player bounding box.
         poseStack.translate(0.0F, pose.bodyLift * weight, 0.0F);
         poseStack.translate(0.0F, FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y, 0.0F);
-        // PoseStack post-multiplies, so the Y rotation is applied to vertices
-        // first and banks around the torso's long axis before the body pitches.
+        // PoseStack post-multiplies, so these are listed from the outermost
+        // orientation inwards: first the body's trajectory yaw relative to the
+        // camera, then the horizontal pitch, then the longitudinal bank. The
+        // yaw must stay outside the pitch or a 180-degree turn would twist the
+        // horizontal body around its own chest instead of turning it around
+        // the world's vertical axis.
+        poseStack.mulPose(Axis.YP.rotationDegrees(
+                sample.bodyYawOffsetDegrees() * weight));
         float bodyPitch = pose.bodyPitchDegrees + sample.maneuverPitchDegrees();
         poseStack.mulPose(Axis.XP.rotationDegrees(bodyPitch * weight));
         float bank = pose.bodyRollDegrees + sample.maneuverRollDegrees();

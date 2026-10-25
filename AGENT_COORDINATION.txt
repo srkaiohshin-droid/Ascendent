@@ -400,3 +400,37 @@ Criterios:
 - Publicacao: commit `15d264facc790f7fa02a0a00b54124bc1ab0ce46` enviado com push normal
   na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
   remoto. Resta apenas a homologacao visual humana.
+
+## Voo livre e alinhamento de pose (2026-10-25, sobre 5051a36)
+Arquivos alterados: FlightPhysics, FlightPoseLibrary, FlightAnimationSelector,
+FlightAnimationController, FlightPoseRenderer, FlightController, FlightState,
+PlayerFlightState, FlightManeuvers, FlightManeuverSafety, FlightNetwork, FlightTuning,
+FlightPoseSample, FlightClientInput, FlightCameraController, FlightCaptureHarness,
+FlightGameTests, FrameworkGameTests, lang/en_us.json e lang/pt_br.json.
+Arquivos NAO tocados: catalogo, trajes, packs, poderes, locomocao terrestre e speedster.
+Criterios:
+- [x] Reversao scriptada de 180 graus removida (constantes, tecla H, camera, testes e
+  traducoes); a meia-volta passa a ser voo livre do jogador, com convergencia angular
+  limitada e sem animacao ou trajetoria pre-programada.
+- [x] Loop vertical e roll de 360 graus preservados.
+- [x] Hover real: decay horizontal, bob vertical, corpo ereto com bracos baixos e sem
+  agachar; o bob nao seleciona CLIMB/DIVE.
+- [x] Cabeca alinhada em todas as poses de voo em movimento (yaw/roll zero e pitch local
+  limitado), sem torcao estranha em decolagem, voo, hover ou pouso.
+- [x] Poses de voo com bracos a frente (heroic/cruise/climb/dive/boost) e decolagem com
+  bracos subindo progressivamente, conforme as animacoes do Fisk.
+- [x] Offset de yaw do corpo derivado de velocidade x camera, com decaimento, para o
+  corpo nao acompanhar o snap da camera.
+- [x] Pouso com gate de descida real, distancia de contato e recuperacao suave; pose
+  forcada em STANDING durante todo o voo.
+- [x] Protocolo "5" e remocao dos campos de reversao do pacote.
+- [x] Harness de captura com inventario vazio, 30 ticks de forward real, hover antes da
+  meia-volta e loop no alto; sessao 20261025-153345 com 24 PNGs.
+- [x] GameTests de hover, bob, boost, meia-volta livre, alinhamento de cabeca, yaw do
+  corpo, bracos a frente, decolagem e gate de pouso; suite em 89/89.
+- Validacao: `runGameTestServer` "All 89 required tests passed"; `build` BUILD
+  SUCCESSFUL; `git diff --check` sem erros de conteudo.
+- [ ] Homologacao visual humana de decolagem, hover, voo nivelado, meia-volta, pouso e
+  cabeca/torso pelos 24 frames de 20261025-153345 e por inspecao interativa.
+- Limitacao aberta: nao foi medido se o atrito de `LivingEntity.travel` amortece de
+  forma perceptivel a velocidade aplicada e o bob.

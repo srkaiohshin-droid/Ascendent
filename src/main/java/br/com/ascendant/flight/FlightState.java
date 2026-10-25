@@ -26,16 +26,8 @@ public interface FlightState {
      * trajectory, so this is a real flight path and not a render-only effect.
      */
     int MANEUVER_LOOP = 2;
-    /**
-     * Reserved half-roll. It is kept as a distinct kind so it is never confused
-     * with the 180-degree heading reversal below.
-     */
+    /** Reserved half-roll kind. It has no controller entry yet. */
     int MANEUVER_ROLL_180 = 3;
-    /**
-     * Horizontal 180-degree U-turn. Like {@link #MANEUVER_LOOP}, the heading
-     * change comes from a collision-checked server trajectory.
-     */
-    int MANEUVER_REVERSAL = 4;
 
     /** Why the last flight session ended. Presentation uses this to pick landing or exit. */
     int END_NONE = 0;
@@ -104,8 +96,8 @@ public interface FlightState {
     /**
      * Starts a typed aerial maneuver.
      *
-     * @param kind one of {@link #MANEUVER_ROLL_360}, {@link #MANEUVER_LOOP},
-     *             {@link #MANEUVER_ROLL_180} or {@link #MANEUVER_REVERSAL}
+     * @param kind one of {@link #MANEUVER_ROLL_360}, {@link #MANEUVER_LOOP}
+     *             or {@link #MANEUVER_ROLL_180}
      */
     boolean startManeuver(int kind, int direction, int durationTicks);
 

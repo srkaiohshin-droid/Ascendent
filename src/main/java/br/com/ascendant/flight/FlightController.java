@@ -6,7 +6,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 public final class FlightController {
@@ -85,11 +88,14 @@ public final class FlightController {
     /**
      * Requests a server-authorised maneuver.
      *
-     * <p>Rolls change only the rendered pose. Loops and reversals are real
-     * trajectories: the server validates the entry state, sweeps the complete
-     * path against collision and only then commits the maneuver. A refused
-     * trajectory never moves the player and reports the reason on the action
-     * bar.</p>
+     * <p>Rolls change only the rendered pose. Loops are real trajectories: the
+     * server validates the entry state, sweeps the complete path against
+     * collision and only then commits the maneuver. A refused trajectory never
+     * moves the player and reports the reason on the action bar.</p>
+     *
+     * <p>The 180-degree heading change is not a maneuver anymore. The player
+     * performs it with ordinary look and movement input, so there is no fixed
+     * turn radius, forced camera yaw or pre-programmed animation to trigger.</p>
      */
     public static boolean requestManeuver(ServerPlayer player, int kind, int direction) {
         if (direction != -1 && direction != 1) {
@@ -154,6 +160,10 @@ public final class FlightController {
             player.setNoGravity(true);
         }
         player.resetFallDistance();
+        // Sneak is also the descend key. Force the standing pose while flying so
+        // that holding it lowers the player without shrinking the hitbox or
+        // dropping the camera into a crouch.
+        maintainStandingPose(player);
 
         int kind = state.getManeuverKind();
         int remaining = state.getManeuverTicksRemaining();
@@ -180,13 +190,6 @@ public final class FlightController {
             player.zza = 0.0F;
             player.yya = 0.0F;
             player.setSprinting(false);
-            if (kind == FlightState.MANEUVER_REVERSAL) {
-                float progress = (stepIndex + 1) / (float) duration;
-                float yaw = FlightManeuvers.yawAt(kind, state.getManeuverDirection(),
-                        state.getManeuverYaw(), progress);
-                player.setYRot(yaw);
-                player.setYHeadRot(yaw);
-            }
             player.setDeltaMovement(delta);
             advanceManeuver(serverPlayer, state);
             return;
@@ -217,13 +220,17 @@ public final class FlightController {
         if (state != null && state.isActive() && player.isLocalPlayer()) {
             player.setNoGravity(true);
             player.resetFallDistance();
+            maintainStandingPose(player);
             if (clientManeuverKind != FlightState.MANEUVER_NONE
                     && !tickClientManeuver(player)) {
                 return;
             }
             player.setDeltaMovement(nextVelocity(player, state.getInputMask()));
-        } else if (clientManeuverKind != FlightState.MANEUVER_NONE) {
-            clearClientManeuver();
+        } else {
+            releaseStandingPose(player);
+            if (clientManeuverKind != FlightState.MANEUVER_NONE) {
+                clearClientManeuver();
+            }
         }
     }
 
@@ -262,13 +269,6 @@ public final class FlightController {
         }
         Vec3 delta = FlightManeuvers.stepDelta(clientManeuverKind, clientManeuverDirection,
                 clientManeuverYaw, clientManeuverSpeed, clientManeuverStep, duration);
-        if (clientManeuverKind == FlightState.MANEUVER_REVERSAL) {
-            float progress = (clientManeuverStep + 1) / (float) duration;
-            float yaw = FlightManeuvers.yawAt(clientManeuverKind, clientManeuverDirection,
-                    clientManeuverYaw, progress);
-            player.setYRot(yaw);
-            player.setYHeadRot(yaw);
-        }
         player.setDeltaMovement(delta);
         clientManeuverStep++;
         return false;
@@ -357,25 +357,62 @@ public final class FlightController {
     }
 
     private static Vec3 nextVelocity(Player player, int inputMask) {
+        FlightPhysics.Params params = new FlightPhysics.Params(
+                FlightTuning.MAX_CRUISE_SPEED.get(),
+                FlightTuning.MAX_BOOST_SPEED.get(),
+                FlightTuning.ACCELERATION.get(),
+                FlightTuning.BOOST_ACCELERATION.get(),
+                FlightTuning.DRAG.get(),
+                FlightTuning.BRAKING.get(),
+                FlightTuning.HOVER_STABILITY.get(),
+                FlightTuning.HOVER_BOB.get(),
+                FlightTuning.BOOST_TURN_RATE_DEGREES.get()
+        );
         return FlightPhysics.nextVelocity(
                 player.getDeltaMovement(),
                 player.getYRot(),
                 player.getXRot(),
                 inputMask,
                 player.isSprinting(),
-                FlightTuning.MAX_CRUISE_SPEED.get(),
-                FlightTuning.MAX_BOOST_SPEED.get(),
-                FlightTuning.ACCELERATION.get(),
-                FlightTuning.BOOST_ACCELERATION.get(),
-                FlightTuning.STEERING_FACTOR.get(),
-                FlightTuning.DRAG.get(),
-                FlightTuning.BRAKING.get(),
-                FlightTuning.HOVER_STABILITY.get()
+                player.level().getGameTime(),
+                params
         );
+    }
+
+    /**
+     * Keeps the standing pose while flight is active. Sneak is the descend
+     * input, so allowing vanilla to apply {@link Pose#CROUCHING} would shrink
+     * the hitbox and lower the camera every time the player descends. The pose
+     * is only forced when the standing box is actually clear; a low ceiling
+     * still falls back to vanilla collision handling.
+     */
+    private static void maintainStandingPose(Player player) {
+        if (player.isFallFlying() || !hasRoomForStandingPose(player)) {
+            releaseStandingPose(player);
+        } else {
+            player.setForcedPose(Pose.STANDING);
+        }
+    }
+
+    /**
+     * {@code Entity.canEnterPose} is protected, so the same vanilla check is
+     * reproduced here with the public dimension and collision API.
+     */
+    private static boolean hasRoomForStandingPose(Player player) {
+        EntityDimensions dimensions = player.getDimensions(Pose.STANDING);
+        AABB box = dimensions.makeBoundingBox(player.position()).deflate(1.0E-7D);
+        return player.level().noCollision(player, box);
+    }
+
+    private static void releaseStandingPose(Player player) {
+        if (player.getForcedPose() == Pose.STANDING) {
+            player.setForcedPose(null);
+        }
     }
 
     private static void deactivate(Player player, FlightState state, int reason) {
         boolean restoreNoGravity = state.hadNoGravity();
+        releaseStandingPose(player);
         state.clear();
         // clear() wipes the session, so the presentation reason is recorded
         // afterwards and travels in the same state packet as the deactivation.

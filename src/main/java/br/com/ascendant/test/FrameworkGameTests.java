@@ -64,6 +64,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import net.minecraftforge.network.NetworkHooks;
@@ -406,6 +407,11 @@ public final class FrameworkGameTests {
                 "The bounded phase step should execute through the server runtime");
         helper.assertTrue(serverPlayer.position().distanceToSqr(phaseStart) > 1.0D,
                 "Phase step should displace the player to a collision-free destination");
+        // Test structures share one level. Leftover hostiles can become valid
+        // gravity/beam targets for a neighbouring test and make it order
+        // dependent, so every spawned mob must be removed explicitly.
+        levitationTarget.discard();
+        vortexTarget.discard();
         removeServerPlayer(testPlayer);
         helper.succeed();
     }
@@ -514,6 +520,8 @@ public final class FrameworkGameTests {
         for (int dy = 0; dy <= 2; dy++) {
             level.removeBlock(wallBase.offset(0, dy, 0), false);
         }
+        exposed.discard();
+        behindWall.discard();
         removeServerPlayer(testPlayer);
         helper.succeed();
     }
@@ -559,10 +567,22 @@ public final class FrameworkGameTests {
         serverPlayer.moveTo(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D, 0.0F, 0.0F);
 
         ServerLevel level = serverPlayer.serverLevel();
+        // The gametest level is reused between runs. Discard only zombies left
+        // in this test's own spawn area; clearing a wider radius could remove
+        // entities owned by a neighbouring test structure.
+        Vec3 targetPosition = new Vec3(serverPlayer.getX() + 2.0D,
+                serverPlayer.getY(), serverPlayer.getZ());
+        level.getEntitiesOfClass(Mob.class,
+                        new AABB(targetPosition, targetPosition).inflate(1.0D), Mob::isAlive)
+                .forEach(Mob::discard);
         Mob target = EntityType.ZOMBIE.create(level);
         helper.assertTrue(target != null, "Gravity test requires a vanilla zombie");
-        target.moveTo(serverPlayer.getX() + 3.0D, serverPlayer.getY(), serverPlayer.getZ(), 0.0F, 0.0F);
-        level.addFreshEntity(target);
+        // Two blocks is the last column of the excavated test area. At three
+        // blocks the target ends up inside unexcavated deepslate, which blocks
+        // the line-of-sight check used by the field.
+        target.moveTo(targetPosition.x, targetPosition.y, targetPosition.z, 0.0F, 0.0F);
+        helper.assertTrue(level.addFreshEntity(target),
+                "Gravity test requires the target to enter the level");
 
         Vec3 toward = new Vec3(serverPlayer.getX() - target.getX(), 0.0D,
                 serverPlayer.getZ() - target.getZ()).normalize();

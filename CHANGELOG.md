@@ -243,3 +243,35 @@
 - Publicacao: commit `15d264facc790f7fa02a0a00b54124bc1ab0ce46` enviado com push normal
   na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
   remoto.
+
+## 0.1.0 - Voo livre, hover real e alinhamento de pose (2026-10-25)
+- Reversao de 180 graus scriptada removida por completo: constantes
+  `MANEUVER_REVERSAL`/`REVERSAL_*`, tecla H, camera, testes e traducoes. A meia-volta
+  passa a ser voo normal do jogador, com convergencia angular limitada, sem animacao ou
+  trajetoria pre-programada. Loop vertical e roll de 360 graus preservados.
+- Fisica em dois modos: voo normal relativo a camera (WASD, jump/sneak vertical e pitch
+  do olhar) e boost de sprint seguindo o vetor completo do look. Hover real com decay
+  horizontal e bob vertical.
+- Poses refeitas: hover ereto com bracos baixos; voo em movimento quase horizontal com
+  bracos a frente (heroic -168/-164, cruise -170/-166, climb -154/-150, dive -182/-178,
+  boost -174/-170) e cabeca alinhada; decolagem sobe os bracos progressivamente.
+- Offset de yaw do corpo derivado de velocidade x camera, com decaimento, para o corpo
+  nao acompanhar o snap da camera nas curvas.
+- Pouso com gate de descida real em `LANDING_PROBE_HEIGHT = 2.40`, distancia de contato
+  e recuperacao suave em `LANDING_RECOVERY_TICKS = 12`; pose forcada em STANDING durante
+  todo o voo.
+- `FlightAnimationSelector` ganhou `VERTICAL_CLASSIFICATION_SPEED = 0.05` e
+  `TRAJECTORY_HORIZONTAL_SPEED = 0.10` para o bob do hover nao selecionar CLIMB/DIVE.
+- Protocolo de voo "5", sem os campos de reversao.
+- Harness de captura atualizado: inventario vazio, `FLIGHT_Y = 230`, 30 ticks de forward
+  real antes das fotos de nivel, hover antes da meia-volta livre, loop no alto e teclas
+  liberadas no fim. Sessao 20261025-153345 gerou 24 PNGs sem recusa.
+- Testes: hover, bob, boost, meia-volta livre, alinhamento de cabeca, yaw do corpo,
+  bracos a frente, decolagem e gate de pouso; suite em 89/89 GameTests.
+  `runGameTestServer` "All 89 required tests passed" e `build` BUILD SUCCESSFUL.
+- Telemetria: nivel weight 1.00 bodyPitch -77.6/-71.6; hover -9.6/-10.7; meia-volta
+  -59.7 -> -72.4 -> -76.3; decolagem -2.0 -> -36.3 -> -52.3; pouso -58.5 -> -34.6 ->
+  -18.4 -> vanilla.
+- Sem homologacao visual humana; as capturas sao evidencia, nao aprovacao. Tambem nao
+  foi medido se o atrito de `LivingEntity.travel` amortece de forma perceptivel a
+  velocidade aplicada e o bob.

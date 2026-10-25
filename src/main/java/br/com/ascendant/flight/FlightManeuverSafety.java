@@ -14,10 +14,10 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  *
  * <p>The complete analytic path is checked before the server commits to it,
  * including intermediate samples between tick positions. The player's real
- * bounding box is used at every sample, so a loop or U-turn that would clip a
- * block, a liquid, the world border or the build-height limits is refused
- * instead of being "fixed" by collision later. Unloaded chunks are refused
- * because their geometry cannot be verified.</p>
+ * bounding box is used at every sample, so a loop that would clip a block, a
+ * liquid, the world border or the build-height limits is refused instead of
+ * being "fixed" by collision later. Unloaded chunks are refused because their
+ * geometry cannot be verified.</p>
  */
 public final class FlightManeuverSafety {
     private FlightManeuverSafety() {

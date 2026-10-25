@@ -259,7 +259,7 @@ final class PlayerFlightState implements FlightState {
 
     private static boolean isValidKind(int kind) {
         return kind == MANEUVER_ROLL_360 || kind == MANEUVER_LOOP
-                || kind == MANEUVER_ROLL_180 || kind == MANEUVER_REVERSAL;
+                || kind == MANEUVER_ROLL_180;
     }
 
     private static boolean isValidEndReason(int reason) {

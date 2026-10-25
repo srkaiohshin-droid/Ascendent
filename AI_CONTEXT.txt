@@ -298,3 +298,44 @@ LOTE DE MANOBRAS E CAPTURA (2026-10-23, sobre `418038e`)
 - Publicacao: commit `15d264facc790f7fa02a0a00b54124bc1ab0ce46` enviado com push normal
   na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
   remoto.
+
+VOO LIVRE E ALINHAMENTO DE POSE (2026-10-25, sobre 5051a36)
+- Escopo: `FlightPhysics`, `FlightPoseLibrary`, `FlightAnimationSelector`,
+  `FlightAnimationController`, `FlightPoseRenderer`, `FlightController`, `FlightState`,
+  `PlayerFlightState`, `FlightManeuvers`, `FlightManeuverSafety`, `FlightNetwork`,
+  `FlightTuning`, `FlightPoseSample`, `FlightClientInput`, `FlightCameraController`,
+  `FlightCaptureHarness`, `FlightGameTests`, `FrameworkGameTests` e traducoes en_us/pt_br.
+  Catalogo, poderes, trajes, packs, locomocao e speedster nao foram alterados.
+- Reversao de 180 graus scriptada removida por completo: `MANEUVER_REVERSAL`,
+  `REVERSAL_*`, entrada H, camera e testes associados deixaram de existir. A meia-volta
+  agora e voo normal do jogador: a velocidade converge para o novo look com taxa
+  angular limitada e o corpo acompanha por offset de yaw, sem animacao ou trajetoria
+  pre-programada. Loop vertical e roll de 360 graus foram preservados.
+- Fisica em dois modos: voo normal relativo a camera (WASD no plano do look, jump/sneak
+  como comando vertical, pitch do olhar enviesando o alvo vertical com forward) e boost
+  de sprint seguindo o vetor completo do look com convergencia limitada. Hover real:
+  sem controles a velocidade horizontal decai e a vertical entra no bob.
+- Hover: corpo ereto, bracos baixos, bodyPitch -9 + settle*1.8, yaw de cabeca 1.2 graus;
+  nada de agachar durante o hover. Poses de voo em movimento mantem a cabeca alinhada
+  (yaw/roll zero): heroic -168/-164, cruise -170/-166, climb -154/-150, dive -182/-178,
+  boost -174/-170. Decolagem sobe os bracos (-132/-128) e estende progressivamente.
+- `FlightAnimationSelector`: `VERTICAL_CLASSIFICATION_SPEED = 0.05` e
+  `TRAJECTORY_HORIZONTAL_SPEED = 0.10` impedem que o bob do hover selecione CLIMB/DIVE.
+- Pouso: gate por descida real a partir de `LANDING_PROBE_HEIGHT = 2.40`, contato e
+  recuperacao suave em `LANDING_RECOVERY_TICKS = 12`; pose forcada em STANDING durante
+  todo o voo para o sneak nao encolher hitbox nem baixar a camera.
+- Rede: protocolo de voo "5" (sem kind/direcao/ticks de reversao).
+- Captura: `FLIGHT_Y = 230`, inventario vazio, 30 ticks de forward real antes das fotos
+  de nivel, hover antes da meia-volta livre, loop no alto e teclas liberadas no fim.
+  Sessao 20261025-153345 gerou 24 PNGs sem recusa.
+- Telemetria da sessao 20261025-153345: nivel weight 1.00 bodyPitch -77.6/-71.6;
+  hover -9.6/-10.7; meia-volta livre bodyPitch -59.7 -> -72.4 -> -76.3, bodyRoll
+  4.2 -> 18.6, bodyYaw 11.0 -> 31.7, sem pacote de manobra; decolagem -2.0 -> -36.3 ->
+  -52.3; pouso -58.5 -> -34.6 -> -18.4 -> vanilla.
+- Validacao: `runGameTestServer` "All 89 required tests passed" (BUILD SUCCESSFUL);
+  `build` BUILD SUCCESSFUL; `git diff --check` sem erros de conteudo.
+- Limitacoes: nao houve homologacao visual humana nem inspecao interativa de mouse e
+  teclado; nao foi medido se o atrito de `LivingEntity.travel` amortece de forma
+  perceptivel a velocidade aplicada e o bob. As capturas sao evidencia, nao aprovacao.
+- Proximo passo: revisar os 24 frames de 20261025-153345 e conceder ou recusar a
+  homologacao visual de decolagem, hover, voo nivelado, meia-volta e pouso.

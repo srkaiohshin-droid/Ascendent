@@ -13,8 +13,12 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import java.util.function.Supplier;
 
 public final class FlightNetwork {
-    /** Bumped whenever the state payload changes so mismatched peers fail fast. */
-    private static final String PROTOCOL = "4";
+    /**
+     * Bumped whenever the state payload or maneuver semantics change so
+     * mismatched peers fail fast. Version 5 removed the scripted 180-degree
+     * reversal; its kind value is now invalid on purpose.
+     */
+    private static final String PROTOCOL = "5";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(Ascendant.MOD_ID, "flight"), () -> PROTOCOL,
             PROTOCOL::equals, PROTOCOL::equals);

@@ -31,9 +31,6 @@ public final class FlightClientInput {
     private static final KeyMapping MANEUVER_LOOP = new KeyMapping(
             "key.ascendant.flight_loop", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G,
             "key.categories.ascendant.flight");
-    private static final KeyMapping MANEUVER_REVERSAL = new KeyMapping(
-            "key.ascendant.flight_reversal", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H,
-            "key.categories.ascendant.flight");
 
     private static boolean requestPending;
     private static int lastSentInput = -1;
@@ -49,7 +46,6 @@ public final class FlightClientInput {
         event.register(MANEUVER_LEFT);
         event.register(MANEUVER_RIGHT);
         event.register(MANEUVER_LOOP);
-        event.register(MANEUVER_REVERSAL);
         MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onClientTick);
         MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onPlayerTick);
         MinecraftForge.EVENT_BUS.addListener(FlightClientInput::onMovementInput);
@@ -97,10 +93,6 @@ public final class FlightClientInput {
             while (MANEUVER_LOOP.consumeClick()) {
                 FlightNetwork.requestManeuver(FlightState.MANEUVER_LOOP, 1);
             }
-            while (MANEUVER_REVERSAL.consumeClick()) {
-                FlightNetwork.requestManeuver(FlightState.MANEUVER_REVERSAL,
-                        heldTurnDirection(minecraft));
-            }
         } else {
             drainManeuverClicks();
         }
@@ -120,15 +112,6 @@ public final class FlightClientInput {
         while (MANEUVER_LEFT.consumeClick()) { }
         while (MANEUVER_RIGHT.consumeClick()) { }
         while (MANEUVER_LOOP.consumeClick()) { }
-        while (MANEUVER_REVERSAL.consumeClick()) { }
-    }
-
-    /** Left turns left, right turns right, and an unheld key defaults to right. */
-    private static int heldTurnDirection(Minecraft minecraft) {
-        if (minecraft.options.keyLeft.isDown() && !minecraft.options.keyRight.isDown()) {
-            return -1;
-        }
-        return 1;
     }
 
     private static int readInput(Minecraft minecraft) {

@@ -7,29 +7,24 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Deterministic geometry and entry validation for trajectory maneuvers.
  *
- * <p>Both maneuvers are real server-owned paths, not camera or pose tricks:
- * the controller advances the player by the delta of the analytic path and
- * every path is swept against block, fluid, height and world-border collision
- * before it is allowed to start. The same geometry feeds client prediction and
- * the presentation layer, so no client decides where the player goes.</p>
+ * <p>The vertical loop is a real server-owned path, not a camera or pose trick:
+ * the controller advances the player by the delta of the analytic circle and
+ * the complete path is swept against block, fluid, height and world-border
+ * collision before it is allowed to start. The same geometry feeds client
+ * prediction and the presentation layer, so no client decides where the player
+ * goes.</p>
  *
- * <p>The loop is a full circle in the vertical plane of the entry heading: it
- * starts and ends at the same point with the original forward velocity. The
- * reversal is a half circle in the horizontal plane: it ends one diameter to
- * the side of the entry point, facing the opposite heading. A full loop has a
- * circumference of {@code speed * ticks}; a reversal has an arc length of
- * {@code PI * radius}.</p>
+ * <p>The 180-degree heading change is intentionally not a scripted trajectory
+ * anymore. It is ordinary player control: the look direction turns freely and
+ * the physics curves the velocity towards it. This keeps the full manoeuvre in
+ * the player's hands instead of replaying a fixed animation.</p>
  */
 public final class FlightManeuvers {
     /** Ticks in one full vertical loop. */
     public static final int LOOP_TICKS = 28;
-    /** Ticks in one horizontal 180-degree reversal. */
-    public static final int REVERSAL_TICKS = 18;
 
     /** Minimum horizontal speed to enter a loop, in blocks per tick. */
     public static final double LOOP_MIN_SPEED = 0.50D;
-    /** Minimum horizontal speed to enter a reversal, in blocks per tick. */
-    public static final double REVERSAL_MIN_SPEED = 0.40D;
     /** Upper bound that keeps the swept volume reviewable. */
     public static final double MAX_ENTRY_SPEED = 1.25D;
     /** Maximum trajectory pitch at entry, in degrees. */
@@ -47,8 +42,6 @@ public final class FlightManeuvers {
      * Requiring this clearance keeps the reviewed path safe in both copies.
      */
     public static final double SWEEP_CLEARANCE = 0.35D;
-    /** Bank held at the middle of a reversal, in degrees. */
-    public static final float REVERSAL_BANK_DEGREES = 30.0F;
 
     public static final int PROBLEM_NONE = 0;
     public static final int PROBLEM_INVALID = 1;
@@ -67,27 +60,22 @@ public final class FlightManeuvers {
     private FlightManeuvers() {
     }
 
-    /** Ticks for a maneuver kind, or zero when the kind is not a real maneuver. */
+    /** Ticks for a maneuver kind, or zero when the kind has no controller entry. */
     public static int duration(int kind) {
         return switch (kind) {
             case FlightState.MANEUVER_ROLL_360 -> FlightPoseLibrary.MANEUVER_TICKS;
             case FlightState.MANEUVER_LOOP -> LOOP_TICKS;
-            case FlightState.MANEUVER_REVERSAL -> REVERSAL_TICKS;
             default -> 0;
         };
     }
 
     /** True for maneuvers that move the player along a checked trajectory. */
     public static boolean isTrajectory(int kind) {
-        return kind == FlightState.MANEUVER_LOOP || kind == FlightState.MANEUVER_REVERSAL;
+        return kind == FlightState.MANEUVER_LOOP;
     }
 
     public static double minimumSpeed(int kind) {
-        return switch (kind) {
-            case FlightState.MANEUVER_LOOP -> LOOP_MIN_SPEED;
-            case FlightState.MANEUVER_REVERSAL -> REVERSAL_MIN_SPEED;
-            default -> 0.0D;
-        };
+        return kind == FlightState.MANEUVER_LOOP ? LOOP_MIN_SPEED : 0.0D;
     }
 
     public static double horizontalSpeed(Vec3 velocity) {
@@ -141,11 +129,7 @@ public final class FlightManeuvers {
 
     public static double radius(int kind, double speed) {
         double clamped = Math.max(0.0D, speed);
-        return switch (kind) {
-            case FlightState.MANEUVER_LOOP -> clamped * LOOP_TICKS / TWO_PI;
-            case FlightState.MANEUVER_REVERSAL -> clamped * REVERSAL_TICKS / Math.PI;
-            default -> 0.0D;
-        };
+        return kind == FlightState.MANEUVER_LOOP ? clamped * LOOP_TICKS / TWO_PI : 0.0D;
     }
 
     /** Horizontal unit vector for a Minecraft yaw. */
@@ -154,36 +138,22 @@ public final class FlightManeuvers {
         return new Vec3(-Math.sin(radians), 0.0D, Math.cos(radians));
     }
 
-    /** Unit vector to the player's right for a Minecraft yaw. */
-    public static Vec3 right(float yawDegrees) {
-        double radians = Math.toRadians(yawDegrees);
-        return new Vec3(-Math.cos(radians), 0.0D, -Math.sin(radians));
-    }
-
     /**
      * Position offset from the entry point at a normalized progress.
      * Progress is clamped, so the final sample is exactly the end of the path.
      */
     public static Vec3 offset(int kind, int direction, float yawDegrees,
                               double speed, double progress) {
+        if (kind != FlightState.MANEUVER_LOOP) {
+            return Vec3.ZERO;
+        }
         double p = clamp(progress, 0.0D, 1.0D);
         double radius = radius(kind, speed);
-        if (kind == FlightState.MANEUVER_LOOP) {
-            double angle = TWO_PI * p;
-            Vec3 forward = forward(yawDegrees);
-            double horizontal = radius * Math.sin(angle);
-            return new Vec3(forward.x * horizontal, radius * (1.0D - Math.cos(angle)),
-                    forward.z * horizontal);
-        }
-        if (kind == FlightState.MANEUVER_REVERSAL) {
-            double angle = Math.PI * p;
-            Vec3 forward = forward(yawDegrees);
-            Vec3 side = right(yawDegrees).scale(direction);
-            double across = radius * (1.0D - Math.cos(angle));
-            double along = radius * Math.sin(angle);
-            return side.scale(across).add(forward.scale(along));
-        }
-        return Vec3.ZERO;
+        double angle = TWO_PI * p;
+        Vec3 forward = forward(yawDegrees);
+        double horizontal = radius * Math.sin(angle);
+        return new Vec3(forward.x * horizontal, radius * (1.0D - Math.cos(angle)),
+                forward.z * horizontal);
     }
 
     /** Delta for one server tick. Step index zero is the first step after entry. */
@@ -198,30 +168,12 @@ public final class FlightManeuvers {
                 .subtract(offset(kind, direction, yawDegrees, speed, start));
     }
 
-    /** Heading the entity should face at a normalized progress. */
-    public static float yawAt(int kind, int direction, float basisYawDegrees, float progress) {
-        if (kind != FlightState.MANEUVER_REVERSAL) {
-            return Mth.wrapDegrees(basisYawDegrees);
-        }
-        return Mth.wrapDegrees(basisYawDegrees
-                + direction * 180.0F * Mth.clamp(progress, 0.0F, 1.0F));
-    }
-
     /** Extra body pitch for the loop; a full 360 turn about the lateral axis. */
     public static float bodyPitchOffset(int kind, float progress) {
         if (kind != FlightState.MANEUVER_LOOP) {
             return 0.0F;
         }
         return 360.0F * Mth.clamp(progress, 0.0F, 1.0F);
-    }
-
-    /** Extra body bank for the reversal; zero at both ends. */
-    public static float bodyRollOffset(int kind, int direction, float progress) {
-        if (kind != FlightState.MANEUVER_REVERSAL || direction != -1 && direction != 1) {
-            return 0.0F;
-        }
-        float p = Mth.clamp(progress, 0.0F, 1.0F);
-        return direction * REVERSAL_BANK_DEGREES * Mth.sin(p * (float) Math.PI);
     }
 
     /** Human-readable key used by the server refusal message. */

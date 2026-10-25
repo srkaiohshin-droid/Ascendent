@@ -43,12 +43,12 @@ import java.util.WeakHashMap;
 @Mod.EventBusSubscriber(modid = Ascendant.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class FlightAnimationController {
     private static final Map<Player, Rig> RIGS = new WeakHashMap<>();
-    private static final float POSE_SMOOTHING = 0.32F;
-    private static final float WEIGHT_STEP = 0.28F;
+    private static final float POSE_SMOOTHING = 0.18F;
+    private static final float WEIGHT_STEP = 0.18F;
     private static final float BANK_SMOOTHING = 0.22F;
+    private static final float BODY_YAW_SMOOTHING = 0.16F;
     private static final float ACCELERATION_SMOOTHING = 0.30F;
-    private static final float LANDING_PROGRESS_SMOOTHING = 0.28F;
-    private static final float LANDING_PROBE_HEIGHT = 1.6F;
+    private static final float LANDING_PROGRESS_SMOOTHING = 0.22F;
     private static final float MAX_REMOTE_STEP = 3.0F;
     private static final int EXIT_MODE_NONE = 0;
     private static final int EXIT_MODE_BLEND = 1;
@@ -109,11 +109,13 @@ public final class FlightAnimationController {
             return null;
         }
         FlightPose pose = FlightPose.lerp(rig.previous, rig.current, delta);
+        float bodyYaw = FlightPose.lerpAngleDegrees(
+                rig.previousBodyYaw, rig.currentBodyYaw, delta);
         float maneuverPitch = FlightPose.lerpAngleDegrees(
                 rig.previousManeuverPitch, rig.currentManeuverPitch, delta);
         float maneuverRoll = FlightPose.lerpAngleDegrees(
                 rig.previousManeuverRoll, rig.currentManeuverRoll, delta);
-        return new FlightPoseSample(pose, weight, maneuverPitch, maneuverRoll);
+        return new FlightPoseSample(pose, weight, bodyYaw, maneuverPitch, maneuverRoll);
     }
 
     /** Snapshot used by the camera and FOV effects for the active maneuver. */
@@ -128,6 +130,21 @@ public final class FlightAnimationController {
         float progress = Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F),
                 rig.previousManeuverProgress, rig.currentManeuverProgress);
         return new ManeuverView(rig.maneuverKind, rig.maneuverDirection, progress);
+    }
+
+    /**
+     * Whether the body may visually lead the camera towards the real
+     * trajectory. The upright takeoff, hover and landing poses stay aligned
+     * with the camera; everything horizontal uses the trajectory offset, which
+     * is what makes a free 180-degree turn read as a turn of the body instead
+     * of the model snapping with the mouse.
+     */
+    private static boolean allowsBodyYaw(FlightAnimationState state) {
+        return state != FlightAnimationState.HOVER
+                && state != FlightAnimationState.TAKEOFF
+                && state != FlightAnimationState.LANDING
+                && state != FlightAnimationState.EXIT
+                && state != FlightAnimationState.MANEUVER;
     }
 
     /**
@@ -168,10 +185,15 @@ public final class FlightAnimationController {
         private float previousBank;
         private float currentBank;
         private float smoothedBank;
+        private float previousBodyYaw;
+        private float currentBodyYaw;
+        private float smoothedBodyYaw;
         private float smoothedAcceleration;
         private float smoothedLanding;
         private float landingImpact;
         private float lastSpeed;
+        private float lastVerticalSpeed;
+        private float lastHorizontalSpeed;
         private float lastHeading = Float.NaN;
         private int activeTicks;
         private int stateTicks;
@@ -218,8 +240,6 @@ public final class FlightAnimationController {
             // like a high-speed pass.
             boolean boosting = player.isSprinting()
                     && speed >= FlightAnimationSelector.SLOW_ENTER_SPEED * 0.5F;
-            int takeoffTicks = state.wasLaunchedFromGround()
-                    ? FlightPoseLibrary.TAKEOFF_GROUND_TICKS : FlightPoseLibrary.TAKEOFF_AIR_TICKS;
 
             if (state.isActive()) {
                 if (!wasActive) {
@@ -233,30 +253,34 @@ public final class FlightAnimationController {
                     smoothedBank = 0.0F;
                     currentBank = 0.0F;
                     previousBank = 0.0F;
+                    smoothedBodyYaw = 0.0F;
+                    currentBodyYaw = 0.0F;
+                    previousBodyYaw = 0.0F;
                     smoothedLanding = 0.0F;
                     landingImpact = 0.0F;
                     smoothedAcceleration = 0.0F;
                     lastSpeed = 0.0F;
+                    lastVerticalSpeed = 0.0F;
+                    lastHorizontalSpeed = 0.0F;
                     lastHeading = Float.NaN;
                 }
                 wasActive = true;
                 activeTicks++;
 
                 float groundDistance = distanceToGround(player);
-                float rawLanding = 0.0F;
-                boolean descending = verticalSpeed < -0.02F;
-                boolean nearContact = groundDistance < 0.55F;
-                if (activeTicks > takeoffTicks && groundDistance < LANDING_PROBE_HEIGHT
-                        && verticalSpeed <= 0.02F
-                        && (braking || descending || (horizontalSpeed < 0.30F && nearContact))) {
-                    rawLanding = 1.0F - clamp01((groundDistance - 0.05F)
-                            / (LANDING_PROBE_HEIGHT - 0.05F));
-                }
+                // Only a real descent may start a landing. The old gate used
+                // "not climbing" and fired during a hover near the ground,
+                // folding the body into the contact pose while the player was
+                // simply floating. The pure gate also requires the launch pose
+                // to be over, so takeoff cannot be mistaken for a landing.
+                float rawLanding = FlightPoseLibrary.landingProgress(activeTicks,
+                        state.wasLaunchedFromGround(), groundDistance, verticalSpeed, braking);
                 smoothedLanding += (rawLanding - smoothedLanding) * LANDING_PROGRESS_SMOOTHING;
                 if (smoothedLanding < 0.002F) {
                     smoothedLanding = 0.0F;
                 }
-                landingImpact = clamp01(-verticalSpeed / 0.25F + horizontalSpeed / 0.90F);
+                landingImpact = clamp01(-lastVerticalSpeed / 0.30F
+                        + lastHorizontalSpeed / 1.0F);
 
                 FlightMotionSample sample = FlightMotionSample.builder()
                         .active(true)
@@ -288,6 +312,17 @@ public final class FlightAnimationController {
                 }
                 target = FlightPoseLibrary.target(animationState, sample);
 
+                // Interpolate the yaw on the shortest arc. A straight scalar
+                // lerp would spin the body the long way round when the target
+                // crosses the +/-180 seam during a free reversal.
+                float bodyYawTarget = allowsBodyYaw(animationState) && !maneuvering
+                        ? FlightPoseLibrary.bodyYawOffset(aimError, horizontalSpeed,
+                        FlightPoseLibrary.MAX_BODY_YAW_OFFSET)
+                        : 0.0F;
+                smoothedBodyYaw += Mth.wrapDegrees(bodyYawTarget - smoothedBodyYaw)
+                        * BODY_YAW_SMOOTHING;
+                smoothedBodyYaw = Mth.wrapDegrees(smoothedBodyYaw);
+
                 previousWeight = weight;
                 weight = Math.min(1.0F, weight + WEIGHT_STEP);
             } else {
@@ -312,10 +347,14 @@ public final class FlightAnimationController {
             currentManeuverPitch = maneuverPitch;
             previousManeuverProgress = currentManeuverProgress;
             currentManeuverProgress = maneuverProgress;
+            previousBodyYaw = currentBodyYaw;
+            currentBodyYaw = smoothedBodyYaw;
 
             previous = current;
             current = FlightPose.lerp(current, target, POSE_SMOOTHING);
             lastSpeed = speed;
+            lastVerticalSpeed = verticalSpeed;
+            lastHorizontalSpeed = horizontalSpeed;
             if (finishAfterTick) {
                 finishAfterTick = false;
                 finishPlayback(true);
@@ -385,8 +424,7 @@ public final class FlightAnimationController {
             maneuverRoll = maneuverKind == FlightState.MANEUVER_ROLL_360
                     ? FlightPoseLibrary.maneuverRollProgress(
                     maneuverDirection, maneuverProgress)
-                    : FlightManeuvers.bodyRollOffset(
-                    maneuverKind, maneuverDirection, maneuverProgress);
+                    : 0.0F;
             if (maneuverElapsed >= maneuverDuration) {
                 // Render the exact end orientation once, then stop.
                 finishAfterTick = true;
@@ -421,13 +459,17 @@ public final class FlightAnimationController {
                 exitMode = EXIT_MODE_LANDING;
                 recoveryTicks = FlightPoseLibrary.LANDING_RECOVERY_TICKS;
                 smoothedLanding = 1.0F;
-                landingImpact = clamp01(0.5F + (float) player.getDeltaMovement().length());
+                // The post-deactivation velocity has already been made safe for
+                // the transition, so the impact must come from the last real
+                // flight tick. Otherwise every landing reads as a hard impact.
+                landingImpact = clamp01(-lastVerticalSpeed / 0.30F
+                        + lastHorizontalSpeed / 1.0F);
                 target = FlightPoseLibrary.target(FlightAnimationState.LANDING,
                         FlightMotionSample.builder()
                                 .active(false)
                                 .activeTicks(activeTicks)
-                                .speed((float) player.getDeltaMovement().length())
-                                .verticalSpeed((float) player.getDeltaMovement().y)
+                                .speed(lastHorizontalSpeed)
+                                .verticalSpeed(lastVerticalSpeed)
                                 .bank(smoothedBank)
                                 .landing(1.0F, landingImpact)
                                 .recovery(0.0F)
@@ -456,17 +498,19 @@ public final class FlightAnimationController {
                     .recovery(progress)
                     .build();
             target = FlightPoseLibrary.target(FlightAnimationState.LANDING, sample);
+            // Fade the whole landing pose with the same smooth curve that drives
+            // the contact-to-standing blend. The old step (a hard clamp above
+            // 0.65 followed by a 4-tick drop) produced a visible pop exactly at
+            // the end of the landing.
+            float remaining = 1.0F - smoothstep(progress);
             previousWeight = weight;
+            weight = recoveryTicks <= 0 ? 0.0F : remaining;
             if (recoveryTicks <= 0) {
-                weight = 0.0F;
                 finished = true;
-            } else if (recoveryTicks < 4) {
-                weight = recoveryTicks / 4.0F;
-            } else {
-                weight = Math.max(weight, 0.65F);
             }
-            // Keep the bank target neutral while recovering.
+            // Keep the bank and lateral body lead neutral while recovering.
             smoothedBank += (0.0F - smoothedBank) * BANK_SMOOTHING;
+            smoothedBodyYaw += Mth.wrapDegrees(-smoothedBodyYaw) * BODY_YAW_SMOOTHING;
         }
 
         private void tickExitBlend() {
@@ -479,6 +523,7 @@ public final class FlightAnimationController {
                 finished = true;
             }
             smoothedBank += (0.0F - smoothedBank) * BANK_SMOOTHING;
+            smoothedBodyYaw += Mth.wrapDegrees(-smoothedBodyYaw) * BODY_YAW_SMOOTHING;
         }
 
         private boolean finished() {
@@ -526,7 +571,11 @@ public final class FlightAnimationController {
             }
             float velocityHeading = (float) Math.toDegrees(Math.atan2(velocity.x, velocity.z));
             float lookHeading = (float) Math.toDegrees(Math.atan2(look.x, look.z));
-            return Mth.clamp(Mth.wrapDegrees(lookHeading - velocityHeading), -90.0F, 90.0F);
+            // Keep the full signed separation. During a free 180-degree turn
+            // the body needs to keep facing the old trajectory while the
+            // camera passes behind it; clamping halfway would make the model
+            // stop following the turn at 90 degrees.
+            return Mth.wrapDegrees(lookHeading - velocityHeading);
         }
 
         private static float trajectoryPitch(Vec3 velocity, float horizontalSpeed) {
@@ -556,6 +605,11 @@ public final class FlightAnimationController {
 
         private static float clamp01(float value) {
             return Math.max(0.0F, Math.min(1.0F, value));
+        }
+
+        private static float smoothstep(float value) {
+            float clamped = clamp01(value);
+            return clamped * clamped * (3.0F - 2.0F * clamped);
         }
     }
 }

@@ -35,6 +35,15 @@ public final class FlightAnimationSelector {
     public static final float ACCELERATION_ENTER = 0.008F;
     public static final float DECELERATION_ENTER = -0.008F;
 
+    /**
+     * Minimum vertical speed for a pitch-based climb/dive classification.
+     * The idle hover bob reaches 0.025 blocks per tick, so anything at or
+     * below that band must never turn a stationary hover into a dive.
+     */
+    public static final float VERTICAL_CLASSIFICATION_SPEED = 0.05F;
+    /** Minimum horizontal speed before a trajectory pitch is meaningful. */
+    public static final float TRAJECTORY_HORIZONTAL_SPEED = 0.10F;
+
     private FlightAnimationSelector() {
     }
 
@@ -123,13 +132,26 @@ public final class FlightAnimationSelector {
     private static boolean isClimbing(FlightAnimationState previous, FlightMotionSample sample) {
         float threshold = previous == FlightAnimationState.CLIMB
                 ? CLIMB_EXIT_DEGREES : CLIMB_ENTER_DEGREES;
-        return sample.trajectoryPitchDegrees() >= threshold || sample.verticalSpeed() >= 0.060F;
+        if (sample.verticalSpeed() >= 0.060F) {
+            return true;
+        }
+        // A near-zero horizontal speed with a small vertical bob reports a
+        // trajectory pitch of 90 degrees. Requiring both a real vertical rate
+        // and a real horizontal trajectory keeps hover out of the climb pose.
+        return sample.verticalSpeed() >= VERTICAL_CLASSIFICATION_SPEED
+                && sample.horizontalSpeed() >= TRAJECTORY_HORIZONTAL_SPEED
+                && sample.trajectoryPitchDegrees() >= threshold;
     }
 
     private static boolean isDiving(FlightAnimationState previous, FlightMotionSample sample) {
         float threshold = previous == FlightAnimationState.DIVE
                 ? DIVE_EXIT_DEGREES : DIVE_ENTER_DEGREES;
-        return sample.trajectoryPitchDegrees() <= threshold || sample.verticalSpeed() <= -0.080F;
+        if (sample.verticalSpeed() <= -0.080F) {
+            return true;
+        }
+        return sample.verticalSpeed() <= -VERTICAL_CLASSIFICATION_SPEED
+                && sample.horizontalSpeed() >= TRAJECTORY_HORIZONTAL_SPEED
+                && sample.trajectoryPitchDegrees() <= threshold;
     }
 
     private static boolean isTurning(FlightAnimationState previous, FlightMotionSample sample) {

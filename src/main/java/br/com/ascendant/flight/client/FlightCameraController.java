@@ -30,7 +30,6 @@ public final class FlightCameraController {
     private static final float MAX_BANK_DEGREES = 18.0F;
     private static final float MAX_PITCH_DEGREES = 7.0F;
     private static final float MAX_MANEUVER_CAMERA_ROLL = 12.0F;
-    private static final float MAX_REVERSAL_CAMERA_ROLL = 10.0F;
     private static final float MAX_LOOP_CAMERA_PITCH = 6.0F;
     private static final float FOV_SMOOTHING = 0.20F;
 
@@ -97,8 +96,6 @@ public final class FlightCameraController {
             switch (view.kind()) {
                 case FlightState.MANEUVER_ROLL_360 ->
                         bank += view.direction() * MAX_MANEUVER_CAMERA_ROLL * bump * bump;
-                case FlightState.MANEUVER_REVERSAL ->
-                        bank += view.direction() * MAX_REVERSAL_CAMERA_ROLL * bump;
                 case FlightState.MANEUVER_LOOP ->
                         // A small nose-up/nose-down cue instead of rolling the
                         // whole loop, which would be unreadable in third person.

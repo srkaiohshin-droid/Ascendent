@@ -159,3 +159,26 @@
   confirmado via `git ls-remote`.
 - [x] Autorizacao do dono, commit `df49ac6` publicado com push normal e SHA remoto
   confirmado via `git ls-remote`.
+
+## Voo livre, hover real e alinhamento de pose (2026-10-25)
+- [x] Remover a reversao de 180 graus scriptada (constantes, tecla H, camera, testes e
+  traducoes) e tratar a meia-volta como voo normal do jogador, com convergencia angular
+  limitada e sem trajetoria pre-programada. Loop vertical e roll de 360 preservados.
+- [x] Implementar hover real: decay horizontal, bob vertical e corpo ereto com bracos
+  baixos, sem agachar; impedir que o bob selecione CLIMB/DIVE.
+- [x] Alinhar a cabeca em todas as poses de voo em movimento (yaw/roll zero, pitch local
+  limitado) e suavizar o yaw do corpo pela relacao velocidade x camera.
+- [x] Refazer as poses com bracos a frente (heroic/cruise/climb/dive/boost) e decolagem
+  com bracos subindo progressivamente, conforme as animacoes do Fisk.
+- [x] Pouso com gate de descida real, contato e recuperacao suave; pose forcada em
+  STANDING durante o voo para o sneak nao encolher hitbox nem baixar a camera.
+- [x] Elevar o protocolo para "5" e remover os campos de reversao do pacote.
+- [x] Atualizar o harness de captura (inventario vazio, forward real antes do nivel,
+  hover antes da meia-volta, loop no alto) e gerar 24 frames na sessao 20261025-153345.
+- [x] Atualizar GameTests de hover, bob, boost, meia-volta livre, cabeca, yaw do corpo,
+  bracos a frente, decolagem e pouso; suite em 89/89.
+- [x] Validar `runGameTestServer` (89/89), `build` e `git diff --check`.
+- [ ] Homologacao visual humana de decolagem, hover, voo nivelado, meia-volta, pouso e
+  cabeca/torso pelos 24 frames de 20261025-153345 e por inspecao interativa.
+- [ ] Medir em cliente real se o atrito de `LivingEntity.travel` amortece de forma
+  perceptivel a velocidade aplicada e o bob do hover.

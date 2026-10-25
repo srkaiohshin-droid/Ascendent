@@ -707,3 +707,40 @@ LOOP VERTICAL, REVERSAO 180 E CAPTURA VISUAL DE VOO (2026-10-23)
   remoto.
 - Proximo passo: revisar o pack de captura e conceder ou recusar a homologacao visual
   humana do loop, reversao, banco, pitch, camera e FOV.
+
+- Lote de voo livre e alinhamento de pose (2026-10-25, sobre 5051a36):
+  - Reversao scriptada de 180 graus removida por completo: constantes
+    `MANEUVER_REVERSAL`/`REVERSAL_*`, tecla H, suporte de camera, testes e traducoes.
+    A meia-volta agora e voo normal: a velocidade converge para o novo look com taxa
+    angular limitada e o corpo acompanha por offset de yaw, sem trajetoria pronta.
+  - Loop vertical e roll de 360 graus preservados; protocolo de voo elevado para "5".
+  - Fisica: voo normal relativo a camera com WASD, jump/sneak vertical e pitch do olhar
+    enviesando o alvo; boost de sprint segue o vetor completo do look. Hover real com
+    decay horizontal e bob vertical.
+  - Poses: hover ereto com bracos baixos e sway minimo de cabeca; voo em movimento com
+    corpo quase horizontal, bracos a frente (heroic/cruise/climb/dive/boost) e cabeca
+    alinhada (yaw/roll zero); decolagem sobe os bracos progressivamente.
+  - `FlightAnimationSelector`: limites `VERTICAL_CLASSIFICATION_SPEED = 0.05` e
+    `TRAJECTORY_HORIZONTAL_SPEED = 0.10` evitam que o bob selecione CLIMB/DIVE.
+  - Pouso: gate de descida real em `LANDING_PROBE_HEIGHT = 2.40`, contato e recuperacao
+    suave; pose forcada em STANDING durante o voo para o sneak nao encolher hitbox.
+  - Harness: inventario vazio, `FLIGHT_Y = 230`, 30 ticks de forward real antes das
+    fotos de nivel, sincronizacao do jogador local, hover antes da meia-volta livre,
+    loop no alto e liberacao das teclas ao terminar.
+  - GameTests novos/atualizados de hover, bob, boost, meia-volta livre, alinhamento de
+    cabeca, yaw do corpo, bracos a frente, decolagem e gate de pouso; gravidade de poco
+    corrigida com alvo em +2X, limpeza restrita e assert de `addFreshEntity`.
+  - Validacao:
+    - `runGameTestServer`: "All 89 required tests passed" (BUILD SUCCESSFUL).
+    - `build`: BUILD SUCCESSFUL.
+    - Captura `runClient` sessao 20261025-153345: 24 PNGs, "complete", sem recusa;
+      BUILD SUCCESSFUL.
+    - Telemetria: nivel weight 1.00 bodyPitch -77.6/-71.6; hover -9.6/-10.7; meia-volta
+      livre -59.7 -> -72.4 -> -76.3 com bodyRoll 4.2 -> 18.6 e bodyYaw 11.0 -> 31.7,
+      sem pacote de manobra; decolagem -2.0 -> -36.3 -> -52.3; pouso -58.5 -> -34.6 ->
+      -18.4 -> vanilla.
+  - Limitacoes: nao houve homologacao visual humana nem inspecao interativa de mouse e
+    teclado; nao foi medido se o atrito de `LivingEntity.travel` amortece de forma
+    perceptivel a velocidade aplicada e o bob. As capturas sao evidencia, nao aprovacao.
+  - Proximo passo: revisar os 24 frames de 20261025-153345 e conceder ou recusar a
+    homologacao visual de decolagem, hover, voo nivelado, meia-volta e pouso.
