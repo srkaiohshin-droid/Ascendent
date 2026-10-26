@@ -200,3 +200,5 @@
   de mouse e teclado.
 - [ ] Medir a velocidade terminal do boost em gameplay real, com chunk loading e render
   distance ativos.
+- [x] Publicar o lote com push normal e confirmar o SHA remoto
+  (`f4b3fadb9a6019265b36019710c65c9a22335423`).

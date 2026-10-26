@@ -463,3 +463,6 @@ Criterios:
   de mouse/teclado.
 - Limitacao aberta: velocidade terminal do boost em gameplay real com chunk loading e
   render distance; agua/lava seguem sem ativacao por seguranca.
+- Publicacao: commit `f4b3fadb9a6019265b36019710c65c9a22335423` enviado com push normal
+  na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
+  remoto.

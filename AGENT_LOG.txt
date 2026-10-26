@@ -780,3 +780,6 @@ LOOP VERTICAL, REVERSAO 180 E CAPTURA VISUAL DE VOO (2026-10-23)
     agua/lava seguem sem ativacao por seguranca, divergindo do voo reduzido do Fisk.
   - Proximo passo: revisar os 30 frames de 20261025-212903 e homologar ou recusar hover,
     boost, curva, roll e pouso; depois validar a sensacao em cliente interativo.
+  - Publicacao: commit `f4b3fadb9a6019265b36019710c65c9a22335423` enviado com push
+    normal na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou
+    o SHA remoto.

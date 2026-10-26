@@ -304,3 +304,6 @@
   boost-turn banco -11.7; pouso 221.55 -> 220.00 -> recuperacao -> vanilla.
 - Sem homologacao visual humana nem inspecao interativa; a velocidade terminal do boost
   ainda nao foi medida em gameplay real com chunk loading e render distance.
+- Publicacao: commit `f4b3fadb9a6019265b36019710c65c9a22335423` enviado com push normal
+  na branch `srkaiohshin-droid-ascendant-gameplay-ui`; `git ls-remote` confirmou o SHA
+  remoto.
