@@ -2,49 +2,47 @@ package br.com.ascendant.flight;
 
 import net.minecraftforge.common.ForgeConfigSpec;
 
-/** Server-authoritative flight tuning. Values are shared with connected clients by Forge. */
+/**
+ * Server-authoritative flight tuning, shared with connected clients by Forge.
+ *
+ * <p>The defaults follow the reference constants. {@code speed} is the fixed
+ * horizontal impulse applied while hovering and {@code boostSpeed} is the
+ * impulse along the full look vector while sprinting. The steady-state speeds
+ * are derived from the impulse and drag, not capped. The boost impulse is
+ * trimmed slightly from the reference value for control: {@code 0.185} instead
+ * of {@code 0.20}, which lowers the terminal speed from about 4.0 to about
+ * 3.69 blocks per tick.</p>
+ */
 public final class FlightTuning {
+    /** Gameplay default for the boost impulse (reference: 0.20). */
+    public static final double DEFAULT_BOOST_SPEED = 0.185D;
+
     public static final ForgeConfigSpec SPEC;
     public static final ForgeConfigSpec.BooleanValue ENABLED;
-    public static final ForgeConfigSpec.DoubleValue MAX_CRUISE_SPEED;
-    public static final ForgeConfigSpec.DoubleValue MAX_BOOST_SPEED;
-    public static final ForgeConfigSpec.DoubleValue ACCELERATION;
-    public static final ForgeConfigSpec.DoubleValue BOOST_ACCELERATION;
-    public static final ForgeConfigSpec.DoubleValue DRAG;
-    public static final ForgeConfigSpec.DoubleValue BRAKING;
-    public static final ForgeConfigSpec.DoubleValue HOVER_STABILITY;
+    public static final ForgeConfigSpec.DoubleValue SPEED;
+    public static final ForgeConfigSpec.DoubleValue BOOST_SPEED;
+    public static final ForgeConfigSpec.DoubleValue HOVER_DRAG;
+    public static final ForgeConfigSpec.DoubleValue HOVER_GRAVITY;
     public static final ForgeConfigSpec.DoubleValue HOVER_BOB;
-    public static final ForgeConfigSpec.DoubleValue BOOST_TURN_RATE_DEGREES;
-    public static final ForgeConfigSpec.DoubleValue LANDING_SPEED;
-    public static final ForgeConfigSpec.DoubleValue TAKEOFF_IMPULSE;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
         builder.push("flight");
         ENABLED = builder.comment("Allow the unlocked flight power to be activated.")
                 .define("enabled", true);
-        MAX_CRUISE_SPEED = builder.comment("Maximum normal cruise flight speed in blocks per tick.")
-                .defineInRange("maxCruiseSpeed", 0.65D, 0.1D, 2.0D);
-        MAX_BOOST_SPEED = builder.comment("Maximum boosted / sprinting flight speed in blocks per tick.")
-                .defineInRange("maxBoostSpeed", 1.25D, 0.2D, 3.0D);
-        ACCELERATION = builder.comment("Normal-flight control response per tick. Higher values converge on the commanded velocity more quickly.")
-                .defineInRange("acceleration", 0.045D, 0.005D, 0.3D);
-        BOOST_ACCELERATION = builder.comment("Boost / sprinting flight acceleration gained per tick.")
-                .defineInRange("boostAcceleration", 0.080D, 0.01D, 0.5D);
-        DRAG = builder.comment("Velocity retained per tick when gliding or boosting (aerodynamic drag).")
-                .defineInRange("drag", 0.94D, 0.70D, 0.99D);
-        BRAKING = builder.comment("Velocity removed per tick while the brake key is held.")
-                .defineInRange("braking", 0.12D, 0.02D, 0.4D);
-        HOVER_STABILITY = builder.comment("Vertical correction per tick when hovering.")
-                .defineInRange("hoverStability", 0.12D, 0.02D, 0.5D);
-        HOVER_BOB = builder.comment("Amplitude in blocks per tick of the real hover bob when no input is held.")
-                .defineInRange("hoverBob", 0.025D, 0.0D, 0.1D);
-        BOOST_TURN_RATE_DEGREES = builder.comment("Maximum trajectory turn rate in degrees per tick while boosting. Limits how fast a free 180-degree turn can curve.")
-                .defineInRange("boostTurnRateDegrees", 9.0D, 1.0D, 30.0D);
-        LANDING_SPEED = builder.comment("Maximum vertical speed for automatic shutdown after a flight landing.")
-                .defineInRange("landingSpeed", 0.12D, 0.01D, 0.4D);
-        TAKEOFF_IMPULSE = builder.comment("Initial server-authoritative upward impulse when flight starts from the ground, in blocks per tick.")
-                .defineInRange("takeoffImpulse", 0.32D, 0.0D, 0.8D);
+        SPEED = builder.comment("Hover impulse in blocks per tick (reference: 0.10). "
+                        + "The steady hover speed is speed * 0.91 / (1 - 0.91).")
+                .defineInRange("speed", 0.10D, 0.01D, 0.50D);
+        BOOST_SPEED = builder.comment("Boost impulse along the look vector in blocks per tick "
+                        + "(Ascendant: 0.185, reference: 0.20). The steady boost speed is "
+                        + "about 3.69 blocks per tick.")
+                .defineInRange("boostSpeed", DEFAULT_BOOST_SPEED, 0.02D, 1.00D);
+        HOVER_DRAG = builder.comment("Horizontal velocity retained per hover tick (reference: 0.91).")
+                .defineInRange("hoverDrag", 0.91D, 0.50D, 0.995D);
+        HOVER_GRAVITY = builder.comment("Hover gravity and forward lift per tick (reference: 0.08).")
+                .defineInRange("hoverGravity", 0.08D, 0.0D, 0.20D);
+        HOVER_BOB = builder.comment("Amplitude in blocks per tick of the idle hover bob (reference: 0.025).")
+                .defineInRange("hoverBob", 0.025D, 0.0D, 0.10D);
         builder.pop();
         SPEC = builder.build();
     }

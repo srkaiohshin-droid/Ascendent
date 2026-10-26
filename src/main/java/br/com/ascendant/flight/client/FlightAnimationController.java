@@ -15,9 +15,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
@@ -36,23 +33,30 @@ import java.util.WeakHashMap;
  * <p>One rig per player is advanced exactly once per client tick. Rendering
  * interpolates between the previous and current tick with the renderer partial
  * tick, so the pose is independent of the frame rate and never accumulates
- * rotation from frame to frame. The bank comes from the real change of the
- * horizontal trajectory, not from the camera yaw. When flight stops, a landed
- * session plays contact/recovery; other sessions blend back to vanilla.</p>
+ * rotation from frame to frame.</p>
+ *
+ * <p>There is no velocity-headed body yaw: the model faces the player's look
+ * direction at all times. A 180-degree reversal is a normal player-controlled
+ * mouse turn. Hover leans with the real horizontal velocity, sprint blends into
+ * the horizontal boost pose over the reference eight-tick timer, and a
+ * server-authorised loop or roll overlays its own pitch/roll on that silhouette.
+ * When flight stops, the whole pose fades back to vanilla.</p>
  */
 @Mod.EventBusSubscriber(modid = Ascendant.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class FlightAnimationController {
     private static final Map<Player, Rig> RIGS = new WeakHashMap<>();
-    private static final float POSE_SMOOTHING = 0.18F;
+    /**
+     * Per-tick pose convergence. The reference has no extra smoothing beyond
+     * its flight/boost timers, but a light client filter removes packet and
+     * frame jitter. 0.35 settles in roughly half a second without lagging
+     * behind the crosshair during a mouse turn; slower values made the boost
+     * bank and pitch feel detached from the camera.
+     */
+    private static final float POSE_SMOOTHING = 0.35F;
     private static final float WEIGHT_STEP = 0.18F;
-    private static final float BANK_SMOOTHING = 0.22F;
-    private static final float BODY_YAW_SMOOTHING = 0.16F;
-    private static final float ACCELERATION_SMOOTHING = 0.30F;
-    private static final float LANDING_PROGRESS_SMOOTHING = 0.22F;
     private static final float MAX_REMOTE_STEP = 3.0F;
     private static final int EXIT_MODE_NONE = 0;
     private static final int EXIT_MODE_BLEND = 1;
-    private static final int EXIT_MODE_LANDING = 2;
 
     private static ClientLevel lastLevel;
 
@@ -109,16 +113,16 @@ public final class FlightAnimationController {
             return null;
         }
         FlightPose pose = FlightPose.lerp(rig.previous, rig.current, delta);
-        float bodyYaw = FlightPose.lerpAngleDegrees(
-                rig.previousBodyYaw, rig.currentBodyYaw, delta);
         float maneuverPitch = FlightPose.lerpAngleDegrees(
                 rig.previousManeuverPitch, rig.currentManeuverPitch, delta);
         float maneuverRoll = FlightPose.lerpAngleDegrees(
                 rig.previousManeuverRoll, rig.currentManeuverRoll, delta);
-        return new FlightPoseSample(pose, weight, bodyYaw, maneuverPitch, maneuverRoll);
+        FlightPose overlay = FlightPose.lerp(
+                rig.previousRollOverlay, rig.currentRollOverlay, delta);
+        return new FlightPoseSample(pose, weight, maneuverPitch, maneuverRoll, overlay);
     }
 
-    /** Snapshot used by the camera and FOV effects for the active maneuver. */
+    /** Snapshot used by the capture harness for maneuvre telemetry. */
     public record ManeuverView(int kind, int direction, float progress) {
     }
 
@@ -130,34 +134,6 @@ public final class FlightAnimationController {
         float progress = Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F),
                 rig.previousManeuverProgress, rig.currentManeuverProgress);
         return new ManeuverView(rig.maneuverKind, rig.maneuverDirection, progress);
-    }
-
-    /**
-     * Whether the body may visually lead the camera towards the real
-     * trajectory. The upright takeoff, hover and landing poses stay aligned
-     * with the camera; everything horizontal uses the trajectory offset, which
-     * is what makes a free 180-degree turn read as a turn of the body instead
-     * of the model snapping with the mouse.
-     */
-    private static boolean allowsBodyYaw(FlightAnimationState state) {
-        return state != FlightAnimationState.HOVER
-                && state != FlightAnimationState.TAKEOFF
-                && state != FlightAnimationState.LANDING
-                && state != FlightAnimationState.EXIT
-                && state != FlightAnimationState.MANEUVER;
-    }
-
-    /**
-     * Bank used by the optional flight camera. It is the same smoothed value
-     * that poses the body, so camera and model bank together instead of adding
-     * two independent rolls.
-     */
-    public static float cameraBank(Player player, float partialTick) {
-        Rig rig = RIGS.get(player);
-        if (rig == null) {
-            return 0.0F;
-        }
-        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), rig.previousBank, rig.currentBank);
     }
 
     private static final class Rig {
@@ -175,6 +151,9 @@ public final class FlightAnimationController {
         private float maneuverRoll;
         private float maneuverPitch;
         private float maneuverProgress;
+        private FlightPose rollOverlay = FlightPose.VANILLA;
+        private FlightPose previousRollOverlay = FlightPose.VANILLA;
+        private FlightPose currentRollOverlay = FlightPose.VANILLA;
         private int maneuverKind = FlightState.MANEUVER_NONE;
         private int maneuverDirection;
         private int maneuverDuration;
@@ -182,23 +161,9 @@ public final class FlightAnimationController {
         private int completedKind = FlightState.MANEUVER_NONE;
         private int completedDirection;
         private boolean finishAfterTick;
-        private float previousBank;
-        private float currentBank;
-        private float smoothedBank;
-        private float previousBodyYaw;
-        private float currentBodyYaw;
-        private float smoothedBodyYaw;
-        private float smoothedAcceleration;
-        private float smoothedLanding;
-        private float landingImpact;
-        private float lastSpeed;
-        private float lastVerticalSpeed;
-        private float lastHorizontalSpeed;
-        private float lastHeading = Float.NaN;
         private int activeTicks;
-        private int stateTicks;
+        private float boostTimer;
         private int exitTicks;
-        private int recoveryTicks;
         private int exitMode = EXIT_MODE_NONE;
         private FlightAnimationState animationState = FlightAnimationState.EXIT;
         private boolean wasActive;
@@ -209,136 +174,62 @@ public final class FlightAnimationController {
                 return;
             }
             boolean local = player == minecraft.player;
-            Vec3 velocity = sampleVelocity(player, local);
-            float speed = (float) velocity.length();
-            float horizontalSpeed = (float) Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
-            float verticalSpeed = (float) velocity.y;
-            float trajectoryPitch = trajectoryPitch(velocity, horizontalSpeed);
-            float turnRate = turnRate(horizontalSpeed, velocity);
-            float aimError = aimError(player, velocity, horizontalSpeed);
-            float acceleration = speed - lastSpeed;
+            boolean active = state.isActive();
+            boolean justActivated = active && !wasActive;
+            if (justActivated) {
+                resetSession();
+            }
 
             updateManeuver(state);
             boolean maneuvering = maneuverKind != FlightState.MANEUVER_NONE;
 
-            smoothedAcceleration += (acceleration - smoothedAcceleration) * ACCELERATION_SMOOTHING;
-            // A scripted trajectory owns its own bank/pitch. Letting the
-            // measured turn rate add another bank here would double the roll
-            // and produce a false spike at the top of a loop.
-            float bankTarget = state.isActive() && !maneuvering && horizontalSpeed > 0.04F
-                    ? Mth.clamp(turnRate * 2.4F,
-                    -FlightPoseLibrary.MAX_BODY_ROLL, FlightPoseLibrary.MAX_BODY_ROLL)
-                    : 0.0F;
-            previousBank = currentBank;
-            smoothedBank += (bankTarget - smoothedBank) * BANK_SMOOTHING;
-            currentBank = smoothedBank;
+            Vec3 velocity = sampleVelocity(player, local);
+            float speed = (float) velocity.length();
+            float horizontalSpeed = (float) Math.sqrt(
+                    velocity.x * velocity.x + velocity.z * velocity.z);
+            float verticalSpeed = (float) velocity.y;
+            float bodyForward = bodyForward(player, velocity, horizontalSpeed);
+            float bodyRight = bodyRight(player, velocity, horizontalSpeed);
 
-            boolean braking = (state.getInputMask() & FlightState.BRAKE) != 0
-                    || (!local && acceleration < -0.060F && speed > 0.12F);
-            // Sprint is the boost input, but the streamlined boost pose must
-            // follow real movement: holding sprint while hovering must not look
-            // like a high-speed pass.
-            boolean boosting = player.isSprinting()
-                    && speed >= FlightAnimationSelector.SLOW_ENTER_SPEED * 0.5F;
-
-            if (state.isActive()) {
-                if (!wasActive) {
-                    activeTicks = 0;
-                    exitTicks = 0;
-                    recoveryTicks = 0;
-                    exitMode = EXIT_MODE_NONE;
-                    animationState = FlightAnimationState.EXIT;
-                    stateTicks = 0;
-                    finished = false;
-                    smoothedBank = 0.0F;
-                    currentBank = 0.0F;
-                    previousBank = 0.0F;
-                    smoothedBodyYaw = 0.0F;
-                    currentBodyYaw = 0.0F;
-                    previousBodyYaw = 0.0F;
-                    smoothedLanding = 0.0F;
-                    landingImpact = 0.0F;
-                    smoothedAcceleration = 0.0F;
-                    lastSpeed = 0.0F;
-                    lastVerticalSpeed = 0.0F;
-                    lastHorizontalSpeed = 0.0F;
-                    lastHeading = Float.NaN;
-                }
+            if (active) {
                 wasActive = true;
                 activeTicks++;
-
-                float groundDistance = distanceToGround(player);
-                // Only a real descent may start a landing. The old gate used
-                // "not climbing" and fired during a hover near the ground,
-                // folding the body into the contact pose while the player was
-                // simply floating. The pure gate also requires the launch pose
-                // to be over, so takeoff cannot be mistaken for a landing.
-                float rawLanding = FlightPoseLibrary.landingProgress(activeTicks,
-                        state.wasLaunchedFromGround(), groundDistance, verticalSpeed, braking);
-                smoothedLanding += (rawLanding - smoothedLanding) * LANDING_PROGRESS_SMOOTHING;
-                if (smoothedLanding < 0.002F) {
-                    smoothedLanding = 0.0F;
-                }
-                landingImpact = clamp01(-lastVerticalSpeed / 0.30F
-                        + lastHorizontalSpeed / 1.0F);
-
                 FlightMotionSample sample = FlightMotionSample.builder()
                         .active(true)
                         .activeTicks(activeTicks)
-                        .launchedFromGround(state.wasLaunchedFromGround())
                         .speed(speed)
                         .horizontalSpeed(horizontalSpeed)
                         .verticalSpeed(verticalSpeed)
-                        .trajectoryPitch(trajectoryPitch)
-                        .acceleration(smoothedAcceleration)
-                        // The scripted path owns the heading; measured turn
-                        // and aim noise must not twist the neck during it.
-                        .turnRate(maneuvering ? 0.0F : turnRate)
-                        .aimError(maneuvering ? 0.0F : aimError)
-                        .bank(smoothedBank)
-                        .braking(braking)
-                        .boosting(boosting)
+                        .viewPitch(player.getXRot())
+                        .bodyForward(bodyForward)
+                        .bodyRight(bodyRight)
+                        .boosting(player.isSprinting())
                         .maneuvering(maneuvering)
-                        .landing(smoothedLanding, landingImpact)
+                        .idlePhase(FlightPoseLibrary.idlePhase(player.tickCount))
                         .build();
-
-                FlightAnimationState next = FlightAnimationSelector.select(
-                        animationState, stateTicks, sample);
-                if (next != animationState) {
-                    animationState = next;
-                    stateTicks = 0;
-                } else {
-                    stateTicks++;
-                }
-                target = FlightPoseLibrary.target(animationState, sample);
-
-                // Interpolate the yaw on the shortest arc. A straight scalar
-                // lerp would spin the body the long way round when the target
-                // crosses the +/-180 seam during a free reversal.
-                float bodyYawTarget = allowsBodyYaw(animationState) && !maneuvering
-                        ? FlightPoseLibrary.bodyYawOffset(aimError, horizontalSpeed,
-                        FlightPoseLibrary.MAX_BODY_YAW_OFFSET)
-                        : 0.0F;
-                smoothedBodyYaw += Mth.wrapDegrees(bodyYawTarget - smoothedBodyYaw)
-                        * BODY_YAW_SMOOTHING;
-                smoothedBodyYaw = Mth.wrapDegrees(smoothedBodyYaw);
-
+                animationState = FlightAnimationSelector.select(
+                        animationState, activeTicks, sample);
+                // The reference fills or drains the boost timer by one eighth
+                // per tick and eases it before blending the boost layers. The
+                // maneuvre overlay stays separate, so a roll or loop starts
+                // from whatever ordinary silhouette the player is holding.
+                boostTimer = FlightPoseLibrary.advanceBoostTimer(
+                        boostTimer, sample.boosting());
+                target = animationState == FlightAnimationState.EXIT
+                        ? FlightPose.VANILLA
+                        : FlightPoseLibrary.ordinaryPose(sample,
+                        FlightPoseLibrary.boostBlend(boostTimer));
                 previousWeight = weight;
                 weight = Math.min(1.0F, weight + WEIGHT_STEP);
             } else {
                 if (wasActive) {
                     wasActive = false;
-                    beginExit(player, state);
+                    beginExit();
                 } else if (exitMode == EXIT_MODE_NONE) {
                     finished = true;
                     return;
                 }
-
-                if (exitMode == EXIT_MODE_LANDING) {
-                    tickLandingRecovery(player);
-                } else {
-                    tickExitBlend();
-                }
+                tickExitBlend();
             }
 
             previousManeuverRoll = currentManeuverRoll;
@@ -347,22 +238,31 @@ public final class FlightAnimationController {
             currentManeuverPitch = maneuverPitch;
             previousManeuverProgress = currentManeuverProgress;
             currentManeuverProgress = maneuverProgress;
-            previousBodyYaw = currentBodyYaw;
-            currentBodyYaw = smoothedBodyYaw;
+            previousRollOverlay = currentRollOverlay;
+            currentRollOverlay = rollOverlay;
 
             previous = current;
             current = FlightPose.lerp(current, target, POSE_SMOOTHING);
-            lastSpeed = speed;
-            lastVerticalSpeed = verticalSpeed;
-            lastHorizontalSpeed = horizontalSpeed;
             if (finishAfterTick) {
                 finishAfterTick = false;
                 finishPlayback(true);
             }
         }
 
+        private void resetSession() {
+            activeTicks = 0;
+            boostTimer = 0.0F;
+            exitTicks = 0;
+            exitMode = EXIT_MODE_NONE;
+            animationState = FlightAnimationState.EXIT;
+            finished = false;
+            completedKind = FlightState.MANEUVER_NONE;
+            completedDirection = 0;
+            stopManeuver();
+        }
+
         /**
-         * Client-side playback of the server-authorised maneuver. It starts
+         * Client-side playback of the server-authorised maneuvre. It starts
          * only from synced state, advances once per client tick and is
          * independent of the frame rate. A normal completion packet lets the
          * remaining local steps finish; an abort stops them immediately.
@@ -425,6 +325,9 @@ public final class FlightAnimationController {
                     ? FlightPoseLibrary.maneuverRollProgress(
                     maneuverDirection, maneuverProgress)
                     : 0.0F;
+            rollOverlay = maneuverKind == FlightState.MANEUVER_ROLL_360
+                    ? FlightPoseLibrary.rollOverlay(maneuverDirection, maneuverProgress)
+                    : FlightPose.VANILLA;
             if (maneuverElapsed >= maneuverDuration) {
                 // Render the exact end orientation once, then stop.
                 finishAfterTick = true;
@@ -449,68 +352,15 @@ public final class FlightAnimationController {
             maneuverProgress = 0.0F;
             maneuverPitch = 0.0F;
             maneuverRoll = 0.0F;
+            rollOverlay = FlightPose.VANILLA;
             finishAfterTick = false;
         }
 
-        private void beginExit(Player player, FlightState state) {
-            boolean landed = state.getLastEndReason() == FlightState.END_LANDED
-                    || player.onGround() && distanceToGround(player) < 0.8F;
-            if (landed) {
-                exitMode = EXIT_MODE_LANDING;
-                recoveryTicks = FlightPoseLibrary.LANDING_RECOVERY_TICKS;
-                smoothedLanding = 1.0F;
-                // The post-deactivation velocity has already been made safe for
-                // the transition, so the impact must come from the last real
-                // flight tick. Otherwise every landing reads as a hard impact.
-                landingImpact = clamp01(-lastVerticalSpeed / 0.30F
-                        + lastHorizontalSpeed / 1.0F);
-                target = FlightPoseLibrary.target(FlightAnimationState.LANDING,
-                        FlightMotionSample.builder()
-                                .active(false)
-                                .activeTicks(activeTicks)
-                                .speed(lastHorizontalSpeed)
-                                .verticalSpeed(lastVerticalSpeed)
-                                .bank(smoothedBank)
-                                .landing(1.0F, landingImpact)
-                                .recovery(0.0F)
-                                .build());
-            } else {
-                exitMode = EXIT_MODE_BLEND;
-                exitTicks = FlightPoseLibrary.EXIT_TICKS;
-                target = FlightPose.VANILLA;
-            }
+        private void beginExit() {
+            exitMode = EXIT_MODE_BLEND;
+            exitTicks = FlightPoseLibrary.EXIT_TICKS;
+            target = FlightPose.VANILLA;
             previousWeight = weight;
-        }
-
-        private void tickLandingRecovery(Player player) {
-            recoveryTicks--;
-            float progress = 1.0F - recoveryTicks
-                    / (float) FlightPoseLibrary.LANDING_RECOVERY_TICKS;
-            progress = clamp01(progress);
-            float speed = (float) player.getDeltaMovement().length();
-            FlightMotionSample sample = FlightMotionSample.builder()
-                    .active(false)
-                    .activeTicks(activeTicks)
-                    .speed(speed)
-                    .verticalSpeed((float) player.getDeltaMovement().y)
-                    .bank(smoothedBank)
-                    .landing(1.0F, landingImpact)
-                    .recovery(progress)
-                    .build();
-            target = FlightPoseLibrary.target(FlightAnimationState.LANDING, sample);
-            // Fade the whole landing pose with the same smooth curve that drives
-            // the contact-to-standing blend. The old step (a hard clamp above
-            // 0.65 followed by a 4-tick drop) produced a visible pop exactly at
-            // the end of the landing.
-            float remaining = 1.0F - smoothstep(progress);
-            previousWeight = weight;
-            weight = recoveryTicks <= 0 ? 0.0F : remaining;
-            if (recoveryTicks <= 0) {
-                finished = true;
-            }
-            // Keep the bank and lateral body lead neutral while recovering.
-            smoothedBank += (0.0F - smoothedBank) * BANK_SMOOTHING;
-            smoothedBodyYaw += Mth.wrapDegrees(-smoothedBodyYaw) * BODY_YAW_SMOOTHING;
         }
 
         private void tickExitBlend() {
@@ -522,94 +372,52 @@ public final class FlightAnimationController {
                 weight = 0.0F;
                 finished = true;
             }
-            smoothedBank += (0.0F - smoothedBank) * BANK_SMOOTHING;
-            smoothedBodyYaw += Mth.wrapDegrees(-smoothedBodyYaw) * BODY_YAW_SMOOTHING;
         }
 
         private boolean finished() {
             return finished && weight <= 1.0E-4F;
         }
 
-        private static Vec3 sampleVelocity(Player player, boolean local) {
-            Vec3 motion = player.getDeltaMovement();
-            if (local) {
-                return motion;
+        /**
+         * Horizontal velocity expressed in the player's yaw frame. The player
+         * right vector at yaw zero is -X, matching Minecraft's camera axes.
+         */
+        private static float bodyForward(Player player, Vec3 velocity, float horizontalSpeed) {
+            if (horizontalSpeed < 1.0E-4F) {
+                return 0.0F;
             }
-            // Interpolated remote entities often report zero deltaMovement. The
-            // per-tick position step is already a velocity; it must not be
-            // multiplied by a guessed packet interval or the animation runs
-            // three times too fast.
+            double yaw = Math.toRadians(player.getYRot());
+            double forwardX = -Math.sin(yaw);
+            double forwardZ = Math.cos(yaw);
+            return (float) ((velocity.x * forwardX + velocity.z * forwardZ) / horizontalSpeed);
+        }
+
+        private static float bodyRight(Player player, Vec3 velocity, float horizontalSpeed) {
+            if (horizontalSpeed < 1.0E-4F) {
+                return 0.0F;
+            }
+            double yaw = Math.toRadians(player.getYRot());
+            double rightX = -Math.cos(yaw);
+            double rightZ = -Math.sin(yaw);
+            return (float) ((velocity.x * rightX + velocity.z * rightZ) / horizontalSpeed);
+        }
+
+        private static Vec3 sampleVelocity(Player player, boolean local) {
+            // The reference animation and camera use the real per-tick position
+            // step, not the stored delta movement. Hover stores extra drag in
+            // deltaMovement while the entity actually travels farther, so using
+            // the stored value would undershoot the reference lean and head.
             Vec3 step = new Vec3(player.getX() - player.xOld, player.getY() - player.yOld,
                     player.getZ() - player.zOld);
             if (step.lengthSqr() > 1.0E-8D) {
+                if (local) {
+                    return step;
+                }
+                // Remote interpolation can report a multi-block correction.
                 double length = step.length();
                 return length > MAX_REMOTE_STEP ? step.scale(MAX_REMOTE_STEP / length) : step;
             }
-            return motion;
-        }
-
-        private float turnRate(float horizontalSpeed, Vec3 velocity) {
-            if (horizontalSpeed < 0.04F) {
-                lastHeading = Float.NaN;
-                return 0.0F;
-            }
-            float heading = (float) Math.toDegrees(Math.atan2(velocity.x, velocity.z));
-            float rate = Float.isNaN(lastHeading) ? 0.0F : Mth.wrapDegrees(heading - lastHeading);
-            lastHeading = heading;
-            // atan2(x,z) decreases for a right-hand turn; expose positive as right.
-            return Mth.clamp(-rate, -60.0F, 60.0F);
-        }
-
-        private static float aimError(Player player, Vec3 velocity, float horizontalSpeed) {
-            if (horizontalSpeed < 0.04F) {
-                return 0.0F;
-            }
-            Vec3 look = player.getViewVector(1.0F);
-            double lookHorizontal = Math.sqrt(look.x * look.x + look.z * look.z);
-            if (lookHorizontal < 1.0E-4D) {
-                return 0.0F;
-            }
-            float velocityHeading = (float) Math.toDegrees(Math.atan2(velocity.x, velocity.z));
-            float lookHeading = (float) Math.toDegrees(Math.atan2(look.x, look.z));
-            // Keep the full signed separation. During a free 180-degree turn
-            // the body needs to keep facing the old trajectory while the
-            // camera passes behind it; clamping halfway would make the model
-            // stop following the turn at 90 degrees.
-            return Mth.wrapDegrees(lookHeading - velocityHeading);
-        }
-
-        private static float trajectoryPitch(Vec3 velocity, float horizontalSpeed) {
-            if (horizontalSpeed > 0.02F) {
-                return (float) Math.toDegrees(Math.atan2(velocity.y, horizontalSpeed));
-            }
-            if (velocity.y > 0.02D) {
-                return 90.0F;
-            }
-            if (velocity.y < -0.02D) {
-                return -90.0F;
-            }
-            return 0.0F;
-        }
-
-        private static float distanceToGround(Player player) {
-            double startY = player.getY() + 0.05D;
-            Vec3 from = new Vec3(player.getX(), startY, player.getZ());
-            Vec3 to = new Vec3(player.getX(), player.getY() - 3.0D, player.getZ());
-            BlockHitResult hit = player.level().clip(new ClipContext(from, to,
-                    ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
-            if (hit.getType() == HitResult.Type.MISS) {
-                return 4.0F;
-            }
-            return (float) Math.max(0.0D, startY - hit.getLocation().y);
-        }
-
-        private static float clamp01(float value) {
-            return Math.max(0.0F, Math.min(1.0F, value));
-        }
-
-        private static float smoothstep(float value) {
-            float clamped = clamp01(value);
-            return clamped * clamped * (3.0F - 2.0F * clamped);
+            return local ? Vec3.ZERO : player.getDeltaMovement();
         }
     }
 }

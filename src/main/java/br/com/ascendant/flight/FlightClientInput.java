@@ -120,8 +120,6 @@ public final class FlightClientInput {
         if (minecraft.options.keyDown.isDown()) input |= FlightState.BACK;
         if (minecraft.options.keyLeft.isDown()) input |= FlightState.LEFT;
         if (minecraft.options.keyRight.isDown()) input |= FlightState.RIGHT;
-        if (minecraft.options.keyJump.isDown()) input |= FlightState.ASCEND;
-        if (minecraft.options.keyShift.isDown()) input |= FlightState.DESCEND;
         if (BRAKE.isDown()) input |= FlightState.BRAKE;
         return input;
     }
@@ -132,8 +130,17 @@ public final class FlightClientInput {
             return;
         }
         FlightState state = FlightController.getState(event.getEntity());
-        if (state == null || !state.isActive()
-                || !FlightManeuvers.isTrajectory(state.getManeuverKind())
+        if (state == null || !state.isActive()) {
+            return;
+        }
+        // Jump and sneak are not flight controls in the reference. Clearing
+        // them keeps vanilla from starting a jump on landing, crouching the
+        // hitbox or feeding a vertical impulse while the flight kernel owns
+        // movement. Forward/strafe are preserved because the client uses them
+        // to decide whether sprinting (and therefore boost) may continue.
+        event.getInput().jumping = false;
+        event.getInput().shiftKeyDown = false;
+        if (!FlightManeuvers.isTrajectory(state.getManeuverKind())
                 || state.getManeuverTicksRemaining() <= 0) {
             return;
         }
@@ -142,8 +149,6 @@ public final class FlightClientInput {
         // the authoritative step instead of widening the reviewed curve.
         event.getInput().leftImpulse = 0.0F;
         event.getInput().forwardImpulse = 0.0F;
-        event.getInput().jumping = false;
-        event.getInput().shiftKeyDown = false;
     }
 
     private static void onPlayerTick(TickEvent.PlayerTickEvent event) {

@@ -43,10 +43,10 @@ import java.util.UUID;
  *
  * <p>The class is registered by {@code Ascendant} only in a development client
  * and only when the JVM property {@code ascendant.flightCapture} is set.
- * It drives the integrated server through survival flight, a 360-degree roll, a
- * vertical loop, a ground takeoff, an idle hover, a free 180-degree turn and a
- * real landing, then writes labelled screenshots to {@code run/screenshots/}
- * plus an HTML contact sheet and a manifest.</p>
+ * It drives the integrated server through hover, sprint boost, a 360-degree
+ * roll, a vertical loop, a ground takeoff, an idle hover, a free 180-degree
+ * turn and a real landing, then writes labelled screenshots to
+ * {@code run/screenshots/} plus an HTML contact sheet and a manifest.</p>
  *
  * <p>The harness calls the same server-authoritative entry points used by the
  * network handlers. It does not grant the client authority and it does not
@@ -79,6 +79,9 @@ public final class FlightCaptureHarness {
     private static final float TURN_RATE_DEGREES = 10.0F;
     private static final int WORLD_LOAD_TIMEOUT_TICKS = 600;
     private static final int PLAN_TIMEOUT_TICKS = 80;
+    /** Abort and retry a landing that stops descending instead of hanging the run. */
+    private static final int LANDING_TIMEOUT_TICKS = 160;
+    private static final int LANDING_RETRIES = 2;
 
     private static boolean running;
     private static volatile boolean prepared;
@@ -100,6 +103,12 @@ public final class FlightCaptureHarness {
     private static boolean contactCaptured;
     private static boolean hoverCaptured;
     private static int recoveryWait;
+    private static int landingTicks;
+    private static int landingWaitTicks;
+    private static int landingRetries;
+    private static boolean landingSawActive;
+    private static boolean holdForward;
+    private static boolean holdSprint;
     private static final List<CapturedImage> images = new ArrayList<>();
     private static final List<String> manifest = new ArrayList<>();
 
@@ -146,6 +155,10 @@ public final class FlightCaptureHarness {
         }
 
         tickPlan();
+        // Simulated key state is fragile when the automated client loses focus
+        // or the window manager consumes a release. Reassert the intended keys
+        // every tick so a long stage cannot silently turn into an idle hover.
+        applyHeldKeys(minecraft);
         tickStep(minecraft, server);
     }
 
@@ -249,6 +262,7 @@ public final class FlightCaptureHarness {
         level.setWeatherParameters(12000, 0, false, false);
         buildCaptureArea(level);
         player.teleportTo(level, 0.5D, startY, 0.5D, 0.0F, 0.0F);
+        player.setOldPosAndRot();
         player.setYHeadRot(0.0F);
 
         FlightState state = FlightController.getState(player);
@@ -304,6 +318,12 @@ public final class FlightCaptureHarness {
     }
 
     private static void tickStep(Minecraft minecraft, MinecraftServer server) {
+        // A screenshot is only consumed on the next render pass. Advancing the
+        // script before that would let a later stage overwrite the pending
+        // frame and label the image with a state it never showed.
+        if (staticCapture != null) {
+            return;
+        }
         switch (step) {
             case 0 -> {
                 step = 1;
@@ -312,26 +332,73 @@ public final class FlightCaptureHarness {
             case 1 -> {
                 if (--waitTicks <= 0) {
                     stageEntry(minecraft, server, true);
-                    // Let real forward input settle the pose to its full weight
-                    // before the level photographs. A velocity injected on the
-                    // same tick would still be blending from standing.
-                    minecraft.options.keyUp.setDown(true);
+                    // Let real forward input settle the hover pose to full
+                    // weight before photographing it.
+                    setHeldKeys(minecraft, true, false);
                     step = 2;
                     waitTicks = 30;
                 }
             }
             case 2 -> {
                 if (--waitTicks <= 0) {
-                    staticCapture = new StaticCapture("level-back");
-                    minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
-                    stageEntry(minecraft, server, false);
+                    minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                    staticCapture = new StaticCapture("hover-level-back");
                     step = 3;
-                    waitTicks = 8;
+                    waitTicks = 10;
                 }
             }
             case 3 -> {
                 if (--waitTicks <= 0) {
-                    staticCapture = new StaticCapture("level-front");
+                    minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+                    staticCapture = new StaticCapture("hover-level-front");
+                    // Hold the front hover long enough for the screenshot to be
+                    // consumed before the boost stage teleports the player.
+                    step = 32;
+                    waitTicks = 10;
+                }
+            }
+            case 32 -> {
+                if (--waitTicks <= 0) {
+                    startBoost(minecraft, server);
+                    step = 21;
+                    waitTicks = 24;
+                }
+            }
+            case 21 -> {
+                if (--waitTicks <= 0) {
+                    staticCapture = new StaticCapture("boost-back");
+                    step = 22;
+                    waitTicks = 6;
+                }
+            }
+            case 22 -> {
+                if (--waitTicks <= 0) {
+                    minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+                    staticCapture = new StaticCapture("boost-front");
+                    step = 30;
+                    waitTicks = 8;
+                }
+            }
+            case 30 -> {
+                if (--waitTicks <= 0) {
+                    // Releasing sprint leaves the reference's raw velocity for
+                    // a few ticks, which is what drives the deceleration lean
+                    // and the asymmetric trailing legs.
+                    releaseMovementKeys(minecraft);
+                    minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+                    step = 31;
+                    waitTicks = 4;
+                }
+            }
+            case 31 -> {
+                if (--waitTicks <= 0) {
+                    staticCapture = new StaticCapture("boost-release");
+                    step = 23;
+                    waitTicks = 8;
+                }
+            }
+            case 23 -> {
+                if (--waitTicks <= 0) {
                     minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
                     releaseMovementKeys(minecraft);
                     stageEntry(minecraft, server, false);
@@ -389,7 +456,7 @@ public final class FlightCaptureHarness {
             }
             case 10 -> {
                 if (--waitTicks <= 0) {
-                    staticCapture = new StaticCapture("takeoff-launch");
+                    staticCapture = new StaticCapture("takeoff-lift");
                     step = 11;
                     waitTicks = 6;
                 }
@@ -426,9 +493,61 @@ public final class FlightCaptureHarness {
                         staticCapture = new StaticCapture("hover-bob");
                         waitTicks = 4;
                     } else {
-                        beginFreeTurn(minecraft, server);
-                        step = 15;
+                        beginHoverLookUp(minecraft, server);
+                        step = 24;
+                        waitTicks = 20;
                     }
+                }
+            }
+            case 24 -> {
+                if (--waitTicks <= 0) {
+                    staticCapture = new StaticCapture("hover-look-up");
+                    step = 25;
+                    waitTicks = 24;
+                }
+            }
+            case 25 -> {
+                if (--waitTicks <= 0) {
+                    beginBoostLookUp(minecraft, server);
+                    step = 26;
+                    waitTicks = 24;
+                }
+            }
+            case 26 -> {
+                if (--waitTicks <= 0) {
+                    staticCapture = new StaticCapture("boost-look-up");
+                    step = 28;
+                    waitTicks = 6;
+                }
+            }
+            case 28 -> {
+                if (--waitTicks <= 0) {
+                    beginBoostTurn(minecraft, server);
+                    // First establish a straight-line boost, then yaw away from
+                    // it so the turn offsets and bank are measurable.
+                    step = 33;
+                    waitTicks = 20;
+                }
+            }
+            case 33 -> {
+                if (--waitTicks <= 0) {
+                    setYaw(minecraft, server, 75.0F);
+                    setHeldKeys(minecraft, true, true);
+                    step = 29;
+                    waitTicks = 5;
+                }
+            }
+            case 29 -> {
+                if (--waitTicks <= 0) {
+                    staticCapture = new StaticCapture("boost-turn");
+                    step = 27;
+                    waitTicks = 6;
+                }
+            }
+            case 27 -> {
+                if (--waitTicks <= 0) {
+                    beginFreeTurn(minecraft, server);
+                    step = 15;
                 }
             }
             case 15 -> tickFreeTurn(minecraft, server);
@@ -442,11 +561,12 @@ public final class FlightCaptureHarness {
             }
             case 17 -> {
                 if (--waitTicks <= 0) {
+                    landingRetries = 0;
                     beginLandingApproach(minecraft, server);
                     step = 18;
                 }
             }
-            case 18 -> tickLandingWatch(minecraft);
+            case 18 -> tickLandingWatch(minecraft, server);
             case 19 -> {
                 if (--waitTicks <= 0) {
                     staticCapture = new StaticCapture("landing-recovered");
@@ -495,21 +615,55 @@ public final class FlightCaptureHarness {
      * after the server has already deactivated the flight with the landed
      * reason, so they photograph the actual recovery animation.
      */
-    private static void tickLandingWatch(Minecraft minecraft) {
+    private static void tickLandingWatch(Minecraft minecraft, MinecraftServer server) {
         LocalPlayer player = minecraft.player;
         if (player == null) {
             return;
         }
         FlightState state = FlightController.getState(player);
         boolean active = state != null && state.isActive();
-        if (!approachCaptured && active
-                && player.getY() < CAPTURE_Y + 1.0D
-                && player.getDeltaMovement().y < -0.02D) {
-            approachCaptured = true;
-            staticCapture = new StaticCapture("landing-approach");
+        landingWaitTicks++;
+        if (active) {
+            landingSawActive = true;
+            landingTicks++;
+            // Keep the real descent input and orientation locked. A lost key or
+            // a drifting camera otherwise turns the approach into a hover and
+            // the capture session hangs above the pad.
+            setHeldKeys(minecraft, true, false);
+            lockLandingLook(minecraft, server);
+            if (!approachCaptured && player.getY() < CAPTURE_Y + 2.0D
+                    && player.getDeltaMovement().y < -0.02D) {
+                approachCaptured = true;
+                staticCapture = new StaticCapture("landing-approach");
+            }
+            if (landingTicks > LANDING_TIMEOUT_TICKS) {
+                if (landingRetries < LANDING_RETRIES) {
+                    landingRetries++;
+                    LOGGER.warn("[flight-capture] landing stalled at y={}; retry {}",
+                            player.getY(), landingRetries);
+                    beginLandingApproach(minecraft, server);
+                } else {
+                    LOGGER.warn("[flight-capture] landing never contacted the ground at y={}; "
+                            + "finishing without a contact frame", player.getY());
+                    releaseMovementKeys(minecraft);
+                    staticCapture = new StaticCapture("landing-timeout");
+                    step = 20;
+                    waitTicks = 12;
+                }
+            }
+            return;
         }
-        if (!contactCaptured && !active) {
+        if (!landingSawActive && landingWaitTicks > LANDING_TIMEOUT_TICKS) {
+            LOGGER.warn("[flight-capture] flight did not resume for the landing stage");
+            releaseMovementKeys(minecraft);
+            staticCapture = new StaticCapture("landing-timeout");
+            step = 20;
+            waitTicks = 12;
+            return;
+        }
+        if (!contactCaptured && landingSawActive) {
             contactCaptured = true;
+            releaseMovementKeys(minecraft);
             staticCapture = new StaticCapture("landing-contact");
             recoveryWait = 4;
             return;
@@ -520,6 +674,40 @@ public final class FlightCaptureHarness {
             step = 19;
             waitTicks = 16;
         }
+    }
+
+    /**
+     * Reasserts the straight-down approach each tick. The local rotation is
+     * what the client sends to the integrated server; the server copy is only
+     * refreshed periodically to avoid flooding its task queue.
+     */
+    private static void lockLandingLook(Minecraft minecraft, MinecraftServer server) {
+        LocalPlayer local = minecraft.player;
+        if (local != null) {
+            local.setYRot(0.0F);
+            local.setYHeadRot(0.0F);
+            local.setYBodyRot(0.0F);
+            local.setXRot(90.0F);
+            local.setSprinting(false);
+        }
+        if (landingTicks % 5 != 1) {
+            return;
+        }
+        UUID playerId = local == null ? null : local.getUUID();
+        if (playerId == null) {
+            return;
+        }
+        server.execute(() -> {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) {
+                return;
+            }
+            player.setYRot(0.0F);
+            player.setYHeadRot(0.0F);
+            player.setYBodyRot(0.0F);
+            player.setXRot(90.0F);
+            player.setSprinting(false);
+        });
     }
 
     private static void prepareGroundStart(Minecraft minecraft, MinecraftServer server) {
@@ -533,6 +721,7 @@ public final class FlightCaptureHarness {
                 }
                 FlightController.requestActive(player, false);
                 player.teleportTo(player.serverLevel(), 0.5D, CAPTURE_Y, 0.5D, 0.0F, 0.0F);
+                player.setOldPosAndRot();
                 player.setOnGround(true);
                 player.setDeltaMovement(Vec3.ZERO);
                 player.setSprinting(false);
@@ -541,6 +730,7 @@ public final class FlightCaptureHarness {
         LocalPlayer local = minecraft.player;
         if (local != null) {
             local.setPos(0.5D, CAPTURE_Y, 0.5D);
+            local.setOldPosAndRot();
             local.setDeltaMovement(Vec3.ZERO);
             local.setSprinting(false);
             local.setYRot(0.0F);
@@ -560,6 +750,7 @@ public final class FlightCaptureHarness {
                     return;
                 }
                 player.teleportTo(player.serverLevel(), 0.5D, CAPTURE_Y, 0.5D, 0.0F, 0.0F);
+                player.setOldPosAndRot();
                 // A teleport keeps the previous onGround flag. The player is
                 // physically on the platform, so mark it before activation or
                 // the launch would be classified as an air start.
@@ -568,7 +759,9 @@ public final class FlightCaptureHarness {
                 player.setYRot(0.0F);
                 player.setYHeadRot(0.0F);
                 player.setYBodyRot(0.0F);
-                player.setXRot(0.0F);
+                // Looking up while holding forward is the reference way to
+                // leave the ground; jump has no vertical role in this flight.
+                player.setXRot(-20.0F);
                 player.setSprinting(false);
                 boolean active = FlightController.requestActive(player, true);
                 LOGGER.info("[flight-capture] ground takeoff active={} onGround={}",
@@ -578,19 +771,22 @@ public final class FlightCaptureHarness {
         LocalPlayer local = minecraft.player;
         if (local != null) {
             local.setPos(0.5D, CAPTURE_Y, 0.5D);
+            local.setOldPosAndRot();
             local.setDeltaMovement(Vec3.ZERO);
             local.setSprinting(false);
             local.setYRot(0.0F);
             local.setYHeadRot(0.0F);
             local.setYBodyRot(0.0F);
-            local.setXRot(0.0F);
+            local.setXRot(-20.0F);
         }
-        // Hold jump so the launch actually climbs away from the platform; the
-        // capture shows the real input-driven takeoff, not a staged hover.
-        minecraft.options.keyJump.setDown(true);
+        // Forward input (not jump) provides the lift impulse. The pitch also
+        // tilts the impulse upward, so the capture shows a real ascent.
+        setHeldKeys(minecraft, true, false);
     }
 
-    private static void stageHover(Minecraft minecraft, MinecraftServer server) {
+    private static void startBoost(Minecraft minecraft, MinecraftServer server) {
+        releaseMovementKeys(minecraft);
+        minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
         UUID playerId = minecraft.player == null ? null : minecraft.player.getUUID();
         if (playerId != null) {
             server.execute(() -> {
@@ -603,31 +799,74 @@ public final class FlightCaptureHarness {
                     FlightController.requestActive(player, true);
                 }
                 player.teleportTo(player.serverLevel(), 0.5D, FLIGHT_Y, 0.5D, 0.0F, 0.0F);
-                player.setDeltaMovement(Vec3.ZERO);
-                player.setSprinting(false);
+                player.setOldPosAndRot();
+                player.setDeltaMovement(0.0D, 0.0D, 0.0D);
                 player.setYRot(0.0F);
                 player.setYHeadRot(0.0F);
                 player.setYBodyRot(0.0F);
+                player.setXRot(0.0F);
+                player.setSprinting(true);
+            });
+        }
+        LocalPlayer local = minecraft.player;
+        if (local != null) {
+            local.setPos(0.5D, FLIGHT_Y, 0.5D);
+            local.setOldPosAndRot();
+            local.setDeltaMovement(Vec3.ZERO);
+            local.setYRot(0.0F);
+            local.setYHeadRot(0.0F);
+            local.setYBodyRot(0.0F);
+            local.setXRot(0.0F);
+            local.setSprinting(true);
+        }
+        setHeldKeys(minecraft, true, true);
+    }
+
+    /**
+     * Establish a straight sprint boost before the crosshair is moved away from
+     * the trajectory. The following yaw step then exposes the reference turn
+     * offsets and bank without the previous stage's residual direction.
+     */
+    private static void beginBoostTurn(Minecraft minecraft, MinecraftServer server) {
+        releaseMovementKeys(minecraft);
+        minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        float yaw = 0.0F;
+        UUID playerId = minecraft.player == null ? null : minecraft.player.getUUID();
+        if (playerId != null) {
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null) {
+                    return;
+                }
+                FlightState state = FlightController.getState(player);
+                if (state == null || !state.isActive()) {
+                    FlightController.requestActive(player, true);
+                }
+                player.teleportTo(player.serverLevel(), 0.5D, FLIGHT_Y, 0.5D, yaw, 0.0F);
+                player.setOldPosAndRot();
+                player.setDeltaMovement(0.0D, 0.0D, 2.2D);
+                player.setSprinting(true);
+                player.setYRot(yaw);
+                player.setYHeadRot(yaw);
+                player.setYBodyRot(yaw);
                 player.setXRot(0.0F);
             });
         }
         LocalPlayer local = minecraft.player;
         if (local != null) {
             local.setPos(0.5D, FLIGHT_Y, 0.5D);
-            local.setDeltaMovement(Vec3.ZERO);
-            local.setSprinting(false);
-            local.setYRot(0.0F);
-            local.setYHeadRot(0.0F);
-            local.setYBodyRot(0.0F);
+            local.setOldPosAndRot();
+            local.setDeltaMovement(0.0D, 0.0D, 2.2D);
+            local.setSprinting(true);
+            local.setYRot(yaw);
+            local.setYHeadRot(yaw);
+            local.setYBodyRot(yaw);
             local.setXRot(0.0F);
         }
+        setHeldKeys(minecraft, true, true);
     }
 
-    private static void beginFreeTurn(Minecraft minecraft, MinecraftServer server) {
-        turnTicks = 0;
-        turnEarlyCaptured = false;
-        turnMiddleCaptured = false;
-        turnEndCaptured = false;
+    private static void stageHover(Minecraft minecraft, MinecraftServer server) {
         releaseMovementKeys(minecraft);
         UUID playerId = minecraft.player == null ? null : minecraft.player.getUUID();
         if (playerId != null) {
@@ -641,6 +880,104 @@ public final class FlightCaptureHarness {
                     FlightController.requestActive(player, true);
                 }
                 player.teleportTo(player.serverLevel(), 0.5D, FLIGHT_Y, 0.5D, 0.0F, 0.0F);
+                player.setOldPosAndRot();
+                player.setDeltaMovement(Vec3.ZERO);
+                player.setSprinting(false);
+                player.setYRot(0.0F);
+                player.setYHeadRot(0.0F);
+                player.setYBodyRot(0.0F);
+                player.setXRot(0.0F);
+            });
+        }
+        LocalPlayer local = minecraft.player;
+        if (local != null) {
+            local.setPos(0.5D, FLIGHT_Y, 0.5D);
+            local.setOldPosAndRot();
+            local.setDeltaMovement(Vec3.ZERO);
+            local.setSprinting(false);
+            local.setYRot(0.0F);
+            local.setYHeadRot(0.0F);
+            local.setYBodyRot(0.0F);
+            local.setXRot(0.0F);
+        }
+    }
+
+    /**
+     * Hovering forward while looking steeply up. The torso must stay upright
+     * like the reference hover, the neck must follow the real -60 degree look,
+     * and the pose must not turn the ascent into a boost silhouette.
+     */
+    private static void beginHoverLookUp(Minecraft minecraft, MinecraftServer server) {
+        releaseMovementKeys(minecraft);
+        stageLookUp(minecraft, server, false, -60.0F);
+        minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+        setHeldKeys(minecraft, true, false);
+    }
+
+    /** Sprinting forward while looking up: the reference body pitch follows the view. */
+    private static void beginBoostLookUp(Minecraft minecraft, MinecraftServer server) {
+        releaseMovementKeys(minecraft);
+        stageLookUp(minecraft, server, true, -60.0F);
+        minecraft.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+        setHeldKeys(minecraft, true, true);
+    }
+
+    private static void stageLookUp(Minecraft minecraft, MinecraftServer server,
+                                    boolean sprinting, float pitch) {
+        UUID playerId = minecraft.player == null ? null : minecraft.player.getUUID();
+        if (playerId != null) {
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null) {
+                    return;
+                }
+                FlightState state = FlightController.getState(player);
+                if (state == null || !state.isActive()) {
+                    FlightController.requestActive(player, true);
+                }
+                player.teleportTo(player.serverLevel(), 0.5D, FLIGHT_Y, 0.5D, 0.0F, pitch);
+                player.setOldPosAndRot();
+                player.setDeltaMovement(Vec3.ZERO);
+                player.setSprinting(sprinting);
+                player.setYRot(0.0F);
+                player.setYHeadRot(0.0F);
+                player.setYBodyRot(0.0F);
+                player.setXRot(pitch);
+            });
+        }
+        LocalPlayer local = minecraft.player;
+        if (local != null) {
+            local.setPos(0.5D, FLIGHT_Y, 0.5D);
+            local.setOldPosAndRot();
+            local.setDeltaMovement(Vec3.ZERO);
+            local.setSprinting(sprinting);
+            local.setYRot(0.0F);
+            local.setYHeadRot(0.0F);
+            local.setYBodyRot(0.0F);
+            local.setXRot(pitch);
+        }
+    }
+
+    private static void beginFreeTurn(Minecraft minecraft, MinecraftServer server) {
+        turnTicks = 0;
+        turnEarlyCaptured = false;
+        turnMiddleCaptured = false;
+        turnEndCaptured = false;
+        releaseMovementKeys(minecraft);
+        minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        UUID playerId = minecraft.player == null ? null : minecraft.player.getUUID();
+        if (playerId != null) {
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null) {
+                    return;
+                }
+                FlightState state = FlightController.getState(player);
+                if (state == null || !state.isActive()) {
+                    FlightController.requestActive(player, true);
+                }
+                player.teleportTo(player.serverLevel(), 0.5D, FLIGHT_Y, 0.5D, 0.0F, 0.0F);
+                player.setOldPosAndRot();
                 player.setDeltaMovement(0.0D, 0.0D, 0.55D);
                 player.setSprinting(false);
                 player.setYRot(0.0F);
@@ -652,6 +989,7 @@ public final class FlightCaptureHarness {
         LocalPlayer local = minecraft.player;
         if (local != null) {
             local.setPos(0.5D, FLIGHT_Y, 0.5D);
+            local.setOldPosAndRot();
             local.setDeltaMovement(0.0D, 0.0D, 0.55D);
             local.setSprinting(false);
             local.setYRot(0.0F);
@@ -662,7 +1000,7 @@ public final class FlightCaptureHarness {
         // Forward input is the only thing that turns the trajectory. The yaw is
         // rotated gradually below, so this is ordinary free flight: no maneuver
         // packet, no scripted arc and no server-owned turn radius.
-        minecraft.options.keyUp.setDown(true);
+        setHeldKeys(minecraft, true, false);
     }
 
     private static void setYaw(Minecraft minecraft, MinecraftServer server, float yaw) {
@@ -690,7 +1028,12 @@ public final class FlightCaptureHarness {
         approachCaptured = false;
         contactCaptured = false;
         recoveryWait = 0;
-        double startY = CAPTURE_Y + 3.0D;
+        landingTicks = 0;
+        landingWaitTicks = 0;
+        landingSawActive = false;
+        // Straight-down look removes the horizontal hover impulse, so the
+        // descent stays above the prepared pad instead of drifting away.
+        double startY = FLIGHT_Y;
         UUID playerId = minecraft.player == null ? null : minecraft.player.getUUID();
         if (playerId != null) {
             server.execute(() -> {
@@ -703,29 +1046,47 @@ public final class FlightCaptureHarness {
                     FlightController.requestActive(player, true);
                 }
                 player.teleportTo(player.serverLevel(), 0.5D, startY, 0.5D, 0.0F, 0.0F);
+                player.setOldPosAndRot();
                 player.setOnGround(false);
-                player.setDeltaMovement(0.0D, -0.18D, 0.0D);
+                player.setDeltaMovement(Vec3.ZERO);
                 player.setSprinting(false);
                 player.setYRot(0.0F);
                 player.setYHeadRot(0.0F);
                 player.setYBodyRot(0.0F);
-                player.setXRot(0.0F);
+                // Looking straight down while holding forward is the reference
+                // vertical descent; sneak is not a vertical control.
+                player.setXRot(90.0F);
             });
         }
         LocalPlayer local = minecraft.player;
         if (local != null) {
             local.setPos(0.5D, startY, 0.5D);
-            local.setDeltaMovement(0.0D, -0.18D, 0.0D);
+            local.setOldPosAndRot();
+            local.setOnGround(false);
+            local.setDeltaMovement(Vec3.ZERO);
             local.setSprinting(false);
             local.setYRot(0.0F);
             local.setYHeadRot(0.0F);
             local.setYBodyRot(0.0F);
-            local.setXRot(0.0F);
+            local.setXRot(90.0F);
         }
-        minecraft.options.keyShift.setDown(true);
+        setHeldKeys(minecraft, true, false);
+    }
+
+    private static void setHeldKeys(Minecraft minecraft, boolean forward, boolean sprint) {
+        holdForward = forward;
+        holdSprint = sprint;
+        applyHeldKeys(minecraft);
+    }
+
+    private static void applyHeldKeys(Minecraft minecraft) {
+        minecraft.options.keyUp.setDown(holdForward);
+        minecraft.options.keySprint.setDown(holdSprint);
     }
 
     private static void releaseMovementKeys(Minecraft minecraft) {
+        holdForward = false;
+        holdSprint = false;
         minecraft.options.keyUp.setDown(false);
         minecraft.options.keyDown.setDown(false);
         minecraft.options.keyLeft.setDown(false);
@@ -767,6 +1128,11 @@ public final class FlightCaptureHarness {
     }
 
     private static void stageEntry(Minecraft minecraft, MinecraftServer server, boolean resetPosition) {
+        releaseMovementKeys(minecraft);
+        LocalPlayer local = minecraft.player;
+        if (local != null) {
+            local.setSprinting(false);
+        }
         UUID playerId = minecraft.player == null ? null : minecraft.player.getUUID();
         if (playerId == null) {
             return;
@@ -789,9 +1155,12 @@ public final class FlightCaptureHarness {
             player.setXRot(0.0F);
             player.setSprinting(false);
         });
-        LocalPlayer local = minecraft.player;
+        if (local == null) {
+            return;
+        }
         if (resetPosition) {
             local.setPos(0.5D, FLIGHT_Y, 0.5D);
+            local.setOldPosAndRot();
         }
         local.setDeltaMovement(0.0D, 0.0D, ENTRY_SPEED);
         local.setYRot(0.0F);
@@ -803,6 +1172,7 @@ public final class FlightCaptureHarness {
         server.execute(() -> {
             for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                 player.teleportTo(player.serverLevel(), 0.5D, FLIGHT_Y, 0.5D, 0.0F, 0.0F);
+                player.setOldPosAndRot();
                 player.setDeltaMovement(0.0D, 0.0D, 0.0D);
                 player.setYHeadRot(0.0F);
             }
@@ -810,9 +1180,11 @@ public final class FlightCaptureHarness {
         LocalPlayer local = minecraft.player;
         if (local != null) {
             local.setPos(0.5D, FLIGHT_Y, 0.5D);
+            local.setOldPosAndRot();
             local.setDeltaMovement(Vec3.ZERO);
             local.setYHeadRot(0.0F);
             local.setYBodyRot(0.0F);
+            local.setXRot(0.0F);
         }
     }
 
@@ -825,15 +1197,21 @@ public final class FlightCaptureHarness {
         String progress = view == null ? "-" : String.format(Locale.ROOT, "%.3f", view.progress());
         FlightPoseSample sample = FlightAnimationController.sample(player, partialTick);
         String pose = sample == null ? "weight=-" : String.format(Locale.ROOT,
-                "weight=%.2f bodyPitch=%.1f bodyRoll=%.1f bodyYaw=%.1f maneuverPitch=%.1f maneuverRoll=%.1f",
+                "weight=%.2f bodyPitch=%.1f bodyRoll=%.1f headPitch=%.1f "
+                        + "maneuverPitch=%.1f maneuverRoll=%.1f rollPitch=%.1f rollRArm=%.1f",
                 sample.weight(), sample.pose().bodyPitchDegrees,
-                sample.pose().bodyRollDegrees, sample.bodyYawOffsetDegrees(),
-                sample.maneuverPitchDegrees(), sample.maneuverRollDegrees());
+                sample.pose().bodyRollDegrees, sample.pose().headXRotDegrees,
+                sample.maneuverPitchDegrees(), sample.maneuverRollDegrees(),
+                sample.rollOverlay().bodyPitchDegrees, sample.rollOverlay().rightArmXRot);
+        double stepX = player.getX() - player.xOld;
+        double stepY = player.getY() - player.yOld;
+        double stepZ = player.getZ() - player.zOld;
+        double stepSpeed = Math.sqrt(stepX * stepX + stepY * stepY + stepZ * stepZ);
         String line = String.format(Locale.ROOT,
-                "%s | %s | kind=%s | progress=%s | pos=%.2f,%.2f,%.2f | yaw=%.1f | pitch=%.1f | speed=%.2f | camera=%s | %s",
+                "%s | %s | kind=%s | progress=%s | pos=%.2f,%.2f,%.2f | yaw=%.1f | pitch=%.1f | step=%.2f | camera=%s | %s",
                 name, label, kind, progress,
                 player.getX(), player.getY(), player.getZ(),
-                player.getYRot(), player.getXRot(), player.getDeltaMovement().length(),
+                player.getYRot(), player.getXRot(), stepSpeed,
                 minecraft.options.getCameraType().name(), pose);
         images.add(new CapturedImage(name, label, line));
         manifest.add(line);
@@ -914,9 +1292,6 @@ public final class FlightCaptureHarness {
     }
 
     private static String groupOf(String label) {
-        if (label.contains("level")) {
-            return "Level flight";
-        }
         if (label.contains("roll")) {
             return "360-degree roll";
         }
@@ -926,8 +1301,11 @@ public final class FlightCaptureHarness {
         if (label.contains("takeoff")) {
             return "Ground takeoff";
         }
+        if (label.contains("boost")) {
+            return "Sprint boost";
+        }
         if (label.contains("hover")) {
-            return "Idle hover";
+            return "Hover and forward hover";
         }
         if (label.contains("turn")) {
             return "Free 180-degree turn";

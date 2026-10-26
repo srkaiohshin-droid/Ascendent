@@ -4,6 +4,9 @@
   "package": "br.com.ascendant.mixin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "ascendant.refmap.json",
+  "mixins": [
+    "PlayerTravelMixin"
+  ],
   "client": [
     "HumanoidModelMixin",
     "PlayerRendererMixin"

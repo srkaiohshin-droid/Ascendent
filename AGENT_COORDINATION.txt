@@ -434,3 +434,32 @@ Criterios:
   cabeca/torso pelos 24 frames de 20261025-153345 e por inspecao interativa.
 - Limitacao aberta: nao foi medido se o atrito de `LivingEntity.travel` amortece de
   forma perceptivel a velocidade aplicada e o bob.
+
+## Polimento do voo, idle de hover e barrel roll (2026-10-25, sobre 62787f9)
+Arquivos alterados: FlightPoseLibrary, FlightPhysics, FlightPoseSample,
+FlightMotionSample, FlightAnimationController, FlightPoseRenderer, FlightController,
+FlightManeuvers, FlightTuning, FlightCaptureHarness, FlightGameTests, FlightCameraMath,
+PlayerTravelMixin, PlayerRendererMixin e ascendant.mixins.json.
+Arquivos NAO tocados: catalogo, trajes, packs, poderes, locomocao terrestre e speedster.
+Criterios:
+- [x] Boost levemente mais lento (`DEFAULT_BOOST_SPEED = 0.185`, terminal ~3.69 b/t).
+- [x] Hover com a camada idle de `flight/idle/default.fsk`: fase, gate, sway, pitch de
+  torso e offsets assimetricos de bracos/pernas; cabeca e yaw do corpo preservam a mira.
+- [x] Blend hover/boost pelo timer eased de 8 ticks da referencia; boost com pitch
+  `-(viewPitch + 80)`, cabeca -50, lift 0.14, offset de curva e banco limitado.
+- [x] Barrel roll C/V com duracao 10, curva eased, scrub de 6%, impulso lateral de 0.15
+  da velocidade horizontal e overlay de bracos/pernas/pitch fora do smoothing.
+- [x] Corpo segue o yaw real da mira; nenhuma pose scriptada de decolagem, pouso, curva,
+  subida, descida ou respiracao foi inventada.
+- [x] Harness com hover frontal isolado, boost-turn reto antes da curva, teclas
+  reafirmadas, pouso travado, watchdog com 2 retentativas e telemetria de overlay.
+- [x] GameTests de idle, overlay/fisica do roll e roll eased; suite em 77/77.
+- Validacao: `runGameTestServer` "All 77 required tests passed"; `build` BUILD
+  SUCCESSFUL; `git diff --check` sem erros de conteudo.
+- Evidencia: captura 20261025-212903 com 30 PNGs, sem recusa e sem timeout; hover
+  -15.4/-16.2, boost -80.0, roll 23.6 -> 330.2, boost-turn banco -11.7, pouso real
+  221.55 -> 220.00 -> recuperacao -> vanilla.
+- [ ] Homologacao visual humana dos 30 frames de 20261025-212903 e inspecao interativa
+  de mouse/teclado.
+- Limitacao aberta: velocidade terminal do boost em gameplay real com chunk loading e
+  render distance; agua/lava seguem sem ativacao por seguranca.

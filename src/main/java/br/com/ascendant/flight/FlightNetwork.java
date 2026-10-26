@@ -16,9 +16,10 @@ public final class FlightNetwork {
     /**
      * Bumped whenever the state payload or maneuver semantics change so
      * mismatched peers fail fast. Version 5 removed the scripted 180-degree
-     * reversal; its kind value is now invalid on purpose.
+     * reversal; version 6 removed the takeoff impulse because the reference
+     * flight has no launch kick.
      */
-    private static final String PROTOCOL = "5";
+    private static final String PROTOCOL = "6";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(Ascendant.MOD_ID, "flight"), () -> PROTOCOL,
             PROTOCOL::equals, PROTOCOL::equals);
@@ -75,10 +76,8 @@ public final class FlightNetwork {
         float maneuverYaw = state == null ? 0.0F : state.getManeuverYaw();
         float maneuverSpeed = state == null ? 0.0F : state.getManeuverSpeed();
         boolean maneuverAborted = state != null && state.wasManeuverAborted();
-        float impulse = active && groundLaunch
-                ? (float) (double) FlightTuning.TAKEOFF_IMPULSE.get() : 0.0F;
         return new FlightStateUpdate(player.getId(), active, player.isNoGravity(), kind,
-                direction, ticks, inverted, groundLaunch, endReason, impulse,
+                direction, ticks, inverted, groundLaunch, endReason,
                 maneuverYaw, maneuverSpeed, maneuverAborted);
     }
 
@@ -88,6 +87,11 @@ public final class FlightNetwork {
             ServerPlayer sender = ctx.getSender();
             if (sender != null) {
                 FlightController.requestActive(sender, message.active());
+                // Always answer a toggle, including a refusal or a no-op. The
+                // client latches its request button until the authoritative
+                // state arrives; without this reply a refused activation would
+                // leave the toggle permanently blocked.
+                FlightNetwork.syncState(sender);
             }
         });
         ctx.setPacketHandled(true);
@@ -122,7 +126,7 @@ public final class FlightNetwork {
                 () -> () -> FlightClientPackets.update(message.entityId(), message.active(),
                         message.noGravity(), message.maneuverKind(), message.maneuverDirection(),
                         message.maneuverTicksRemaining(), message.inverted(), message.launchedFromGround(),
-                        message.endReason(), message.takeoffImpulse(), message.maneuverYaw(),
+                        message.endReason(), message.maneuverYaw(),
                         message.maneuverSpeed(), message.maneuverAborted())));
         ctx.setPacketHandled(true);
     }
@@ -174,7 +178,7 @@ public final class FlightNetwork {
     record FlightStateUpdate(int entityId, boolean active, boolean noGravity,
                              int maneuverKind, int maneuverDirection, int maneuverTicksRemaining,
                              boolean inverted, boolean launchedFromGround, int endReason,
-                             float takeoffImpulse, float maneuverYaw, float maneuverSpeed,
+                             float maneuverYaw, float maneuverSpeed,
                              boolean maneuverAborted) {
         static void encode(FlightStateUpdate message, FriendlyByteBuf buffer) {
             buffer.writeVarInt(message.entityId());
@@ -186,7 +190,6 @@ public final class FlightNetwork {
             buffer.writeBoolean(message.inverted());
             buffer.writeBoolean(message.launchedFromGround());
             buffer.writeByte(message.endReason());
-            buffer.writeFloat(message.takeoffImpulse());
             buffer.writeFloat(message.maneuverYaw());
             buffer.writeFloat(message.maneuverSpeed());
             buffer.writeBoolean(message.maneuverAborted());
@@ -196,7 +199,7 @@ public final class FlightNetwork {
             return new FlightStateUpdate(buffer.readVarInt(), buffer.readBoolean(), buffer.readBoolean(),
                     buffer.readUnsignedByte(), buffer.readByte(), buffer.readUnsignedByte(),
                     buffer.readBoolean(), buffer.readBoolean(), buffer.readUnsignedByte(),
-                    buffer.readFloat(), buffer.readFloat(), buffer.readFloat(), buffer.readBoolean());
+                    buffer.readFloat(), buffer.readFloat(), buffer.readBoolean());
         }
 
         private static void handle(FlightStateUpdate message, Supplier<NetworkEvent.Context> context) {

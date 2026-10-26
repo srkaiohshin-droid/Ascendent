@@ -12,7 +12,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.MoverType;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -20,159 +20,66 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 import java.util.UUID;
 
+/**
+ * Deterministic GameTests for the reference flight kernel, its presentation
+ * poses, the state machine, maneuvers and the network payload.
+ *
+ * <p>The physics assertions use the same {@link FlightPhysics#simulate} call
+ * that the travel mixin executes, so a regression in the hover drag, boost
+ * alignment, free reversal or idle bob fails before a client is involved.</p>
+ */
 @PrefixGameTestTemplate(false)
 public final class FlightGameTests {
-    private static final double CRUISE = 0.65D;
-    private static final double BOOST = 1.25D;
-    private static final double ACCELERATION = 0.045D;
-    private static final double BOOST_ACCELERATION = 0.080D;
-    private static final double DRAG = 0.94D;
-    private static final double BRAKING = 0.12D;
-    private static final double HOVER_STABILITY = 0.12D;
-    private static final double HOVER_BOB = 0.025D;
-    private static final double BOOST_TURN_RATE = 9.0D;
-    private static final float VERTICAL_CRUISE = (float) (CRUISE * 0.72D);
-
     private static final FlightPhysics.Params PARAMS = new FlightPhysics.Params(
-            CRUISE, BOOST, ACCELERATION, BOOST_ACCELERATION, DRAG, BRAKING,
-            HOVER_STABILITY, HOVER_BOB, BOOST_TURN_RATE);
+            0.10D, 0.20D, 0.91D, 0.08D, 0.025D);
+    private static final double HOVER_TERMINAL = 1.011D;
+    private static final double HOVER_DISPLACEMENT = 1.111D;
+    private static final double BOOST_TERMINAL = 3.992D;
+    private static final double BOOST_DISPLACEMENT = 4.032D;
 
-    private FlightGameTests() {
+    private static FlightPhysics.Step step(Vec3 velocity, float yaw, float pitch,
+                                           int inputMask, boolean boosting, long gameTime) {
+        return FlightPhysics.simulate(velocity, yaw, pitch, inputMask,
+                boosting, gameTime, PARAMS);
     }
 
-    private static Vec3 step(Vec3 velocity, float yaw, float pitch, int inputMask,
-                             boolean sprinting, long gameTime) {
-        return FlightPhysics.nextVelocity(velocity, yaw, pitch, inputMask,
-                sprinting, gameTime, PARAMS);
-    }
-
-    private static Vec3 step(Vec3 velocity, float yaw, int inputMask) {
-        return step(velocity, yaw, 0.0F, inputMask, false, 0L);
-    }
-
-    /** Minecraft heading in degrees for a horizontal velocity, matching yaw. */
-    private static float heading(Vec3 velocity) {
-        return (float) Math.toDegrees(Math.atan2(-velocity.x, velocity.z));
-    }
-
-    private static float separationDegrees(Vec3 first, Vec3 second) {
-        double dot = first.dot(second);
-        double lengths = first.length() * second.length();
-        if (lengths < 1.0E-9D) {
-            return 0.0F;
+    private static Vec3 settle(Vec3 velocity, float yaw, float pitch,
+                               int inputMask, boolean boosting, int ticks) {
+        Vec3 current = velocity;
+        for (int tick = 0; tick < ticks; tick++) {
+            current = step(current, yaw, pitch, inputMask, boosting, tick).velocity();
         }
-        double cosine = Math.max(-1.0D, Math.min(1.0D, dot / lengths));
-        return (float) Math.toDegrees(Math.acos(cosine));
+        return current;
     }
 
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void normalFlightReachesCruiseAndVerticalCaps(GameTestHelper helper) {
-        Vec3 forward = Vec3.ZERO;
-        for (int tick = 0; tick < 100; tick++) {
-            forward = step(forward, 0.0F, FlightState.FORWARD);
+    private static FlightPhysics.Step lastStep(Vec3 velocity, float yaw, float pitch,
+                                               int inputMask, boolean boosting, int ticks) {
+        Vec3 current = velocity;
+        FlightPhysics.Step last = null;
+        for (int tick = 0; tick < ticks; tick++) {
+            last = step(current, yaw, pitch, inputMask, boosting, tick);
+            current = last.velocity();
         }
-        helper.assertTrue(Math.abs(forward.z - CRUISE) < 1.0E-6D,
-                "Normal forward flight should converge on the cruise cap, got " + forward.z);
-        helper.assertTrue(Math.abs(forward.x) < 1.0E-9D && Math.abs(forward.y) < 1.0E-9D,
-                "Straight forward flight must not add lateral or vertical drift");
-
-        Vec3 ascend = Vec3.ZERO;
-        for (int tick = 0; tick < 100; tick++) {
-            ascend = step(ascend, 0.0F, FlightState.ASCEND);
-        }
-        helper.assertTrue(Math.abs(ascend.y - VERTICAL_CRUISE) < 1.0E-6D,
-                "Direct ascent should converge on the vertical cruise command, got " + ascend.y);
-        helper.assertTrue(Math.sqrt(ascend.x * ascend.x + ascend.z * ascend.z) < 1.0E-9D,
-                "Vertical-only input must not create horizontal movement");
-
-        Vec3 combined = Vec3.ZERO;
-        for (int tick = 0; tick < 100; tick++) {
-            combined = step(combined, 0.0F, FlightState.FORWARD | FlightState.ASCEND);
-        }
-        double combinedSpeed = combined.length();
-        helper.assertTrue(combinedSpeed <= CRUISE * 1.15D + 1.0E-6D,
-                "A combined climb must respect the overall speed ceiling, got " + combinedSpeed);
-        helper.assertTrue(combined.z > 0.55D && combined.y > 0.40D,
-                "A combined climb must keep both forward and upward motion");
-        helper.succeed();
+        return last;
     }
 
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void opposingVerticalControlsCancelAndIdleHoverSettles(GameTestHelper helper) {
-        Vec3 conflicting = step(Vec3.ZERO, 0.0F, 0.0F,
-                FlightState.ASCEND | FlightState.DESCEND, false, 0L);
-        helper.assertTrue(conflicting.length() < 1.0E-9D,
-                "Simultaneous ascent and descent must not create movement");
-
-        Vec3 hovering = new Vec3(0.0D, 0.3D, 0.0D);
-        for (int tick = 0; tick < 40; tick++) {
-            hovering = step(hovering, 0.0F, 0.0F, 0, false, tick);
-        }
-        helper.assertTrue(Math.abs(hovering.y) <= HOVER_BOB + 1.0E-6D,
-                "An idle hover should settle vertical glide into the small bob, got " + hovering.y);
-        helper.assertTrue(Math.sqrt(hovering.x * hovering.x + hovering.z * hovering.z) < 1.0E-4D,
-                "An idle hover must not retain horizontal movement");
-        helper.succeed();
+    private static FlightMotionSample sample(float speed, float horizontal, float pitch,
+                                             float forward, float right, boolean boosting,
+                                             boolean maneuvering) {
+        return sampleAtPhase(speed, horizontal, pitch, forward, right, boosting,
+                maneuvering, 0.0F);
     }
 
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void diagonalInputIsNormalizedAndBrakeReducesSpeed(GameTestHelper helper) {
-        Vec3 diagonal = step(Vec3.ZERO, 0.0F, FlightState.FORWARD | FlightState.RIGHT);
-        double horizontal = Math.sqrt(diagonal.x * diagonal.x + diagonal.z * diagonal.z);
-        helper.assertTrue(horizontal <= CRUISE * 0.18D + 1.0E-6D,
-                "Diagonal input must not exceed one normal response step, got " + horizontal);
-        helper.assertTrue(Math.abs(diagonal.x - diagonal.z) < 1.0E-6D,
-                "Forward-right input must split evenly between both axes");
-
-        Vec3 braking = step(new Vec3(0.3D, 0.0D, 0.0D), 0.0F, FlightState.BRAKE);
-        helper.assertTrue(Math.abs(braking.length() - (0.3D - BRAKING)) < 1.0E-6D,
-                "Brake input should remove the configured speed without changing direction");
-        helper.assertTrue(braking.x > 0.0D && Math.abs(braking.z) < 1.0E-9D,
-                "Braking must preserve the current heading");
-
-        Vec3 stopped = step(Vec3.ZERO, 0.0F, 0.0F, FlightState.BRAKE, false, 0L);
-        helper.assertTrue(stopped.equals(Vec3.ZERO),
-                "Braking from rest must stay at rest");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void inputRejectsInvalidAndDuplicateTickRequests(GameTestHelper helper) {
-        PlayerFlightState state = new PlayerFlightState();
-        helper.assertTrue(state.acceptInput(FlightState.FORWARD, 4L), "First input for a tick should be accepted");
-        helper.assertTrue(!state.acceptInput(FlightState.BACK, 4L), "A second input in the same tick should be rejected");
-        helper.assertTrue(!state.acceptInput(1 << 7, 5L), "Unknown input bits should be rejected");
-        state.clearInput();
-        helper.assertTrue(state.getInputMask() == 0, "Clearing stale input should stop all commanded movement");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void inputMaskDirectUpdateClampsAndReflects(GameTestHelper helper) {
-        PlayerFlightState state = new PlayerFlightState();
-        state.setInputMask(FlightState.FORWARD | FlightState.ASCEND);
-        helper.assertTrue(state.getInputMask() == (FlightState.FORWARD | FlightState.ASCEND),
-                "setInputMask should directly set valid bits");
-        state.setInputMask(FlightState.RIGHT | (1 << 9)); // invalid bit
-        helper.assertTrue(state.getInputMask() == FlightState.RIGHT,
-                "setInputMask must filter out invalid mask bits");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void entityMovementStillCollidesWithSolidBlocks(GameTestHelper helper) {
-        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
-        helper.getLevel().setBlockAndUpdate(origin.offset(2, 1, 0), Blocks.STONE.defaultBlockState());
-        helper.getLevel().setBlockAndUpdate(origin.offset(2, 2, 0), Blocks.STONE.defaultBlockState());
-        Player player = helper.makeMockPlayer();
-        player.setPos(origin.getX() + 0.5D, origin.getY() + 1.0D, origin.getZ() + 0.5D);
-
-        Vec3 fastStep = new Vec3(0.55D, 0.0D, 0.0D).scale(10.0D);
-        player.move(MoverType.SELF, fastStep);
-
-        helper.assertTrue(player.getX() < origin.getX() + 2.0D,
-                "Vanilla entity movement must clip a fast flight step against a block wall");
-        helper.succeed();
+    private static FlightMotionSample sampleAtPhase(float speed, float horizontal, float pitch,
+                                                    float forward, float right, boolean boosting,
+                                                    boolean maneuvering, float idlePhase) {
+        return FlightMotionSample.builder()
+                .active(true).activeTicks(30)
+                .speed(speed).horizontalSpeed(horizontal).verticalSpeed(0.0F)
+                .viewPitch(pitch).bodyForward(forward).bodyRight(right)
+                .boosting(boosting).maneuvering(maneuvering)
+                .idlePhase(idlePhase)
+                .build();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
@@ -180,11 +87,45 @@ public final class FlightGameTests {
         Player player = helper.makeMockPlayer();
         IPlayerPowerData powers = player.getCapability(PlayerPowerDataProvider.CAPABILITY)
                 .orElseThrow(() -> new AssertionError("Player power capability is unavailable"));
-        helper.assertTrue(!FlightController.canActivate(player), "Flight must be denied without its power");
+        helper.assertTrue(!FlightController.canActivate(player),
+                "Flight must be denied without its power");
         powers.unlockPower(FlightController.FLIGHT_POWER);
-        helper.assertTrue(FlightController.canActivate(player), "An eligible player with unlocked flight should be accepted");
+        helper.assertTrue(FlightController.canActivate(player),
+                "An eligible player with unlocked flight should be accepted");
         powers.revokePower(FlightController.FLIGHT_POWER);
-        helper.assertTrue(!FlightController.canActivate(player), "Revoking flight must remove activation permission");
+        helper.assertTrue(!FlightController.canActivate(player),
+                "Revoking flight must remove activation permission");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void requestingInactiveOffLeavesUnrelatedStateUntouched(GameTestHelper helper) {
+        ServerPlayer player = new ServerPlayer(helper.getLevel().getServer(), helper.getLevel(),
+                new GameProfile(UUID.randomUUID(), "inactive_flight_off")) {
+            @Override
+            public boolean isSpectator() {
+                return false;
+            }
+
+            @Override
+            public boolean isCreative() {
+                return false;
+            }
+        };
+        player.setNoGravity(true);
+        Vec3 velocity = new Vec3(0.30D, -0.05D, 0.20D);
+        player.setDeltaMovement(velocity);
+        FlightState state = FlightController.getState(player);
+        helper.assertTrue(state != null, "Player must have a flight state capability");
+        helper.assertTrue(!state.isActive(), "The test player must start inactive");
+
+        helper.assertTrue(FlightController.requestActive(player, false),
+                "Turning an inactive flight off must be handled without error");
+        helper.assertTrue(!state.isActive(), "The state must remain inactive");
+        helper.assertTrue(player.isNoGravity(),
+                "Deactivating an inactive flight must not clear noGravity owned by another system");
+        helper.assertTrue(player.getDeltaMovement().equals(velocity),
+                "Deactivating an inactive flight must not rewrite the player's velocity");
         helper.succeed();
     }
 
@@ -193,7 +134,7 @@ public final class FlightGameTests {
         PlayerFlightState state = new PlayerFlightState();
         state.setActive(true);
         state.setHasLeftGround(true);
-        state.acceptInput(FlightState.FORWARD | FlightState.ASCEND, 1L);
+        state.acceptInput(FlightState.FORWARD | FlightState.BRAKE, 1L);
         helper.assertTrue(state.isActive(), "State must be active before clear");
 
         state.clear();
@@ -212,7 +153,6 @@ public final class FlightGameTests {
                 .orElseThrow(() -> new AssertionError("Player power capability is unavailable"));
         powers.unlockPower(FlightController.FLIGHT_POWER);
 
-        // Manually activate the flight state.
         FlightState state = FlightController.getState(player);
         helper.assertTrue(state != null, "Player must have a flight state capability");
         state.setHadNoGravity(player.isNoGravity());
@@ -221,13 +161,10 @@ public final class FlightGameTests {
         player.setNoGravity(true);
 
         helper.assertTrue(state.isActive(), "State must be active after manual activation");
-
-        // Now deactivate via the lifecycle method (used on death/dimension change/revoke).
         FlightController.deactivateForLifecycle(player);
 
         helper.assertTrue(!state.isActive(), "State must be inactive after deactivateForLifecycle");
         helper.assertTrue(state.getInputMask() == 0, "Input mask must be cleared after deactivation");
-        // noGravity should be restored to what it was before flight (false for a normal player).
         helper.assertTrue(!player.isNoGravity(), "noGravity must be restored after deactivation");
         helper.succeed();
     }
@@ -248,11 +185,14 @@ public final class FlightGameTests {
 
         FlightController.deactivateForLifecycle(player);
 
-        helper.assertTrue(player.fallDistance == 0.0F, "Fall distance must be reset to 0 upon deactivation");
+        helper.assertTrue(player.fallDistance == 0.0F,
+                "Fall distance must be reset to 0 upon deactivation");
         Vec3 velocity = player.getDeltaMovement();
         double hSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
-        helper.assertTrue(hSpeed <= 0.28001D, "Excessive horizontal flight speed must be clamped during transition");
-        helper.assertTrue(velocity.y >= -0.20001D, "Downward plunge speed must be dampened during transition");
+        helper.assertTrue(hSpeed <= 0.28001D,
+                "Excessive horizontal flight speed must be clamped during transition");
+        helper.assertTrue(velocity.y >= -0.20001D,
+                "Downward plunge speed must be dampened during transition");
         helper.succeed();
     }
 
@@ -268,9 +208,9 @@ public final class FlightGameTests {
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void lavaAndWaterDenyFlight(GameTestHelper helper) {
+    public static void lavaDeniesFlight(GameTestHelper helper) {
         ServerPlayer player = new ServerPlayer(helper.getLevel().getServer(), helper.getLevel(),
-                new GameProfile(UUID.randomUUID(), "fluid_test")) {
+                new GameProfile(UUID.randomUUID(), "lava_flight_test")) {
             @Override
             public boolean isSpectator() {
                 return false;
@@ -290,255 +230,532 @@ public final class FlightGameTests {
                 .orElseThrow(() -> new AssertionError("Player power capability is unavailable"));
         powers.unlockPower(FlightController.FLIGHT_POWER);
 
-        helper.assertTrue(!FlightController.canActivate(player), "Flight activation must be denied in lava");
-        helper.assertTrue(!FlightController.canMaintainFlight(player), "Flight maintenance must be denied in lava");
+        helper.assertTrue(!FlightController.canActivate(player),
+                "Flight activation must be denied in lava");
+        helper.assertTrue(!FlightController.canMaintainFlight(player),
+                "Flight maintenance must be denied in lava");
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void lookPitchBiasesTheVerticalCommandWithoutLosingForwardMotion(GameTestHelper helper) {
-        Vec3 climbVel = Vec3.ZERO;
-        // Minecraft pitch is positive downwards, so -45 is looking up.
-        for (int tick = 0; tick < 50; tick++) {
-            climbVel = step(climbVel, 0.0F, -45.0F, FlightState.FORWARD, false, tick);
-        }
-        helper.assertTrue(climbVel.y > 0.30D,
-                "Looking up while holding forward must produce a real climb, got " + climbVel.y);
-        helper.assertTrue(climbVel.z > 0.30D,
-                "Looking up while holding forward must keep forward motion, got " + climbVel.z);
+    public static void hoverForwardPitchControlsClimbAndDive(GameTestHelper helper) {
+        Vec3 climb = settle(Vec3.ZERO, 0.0F, -45.0F, FlightState.FORWARD, false, 100);
+        helper.assertTrue(climb.y > 0.50D,
+                "Looking up while holding forward must produce a real climb, got " + climb.y);
+        helper.assertTrue(climb.z > 0.40D,
+                "Looking up while holding forward must keep forward motion, got " + climb.z);
 
-        Vec3 diveVel = Vec3.ZERO;
-        for (int tick = 0; tick < 50; tick++) {
-            diveVel = step(diveVel, 0.0F, 45.0F, FlightState.FORWARD, false, tick);
-        }
-        helper.assertTrue(diveVel.y < -0.30D,
-                "Looking down while holding forward must produce a real dive, got " + diveVel.y);
-        helper.assertTrue(diveVel.z > 0.30D,
-                "Looking down while holding forward must keep forward motion, got " + diveVel.z);
+        Vec3 dive = settle(Vec3.ZERO, 0.0F, 45.0F, FlightState.FORWARD, false, 100);
+        helper.assertTrue(dive.y < -0.60D,
+                "Looking down while holding forward must produce a real dive, got " + dive.y);
+        helper.assertTrue(dive.z > 0.40D,
+                "Looking down while holding forward must keep forward motion, got " + dive.z);
+
+        Vec3 idle = settle(Vec3.ZERO, 0.0F, 45.0F, 0, false, 100);
+        helper.assertTrue(Math.abs(idle.z) < 1.0E-9D,
+                "Look pitch alone must not move an idle hover");
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void sprintBoostReachesHigherBoostCapAndFollowsPitch(GameTestHelper helper) {
-        Vec3 normalVel = Vec3.ZERO;
-        Vec3 boostVel = Vec3.ZERO;
-        for (int tick = 0; tick < 100; tick++) {
-            normalVel = step(normalVel, 0.0F, FlightState.FORWARD);
-            boostVel = step(boostVel, 0.0F, 0.0F, FlightState.FORWARD, true, tick);
-        }
-        helper.assertTrue(Math.abs(normalVel.z - CRUISE) < 0.01D,
-                "Normal flight must cap around cruise speed, got " + normalVel.z);
-        helper.assertTrue(Math.abs(boostVel.z - BOOST) < 0.01D,
-                "Sprint boost must accelerate to the boost cap, got " + boostVel.z);
-        helper.assertTrue(boostVel.z > normalVel.z + 0.5D,
-                "Boost speed must be substantially faster than normal cruise");
+    public static void idleHoverBobIsDeterministicAndBounded(GameTestHelper helper) {
+        Vec3 first = step(Vec3.ZERO, 0.0F, 0.0F, 0, false, 7L).motion();
+        Vec3 sameTick = step(Vec3.ZERO, 0.0F, 0.0F, 0, false, 7L).motion();
+        Vec3 later = step(Vec3.ZERO, 0.0F, 0.0F, 0, false, 12L).motion();
 
-        Vec3 pitchedBoost = Vec3.ZERO;
-        for (int tick = 0; tick < 100; tick++) {
-            pitchedBoost = step(pitchedBoost, 0.0F, -45.0F,
-                    FlightState.FORWARD, true, tick);
-        }
-        helper.assertTrue(pitchedBoost.y > 0.75D && pitchedBoost.z > 0.75D,
-                "Boost must follow the full look vector, including pitch, got " + pitchedBoost);
+        helper.assertTrue(first.distanceTo(sameTick) < 1.0E-12D,
+                "The hover bob must be deterministic for the same game tick");
+        helper.assertTrue(Math.abs(first.y) <= PARAMS.hoverBob() + 1.0E-9D
+                        && Math.abs(later.y) <= PARAMS.hoverBob() + 1.0E-9D,
+                "The hover bob must stay inside its configured amplitude");
+        helper.assertTrue(Math.abs(first.y - later.y) > 0.005D,
+                "The hover bob must actually move over time");
+        helper.assertTrue(Math.abs(first.y) > 0.005D,
+                "An idle hover must not freeze the vertical axis at zero");
+        helper.assertTrue(Math.abs(first.x) < 1.0E-12D && Math.abs(first.z) < 1.0E-12D,
+                "The hover bob must be purely vertical");
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void aerodynamicSteeringCurvesTrajectory(GameTestHelper helper) {
-        // Start moving forward along +Z (yaw = 0).
-        Vec3 velocity = new Vec3(0.0D, 0.0D, 0.60D);
-        // Turn the look 90 degrees to the right (yaw = -90) while holding forward.
-        for (int tick = 0; tick < 15; tick++) {
-            velocity = step(velocity, -90.0F, FlightState.FORWARD);
+    public static void hoverIgnoresBitsOutsideTheReferenceInputMask(GameTestHelper helper) {
+        int referenceMask = FlightState.FORWARD | FlightState.BACK
+                | FlightState.LEFT | FlightState.RIGHT | FlightState.BRAKE;
+        helper.assertTrue(FlightState.VALID_INPUT_MASK == referenceMask,
+                "Only the five reference inputs may be accepted");
+        helper.assertTrue((FlightState.VALID_INPUT_MASK & (1 << 5)) == 0,
+                "Jump/ascend and sneak/descend bits must not exist in the flight mask");
+
+        PlayerFlightState state = new PlayerFlightState();
+        state.setActive(true);
+        helper.assertTrue(!state.acceptInput(1 << 5, 1L),
+                "An unknown vertical bit must be rejected");
+        helper.assertTrue(state.acceptInput(FlightState.FORWARD | FlightState.BRAKE, 2L),
+                "A valid reference mask must be accepted");
+        helper.assertTrue(state.getInputMask()
+                        == (FlightState.FORWARD | FlightState.BRAKE),
+                "The accepted mask must be stored unchanged");
+        helper.assertTrue(!state.acceptInput(FlightState.BACK, 2L),
+                "A second input on the same game tick must be ignored");
+        helper.assertTrue(state.acceptInput(FlightState.LEFT | FlightState.RIGHT, 3L),
+                "Opposing strafes must be accepted and then cancelled");
+        helper.assertTrue(state.getInputMask() == 0,
+                "Opposing strafe directions must cancel instead of adding an invented sideways drift");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void hoverTerminalSpeedMatchesReference(GameTestHelper helper) {
+        FlightPhysics.Step last = lastStep(Vec3.ZERO, 0.0F, 0.0F,
+                FlightState.FORWARD, false, 200);
+        helper.assertTrue(Math.abs(last.velocity().z - HOVER_TERMINAL) < 0.02D,
+                "Hover terminal velocity must match the reference, got " + last.velocity().z);
+        helper.assertTrue(Math.abs(last.motion().z - HOVER_DISPLACEMENT) < 0.02D,
+                "Hover per-tick displacement must match the reference, got " + last.motion().z);
+        helper.assertTrue(last.motion().y > 0.015D && last.motion().y < 0.03D,
+                "Level forward hover must keep the reference's small climb, got " + last.motion().y);
+        helper.assertTrue(Math.abs(last.motion().x) < 1.0E-9D,
+                "Straight hover must not add sideways drift");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void boostTerminalSpeedMatchesReference(GameTestHelper helper) {
+        FlightPhysics.Step boost = lastStep(Vec3.ZERO, 0.0F, 0.0F,
+                FlightState.FORWARD, true, 200);
+        helper.assertTrue(Math.abs(boost.velocity().z - BOOST_TERMINAL) < 0.02D,
+                "Boost terminal velocity must match the reference, got " + boost.velocity().z);
+        helper.assertTrue(Math.abs(boost.motion().z - BOOST_DISPLACEMENT) < 0.03D,
+                "Boost per-tick displacement must match the reference, got " + boost.motion().z);
+        helper.assertTrue(boost.motion().z > HOVER_DISPLACEMENT * 3.5D,
+                "Boost must stay substantially faster than hover");
+
+        FlightPhysics.Step pitched = lastStep(Vec3.ZERO, 0.0F, -45.0F,
+                FlightState.FORWARD, true, 100);
+        helper.assertTrue(pitched.motion().y > 1.5D && pitched.motion().z > 1.5D,
+                "Boost must follow the full look vector, including pitch, got " + pitched.motion());
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void boostTurnsTowardTheCrosshairWithoutSnapping(GameTestHelper helper) {
+        Vec3 start = new Vec3(0.0D, 0.0D, 0.70D);
+        FlightPhysics.Step first = step(start, 180.0F, 0.0F, FlightState.FORWARD, true, 0L);
+        helper.assertTrue(first.motion().z > 0.30D,
+                "A 180-degree boost request must not snap the direction in one tick");
+        helper.assertTrue(Math.abs(first.motion().x) < 1.0E-9D,
+                "A straight reversal must not add sideways drift");
+
+        Vec3 velocity = first.velocity();
+        FlightPhysics.Step last = first;
+        for (int tick = 1; tick < 40; tick++) {
+            last = step(velocity, 180.0F, 0.0F, FlightState.FORWARD, true, tick);
+            velocity = last.velocity();
         }
-        helper.assertTrue(velocity.x > 0.2D,
-                "Turning the camera must curve the trajectory toward the new facing angle");
-        helper.assertTrue(velocity.z < 0.30D,
-                "The old forward component must be replaced by the new heading");
+        helper.assertTrue(last.motion().z < -3.4D,
+                "The free boost turn must finish moving in the new look direction, got "
+                        + last.motion().z);
+        helper.assertTrue(last.motion().length() <= BOOST_DISPLACEMENT + 0.05D,
+                "The free turn must respect the reference terminal speed");
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void inertiaGlidingPreservesMomentumWithoutSuddenStop(GameTestHelper helper) {
-        Vec3 velocity = new Vec3(0.0D, 0.0D, 0.65D);
-        Vec3 next = step(velocity, 0.0F, 0);
-        helper.assertTrue(next.z > 0.55D,
-                "Releasing every key must preserve momentum through aerodynamic glide");
-        helper.assertTrue(next.z < velocity.z,
-                "The glide must experience gentle aerodynamic drag");
-        helper.assertTrue(Math.abs(next.x) < 1.0E-9D,
-                "A straight glide must not drift sideways");
+    public static void hoverCanReverseOneHundredEightyDegreesWithoutAScript(GameTestHelper helper) {
+        Vec3 start = new Vec3(0.0D, 0.0D, 0.70D);
+        FlightPhysics.Step first = step(start, 180.0F, 0.0F,
+                FlightState.FORWARD, false, 0L);
+        helper.assertTrue(first.motion().z > 0.50D,
+                "Hover must decelerate through the turn instead of teleporting backwards");
+        helper.assertTrue(Math.abs(first.motion().x) < 1.0E-9D,
+                "A straight 180-degree turn must not add sideways drift");
+
+        Vec3 velocity = first.velocity();
+        FlightPhysics.Step last = first;
+        for (int tick = 1; tick < 15; tick++) {
+            last = step(velocity, 180.0F, 0.0F, FlightState.FORWARD, false, tick);
+            velocity = last.velocity();
+        }
+        helper.assertTrue(last.motion().z < -0.50D,
+                "The free hover reversal must finish moving in the new look direction, got "
+                        + last.motion().z);
+        helper.assertTrue(FlightManeuvers.duration(4) == 0,
+                "The retired scripted reversal kind must have no controller duration");
+        PlayerFlightState state = new PlayerFlightState();
+        state.setActive(true);
+        helper.assertTrue(!state.startManeuver(4, 1, 18),
+                "The retired reversal kind must be rejected by the flight state");
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void animationStateSelectionCoversEveryFlightRegime(GameTestHelper helper) {
-        helper.assertTrue(FlightPoseLibrary.selectState(false, 20, 0.50F, 0.0F, 0.0F, false, 0.0F)
+    public static void hoverPoseLeansWithSpeedAndUsesTheReferenceHeadAngle(GameTestHelper helper) {
+        FlightPose fast = FlightPoseLibrary.target(FlightAnimationState.HOVER,
+                sample(1.0F, 1.0F, 0.0F, 1.0F, 0.0F, false, false));
+        helper.assertTrue(Math.abs(fast.bodyPitchDegrees + 15.0F) < 1.0E-4F,
+                "Full-speed hover must lean 15 degrees forward, got " + fast.bodyPitchDegrees);
+        helper.assertTrue(Math.abs(fast.headXRotDegrees + 15.0F) < 1.0E-4F,
+                "Hover head must use the reference -15 degree local lean, got "
+                        + fast.headXRotDegrees);
+        helper.assertTrue(Math.abs(fast.bodyRollDegrees) < 1.0E-4F,
+                "Straight hover must not bank");
+
+        FlightMotionSample slowSample = sample(0.1F, 0.1F, 0.0F, 1.0F, 0.0F, false, false);
+        FlightPose slow = FlightPoseLibrary.target(FlightAnimationState.HOVER, slowSample);
+        float slowIdleGate = FlightPoseLibrary.idleGate(slowSample);
+        helper.assertTrue(Math.abs(slow.bodyPitchDegrees + 0.225F
+                        + 3.5F * slowIdleGate) < 0.01F,
+                "Slow hover must project the raw velocity and layer the reference idle "
+                        + "torso pitch, got " + slow.bodyPitchDegrees);
+        helper.assertTrue(Math.abs(slow.headXRotDegrees + 0.3F) < 0.01F,
+                "The head must use the speed-scaled raw forward projection, got "
+                        + slow.headXRotDegrees);
+
+        helper.assertTrue(Math.abs(fast.rightArmXRot - 0.1F * Mth.RAD_TO_DEG) < 1.0E-3F
+                        && Math.abs(fast.leftArmXRot - 0.1F * Mth.RAD_TO_DEG) < 1.0E-3F,
+                "A forward hover must swing both arms by the reference 0.1-radian offset");
+        helper.assertTrue(Math.abs(fast.rightArmZRot
+                        - (3.0F + 0.1F * Mth.RAD_TO_DEG)) < 1.0E-3F,
+                "The reference hover arm flare must combine the 3-degree baseline with "
+                        + "the speed-scaled radian offset, got " + fast.rightArmZRot);
+        helper.assertTrue(Math.abs(fast.rightLegXRot - 0.3F * Mth.RAD_TO_DEG) < 1.0E-3F
+                        && Math.abs(fast.leftLegXRot - 0.2F * Mth.RAD_TO_DEG) < 1.0E-3F,
+                "Forward hover must trail the legs by the asymmetric reference offsets, got "
+                        + fast.rightLegXRot + " / " + fast.leftLegXRot);
+
+        FlightPose decel = FlightPoseLibrary.target(FlightAnimationState.HOVER,
+                sample(3.6F, 3.6F, 0.0F, 1.0F, 0.0F, false, false));
+        helper.assertTrue(Math.abs(decel.bodyPitchDegrees + 30.0F) < 1.0E-4F,
+                "Releasing boost must keep the reference deceleration lean, got "
+                        + decel.bodyPitchDegrees);
+        helper.assertTrue(Math.abs(decel.headXRotDegrees + 30.0F) < 1.0E-4F,
+                "The deceleration head angle must follow the same clamped projection, got "
+                        + decel.headXRotDegrees);
+        helper.assertTrue(Math.abs(decel.rightArmXRot
+                        - 0.1F * 3.6F * Mth.RAD_TO_DEG) < 1.0E-3F,
+                "The reference limb offsets scale with the raw velocity when the torso lean "
+                        + "is already clamped, got " + decel.rightArmXRot);
+        helper.assertTrue(decel.rightLegXRot > 60.0F,
+                "A boost release must show the reference's strong trailing leg offset, got "
+                        + decel.rightLegXRot);
+
+        FlightPose strafe = FlightPoseLibrary.target(FlightAnimationState.HOVER,
+                sample(1.0F, 1.0F, 0.0F, 0.0F, 1.0F, false, false));
+        helper.assertTrue(Math.abs(strafe.bodyRollDegrees - 15.0F) < 1.0E-4F,
+                "A rightward hover drift must bank to the right, got " + strafe.bodyRollDegrees);
+        helper.assertTrue(Math.abs(strafe.rightArmZRot
+                        - (3.0F + 0.2F * Mth.RAD_TO_DEG)) < 1.0E-3F
+                        && Math.abs(strafe.leftArmZRot
+                        - (-3.0F + 0.2F * Mth.RAD_TO_DEG)) < 1.0E-3F,
+                "A right strafe must flare the right arm and tuck the left arm by the "
+                        + "reference radian offsets, got " + strafe.rightArmZRot + " / "
+                        + strafe.leftArmZRot);
+        helper.assertTrue(Math.abs(strafe.rightLegZRot - 0.4F * Mth.RAD_TO_DEG) < 1.0E-3F
+                        && Math.abs(strafe.leftLegZRot - 0.4F * Mth.RAD_TO_DEG) < 1.0E-3F,
+                "A right strafe must trail both legs sideways by the reference 0.4-radian "
+                        + "offset, got " + strafe.rightLegZRot + " / " + strafe.leftLegZRot);
+
+        FlightPose idle = FlightPoseLibrary.target(FlightAnimationState.HOVER,
+                sample(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, false, false));
+        helper.assertTrue(Math.abs(idle.bodyPitchDegrees + 3.5F) < 1.0E-4F
+                        && Math.abs(idle.rightArmXRot + 10.0F) < 1.0E-4F
+                        && Math.abs(idle.leftArmXRot - 5.0F) < 1.0E-4F
+                        && Math.abs(idle.rightLegXRot - 20.0F) < 1.0E-4F
+                        && Math.abs(idle.leftLegXRot - 5.0F) < 1.0E-4F,
+                "An idle hover must apply the reference idle layer instead of a neutral "
+                        + "mannequin, got bodyPitch " + idle.bodyPitchDegrees
+                        + " arms " + idle.rightArmXRot + "/" + idle.leftArmXRot
+                        + " legs " + idle.rightLegXRot + "/" + idle.leftLegXRot);
+        helper.assertTrue(Math.abs(idle.rightArmZRot - 9.0F) < 1.0E-4F
+                        && Math.abs(idle.leftArmZRot + 13.0F) < 1.0E-4F,
+                "The idle reference combines the 3-degree arm baseline with its "
+                        + "asymmetric 6/10-degree tuck, got " + idle.rightArmZRot + " / "
+                        + idle.leftArmZRot);
+        helper.assertTrue(idle.headXRotDegrees == 0.0F && idle.headYRotDegrees == 0.0F,
+                "The idle head and body-yaw offsets must stay omitted so the neck keeps "
+                        + "the real crosshair");
+
+        FlightPose lookUp = FlightPoseLibrary.target(FlightAnimationState.HOVER,
+                sample(1.0F, 1.0F, -60.0F, 1.0F, 0.0F, false, false));
+        helper.assertTrue(Math.abs(lookUp.bodyPitchDegrees + 15.0F) < 1.0E-4F,
+                "Looking up must not turn the upright hover into a boosted dive, got "
+                        + lookUp.bodyPitchDegrees);
+        helper.assertTrue(Math.abs(lookUp.headXRotDegrees + 75.0F) < 1.0E-4F,
+                "Hover head must keep the -60 degree look pitch and add the -15 degree "
+                        + "reference offset, got " + lookUp.headXRotDegrees);
+
+        FlightPose idleLookUp = FlightPoseLibrary.target(FlightAnimationState.HOVER,
+                sample(0.0F, 0.0F, -60.0F, 0.0F, 0.0F, false, false));
+        helper.assertTrue(Math.abs(idleLookUp.headXRotDegrees + 60.0F) < 1.0E-4F,
+                "A stationary hover looking up must keep the real look pitch in the neck, got "
+                        + idleLookUp.headXRotDegrees);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void idleHoverSwayMatchesTheReferenceLayer(GameTestHelper helper) {
+        FlightMotionSample positive = sampleAtPhase(0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
+                false, false, 0.25F);
+        float gate = FlightPoseLibrary.idleGate(positive);
+        float sway = FlightPoseLibrary.IDLE_SWAY_SCALE * gate;
+        float idle = gate + sway;
+        FlightPose pose = FlightPoseLibrary.target(FlightAnimationState.HOVER, positive);
+
+        helper.assertTrue(Math.abs(pose.bodyPitchDegrees - (-3.5F * gate + 5.0F * sway)) < 1.0E-4F,
+                "The idle torso pitch must use -3.5 * gate + 5 * sway, got "
+                        + pose.bodyPitchDegrees);
+        helper.assertTrue(Math.abs(pose.rightArmXRot
+                        - (-10.0F * gate - 0.1F * Mth.RAD_TO_DEG * sway)) < 1.0E-4F,
+                "The idle right arm must convert its dynamic radian term, got "
+                        + pose.rightArmXRot);
+        helper.assertTrue(Math.abs(pose.leftArmXRot
+                        - (5.0F * gate + 0.08F * Mth.RAD_TO_DEG * sway)) < 1.0E-4F,
+                "The idle left arm must convert its dynamic radian term, got "
+                        + pose.leftArmXRot);
+        helper.assertTrue(Math.abs(pose.rightArmZRot - (3.0F + 6.0F * idle)) < 1.0E-4F
+                        && Math.abs(pose.leftArmZRot - (-3.0F - 10.0F * idle)) < 1.0E-4F,
+                "The idle arms must add the reference asymmetric 6/10-degree tuck");
+        helper.assertTrue(Math.abs(pose.rightLegXRot - 20.0F * idle) < 1.0E-4F
+                        && Math.abs(pose.leftLegXRot
+                        - (5.0F * gate - 15.0F * sway)) < 1.0E-4F,
+                "The idle legs must use the reference 20/5/15-degree offsets, got "
+                        + pose.rightLegXRot + " / " + pose.leftLegXRot);
+        helper.assertTrue(Math.abs(pose.rightLegYRot - 5.0F * gate) < 1.0E-4F
+                        && Math.abs(pose.leftLegYRot + 8.0F * gate) < 1.0E-4F,
+                "The idle legs must keep their asymmetric outward rotation");
+        helper.assertTrue(pose.headXRotDegrees == 0.0F && pose.headYRotDegrees == 0.0F
+                        && pose.headZRotDegrees == 0.0F,
+                "The idle head offsets must not override the real look direction");
+
+        FlightMotionSample negative = sampleAtPhase(0.0F, 0.0F, 0.0F, 0.0F, 0.0F,
+                false, false, 0.75F);
+        FlightPose opposite = FlightPoseLibrary.target(FlightAnimationState.HOVER, negative);
+        helper.assertTrue(opposite.bodyPitchDegrees < pose.bodyPitchDegrees
+                        && opposite.leftLegXRot > pose.leftLegXRot,
+                "The idle sway must move the torso and trailing leg in opposite phases");
+
+        helper.assertTrue(Math.abs(FlightPoseLibrary.idlePhase(0) - 0.4F) < 1.0E-6F,
+                "The reference idle phase must start at its 0.4 offset");
+        float advanced = FlightPoseLibrary.idlePhase(1);
+        helper.assertTrue(advanced > 0.4F && advanced < 0.5F,
+                "The reference idle phase must advance with the player tick counter");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void flightBodyYawCorrectionFollowsTheLook(GameTestHelper helper) {
+        helper.assertTrue(FlightPoseLibrary.lookYawCorrectionDegrees(40.0F, 40.0F) == 0.0F,
+                "A body already facing the look direction needs no yaw correction");
+        helper.assertTrue(Math.abs(FlightPoseLibrary.lookYawCorrectionDegrees(30.0F, 80.0F)
+                + 50.0F) < 1.0E-4F,
+                "The correction must rotate the movement-body frame onto the look frame");
+        helper.assertTrue(Math.abs(FlightPoseLibrary.lookYawCorrectionDegrees(170.0F, -170.0F)
+                + 20.0F) < 1.0E-4F,
+                "The correction must take the shortest arc across the 180-degree seam");
+        helper.assertTrue(Math.abs(FlightPoseLibrary.lookYawCorrectionDegrees(-170.0F, 170.0F)
+                - 20.0F) < 1.0E-4F,
+                "The shortest arc must be symmetric on both sides of the seam");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void boostPoseMatchesTheReferenceSilhouette(GameTestHelper helper) {
+        FlightPose level = FlightPoseLibrary.target(FlightAnimationState.BOOST,
+                sample(4.0F, 4.0F, 0.0F, 1.0F, 0.0F, true, false));
+        helper.assertTrue(Math.abs(level.bodyPitchDegrees + 80.0F) < 1.0E-4F,
+                "Level boost must pitch the body -80 degrees, got " + level.bodyPitchDegrees);
+        helper.assertTrue(Math.abs(level.headXRotDegrees + 50.0F) < 1.0E-4F,
+                "Boost must combine the header's -40 degree head interpolation with the -10 degree offset, got "
+                        + level.headXRotDegrees);
+        helper.assertTrue(Math.abs(level.rightArmXRot - 8.0F) < 1.0E-4F
+                        && Math.abs(level.rightArmYRot - 18.0F) < 1.0E-4F
+                        && Math.abs(level.rightArmZRot - 12.0F) < 1.0E-4F,
+                "Boost right arm must match the reference pose");
+        helper.assertTrue(Math.abs(level.leftArmXRot - 8.0F) < 1.0E-4F
+                        && Math.abs(level.leftArmYRot + 18.0F) < 1.0E-4F
+                        && Math.abs(level.leftArmZRot + 12.0F) < 1.0E-4F,
+                "Boost left arm must mirror the reference pose");
+        helper.assertTrue(Math.abs(level.rightLegXRot - 15.0F) < 1.0E-4F
+                        && Math.abs(level.leftLegXRot - 15.0F) < 1.0E-4F,
+                "Boost legs must trail at the reference angle");
+        helper.assertTrue(level.headYRotDegrees == 0.0F && level.headZRotDegrees == 0.0F,
+                "Straight boost must not twist the neck independently of the body");
+        helper.assertTrue(Math.abs(level.bodyLift - FlightPoseLibrary.BOOST_BODY_LIFT) < 1.0E-4F,
+                "Boost must apply the reference vertical body drop, got " + level.bodyLift);
+
+        // 45 degrees of velocity/crosshair mismatch give an 18-degree reference
+        // turn offset once the radian reference value is converted to degrees.
+        float turn = (float) Math.toDegrees(Math.PI / 4.0D)
+                / FlightPoseLibrary.BOOST_TURN_OFFSET_DIVISOR;
+        FlightPose turning = FlightPoseLibrary.target(FlightAnimationState.BOOST,
+                sample(4.0F, 4.0F, 0.0F, 0.70710677F, 0.70710677F, true, false));
+        helper.assertTrue(Math.abs(turning.rightArmXRot - (8.0F + 0.5F * turn)) < 1.0E-4F
+                        && Math.abs(turning.leftArmXRot - (8.0F + 0.5F * turn)) < 1.0E-4F,
+                "Boost arms must receive the reference 0.5 * abs(turn) offset, got "
+                        + turning.rightArmXRot);
+        helper.assertTrue(Math.abs(turning.rightLegXRot - (15.0F - 0.3F * turn)) < 1.0E-4F
+                        && Math.abs(turning.leftLegXRot - (15.0F + 0.3F * turn)) < 1.0E-4F,
+                "Boost legs must receive the mirrored reference 0.3 * turn offset, got "
+                        + turning.rightLegXRot + " / " + turning.leftLegXRot);
+        helper.assertTrue(turning.bodyRollDegrees > 10.0F,
+                "A right-hand boost turn must visibly bank to the right, got "
+                        + turning.bodyRollDegrees);
+        helper.assertTrue(turning.headZRotDegrees < 0.0F
+                        && Math.abs(turning.headZRotDegrees) < turning.bodyRollDegrees,
+                "The neck must partially counter-roll the body bank, got "
+                        + turning.headZRotDegrees);
+        helper.assertTrue(turning.bodyRollDegrees == -turning.headZRotDegrees * 2.0F,
+                "The neck counter-roll must be exactly half of the bank");
+
+        FlightPose opposite = FlightPoseLibrary.target(FlightAnimationState.BOOST,
+                sample(4.0F, 4.0F, 0.0F, 0.70710677F, -0.70710677F, true, false));
+        helper.assertTrue(opposite.bodyRollDegrees == -turning.bodyRollDegrees
+                        && opposite.headZRotDegrees == -turning.headZRotDegrees,
+                "Opposite boost turns must mirror the bank and neck counter-roll");
+
+        FlightPose sharp = FlightPoseLibrary.target(FlightAnimationState.BOOST,
+                sample(4.0F, 4.0F, 0.0F, -0.70710677F, 0.70710677F, true, false));
+        helper.assertTrue(Math.abs(sharp.bodyRollDegrees) == FlightPoseLibrary.BOOST_TURN_BANK_MAX_DEGREES,
+                "A sharp boost turn must clamp the bank to the readable maximum, got "
+                        + sharp.bodyRollDegrees);
+
+        FlightPose pitched = FlightPoseLibrary.target(FlightAnimationState.BOOST,
+                sample(4.0F, 4.0F, -30.0F, 1.0F, 0.0F, true, false));
+        helper.assertTrue(Math.abs(pitched.bodyPitchDegrees + 50.0F) < 1.0E-4F,
+                "Boost body pitch must follow -(viewPitch + 80), got "
+                        + pitched.bodyPitchDegrees);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void boostTimerBlendsHoverIntoBoostOverEightTicks(GameTestHelper helper) {
+        helper.assertTrue(FlightPoseLibrary.boostBlend(0.0F) == 0.0F,
+                "An empty boost timer must select pure hover");
+        helper.assertTrue(Math.abs(FlightPoseLibrary.boostBlend(0.5F) - 0.5F) < 1.0E-6F,
+                "The reference curve must pass through one half at the midpoint");
+        helper.assertTrue(FlightPoseLibrary.boostBlend(1.0F) == 1.0F,
+                "A full boost timer must select pure boost");
+        helper.assertTrue(FlightPoseLibrary.boostBlend(-1.0F) == 0.0F
+                        && FlightPoseLibrary.boostBlend(2.0F) == 1.0F,
+                "The blend must clamp out-of-range timer values");
+
+        float timer = 0.0F;
+        for (int tick = 0; tick < FlightPoseLibrary.BOOST_BLEND_TICKS; tick++) {
+            timer = FlightPoseLibrary.advanceBoostTimer(timer, true);
+        }
+        helper.assertTrue(Math.abs(timer - 1.0F) < 1.0E-6F,
+                "Eight boosting ticks must fill the reference boost timer");
+        for (int tick = 0; tick < FlightPoseLibrary.BOOST_BLEND_TICKS; tick++) {
+            timer = FlightPoseLibrary.advanceBoostTimer(timer, false);
+        }
+        helper.assertTrue(Math.abs(timer) < 1.0E-6F,
+                "Eight non-boosting ticks must drain the reference boost timer");
+
+        FlightMotionSample fast = sample(4.0F, 4.0F, 0.0F, 1.0F, 0.0F, true, false);
+        FlightPose hover = FlightPoseLibrary.ordinaryPose(fast, 0.0F);
+        FlightPose boost = FlightPoseLibrary.ordinaryPose(fast, 1.0F);
+        FlightPose middle = FlightPoseLibrary.ordinaryPose(fast, 0.5F);
+        helper.assertTrue(hover.bodyPitchDegrees > boost.bodyPitchDegrees,
+                "The blended endpoints must be the hover and boost silhouettes");
+        helper.assertTrue(Math.abs(middle.bodyPitchDegrees
+                - (hover.bodyPitchDegrees + boost.bodyPitchDegrees) * 0.5F) < 1.0E-4F,
+                "The half-blend body pitch must sit between the endpoints");
+        helper.assertTrue(Math.abs(middle.bodyLift
+                - (hover.bodyLift + boost.bodyLift) * 0.5F) < 1.0E-4F,
+                "The half-blend body lift must sit between the endpoints");
+        helper.assertTrue(Math.abs(FlightPoseLibrary.ordinaryPose(fast, 0.0F).rightArmXRot
+                - FlightPoseLibrary.target(FlightAnimationState.HOVER, fast).rightArmXRot) < 1.0E-4F,
+                "A zero blend must use the exact hover pose");
+        helper.assertTrue(Math.abs(FlightPoseLibrary.ordinaryPose(fast, 1.0F).rightArmXRot
+                - FlightPoseLibrary.target(FlightAnimationState.BOOST, fast).rightArmXRot) < 1.0E-4F,
+                "A full blend must use the exact boost pose");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void defaultBoostTuningIsSlightlySlowerThanTheReference(GameTestHelper helper) {
+        helper.assertTrue(FlightTuning.DEFAULT_BOOST_SPEED < 0.20D
+                        && FlightTuning.DEFAULT_BOOST_SPEED > 0.17D,
+                "The gameplay boost impulse must stay a slight trim of the reference");
+        FlightPhysics.Params tuned = new FlightPhysics.Params(0.10D,
+                FlightTuning.DEFAULT_BOOST_SPEED, 0.91D, 0.08D, 0.025D);
+        Vec3 velocity = Vec3.ZERO;
+        for (int tick = 0; tick < 400; tick++) {
+            velocity = FlightPhysics.simulate(velocity, 0.0F, 0.0F, 0, true,
+                    tick, tuned).velocity();
+        }
+        double terminal = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+        helper.assertTrue(Math.abs(terminal - 3.6925D) < 0.01D,
+                "The tuned boost must settle near 3.69 blocks per tick, got " + terminal);
+        helper.assertTrue(terminal < FlightGameTests.BOOST_TERMINAL,
+                "The tuned boost must be slower than the 4.0 reference terminal speed");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void animationSelectorCoversReferenceStates(GameTestHelper helper) {
+        FlightMotionSample inactive = FlightMotionSample.builder().active(false).build();
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HOVER, 20, inactive)
                         == FlightAnimationState.EXIT,
                 "Inactive flight must select the exit blend");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 1, 0.0F, 0.0F, 0.0F, false, 0.0F)
-                        == FlightAnimationState.TAKEOFF,
-                "The first ticks after activation must use takeoff");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.02F, 0.0F, 0.0F, false, 0.0F)
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HOVER, 20, null)
+                        == FlightAnimationState.EXIT,
+                "A missing sample must select the exit blend");
+
+        FlightMotionSample hover = sample(0.2F, 0.2F, 0.0F, 1.0F, 0.0F, false, false);
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.EXIT, 20, hover)
                         == FlightAnimationState.HOVER,
-                "Slow active flight without input must hover");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.02F, 0.025F, 0.0F, false, 0.0F)
-                        == FlightAnimationState.HOVER,
-                "The rising half of the hover bob must not select climb");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.02F, -0.025F, 0.0F, false, 0.0F)
-                        == FlightAnimationState.HOVER,
-                "The falling half of the hover bob must not select dive");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.30F, 0.0F, 0.0F, false, 0.0F)
-                        == FlightAnimationState.HEROIC_FLIGHT,
-                "Moderate forward flight must use the heroic pose");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.50F, 0.0F, 0.0F, false, 0.0F)
-                        == FlightAnimationState.CRUISE,
-                "Stable high-speed flight must cruise");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.50F, 0.0F, 0.0F, false, 25.0F)
-                        == FlightAnimationState.TURNING,
-                "A sustained heading change must select turning");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.50F, 0.30F, 0.0F, false, 0.0F)
-                        == FlightAnimationState.CLIMB,
-                "Positive vertical velocity must select climb");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.50F, -0.30F, 0.0F, false, 0.0F)
-                        == FlightAnimationState.DIVE,
-                "Negative vertical velocity must select dive");
-        helper.assertTrue(FlightPoseLibrary.selectState(true, 20, 0.50F, 0.0F, 0.0F, true, 0.0F)
-                        == FlightAnimationState.BRAKING,
-                "Brake input must select the braking pose");
+                "Ordinary active flight must hover");
+
+        FlightMotionSample boost = sample(4.0F, 4.0F, 0.0F, 1.0F, 0.0F, true, false);
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HOVER, 20, boost)
+                        == FlightAnimationState.BOOST,
+                "Sprint must select the boost pose");
+
+        FlightMotionSample maneuver = sample(1.0F, 1.0F, 0.0F, 1.0F, 0.0F, true, true);
+        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.BOOST, 20, maneuver)
+                        == FlightAnimationState.MANEUVER,
+                "A running maneuver must override boost");
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void heroicPoseOrientsTheWholeBodyForHorizontalFlight(GameTestHelper helper) {
-        FlightPose heroic = FlightPoseLibrary.target(FlightAnimationState.HEROIC_FLIGHT, 20,
-                0.35F, 0.0F, 0.0F, 0.0F);
-
-        helper.assertTrue(heroic.bodyPitchDegrees <= -72.0F && heroic.bodyPitchDegrees >= -95.0F,
-                "The heroic torso must be pitched close to horizontal");
-        helper.assertTrue(heroic.rightArmXRot < -150.0F && heroic.leftArmXRot < -150.0F,
-                "Both arms must be extended forward");
-        helper.assertTrue(heroic.rightLegXRot > -15.0F && heroic.rightLegXRot < 30.0F
-                        && heroic.leftLegXRot > -15.0F && heroic.leftLegXRot < 30.0F,
-                "Legs must trail behind the horizontal body");
-        helper.assertTrue(Math.abs(heroic.bodyRollDegrees) < 0.001F,
-                "Straight flight must not bank");
-        helper.assertTrue(heroic.headXRotDegrees > heroic.bodyPitchDegrees,
-                "The local neck angle must be less extreme than the torso pitch instead of copying it");
-        helper.assertTrue(heroic.headXRotDegrees <= -30.0F && heroic.headXRotDegrees >= -55.0F,
-                "A horizontal body should use the vanilla-style local neck angle, not fold the head into the chest");
-        helper.assertTrue(heroic.headXRotDegrees >= FlightPoseLibrary.MIN_HEAD_PITCH
-                        && heroic.headXRotDegrees <= FlightPoseLibrary.MAX_HEAD_PITCH,
-                "The local head pitch must stay inside the configured neck limit");
-        helper.assertTrue(heroic.headYRotDegrees == 0.0F && heroic.headZRotDegrees == 0.0F,
-                "A moving flight pose must not twist or roll the head relative to the body");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void heroicArmsAreForwardButNotARigidSingleBar(GameTestHelper helper) {
-        FlightPose heroic = FlightPoseLibrary.target(FlightAnimationState.HEROIC_FLIGHT, 20,
-                0.35F, 0.0F, 0.0F, 0.0F);
-
-        helper.assertTrue(Math.abs(heroic.rightArmXRot - heroic.leftArmXRot) > 3.0F,
-                "The two arms must have a slight natural difference in forward angle");
-        helper.assertTrue(Math.abs(heroic.rightArmYRot - heroic.leftArmYRot) > 8.0F,
-                "The arms must be spread enough to avoid reading as one rigid bar");
-        helper.assertTrue(Math.abs(heroic.rightArmZRot) + Math.abs(heroic.leftArmZRot) > 4.0F,
-                "A small elbow-implying angle difference must be visible");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void climbAndDiveFollowTheVerticalTrajectory(GameTestHelper helper) {
-        FlightPose heroic = FlightPoseLibrary.target(FlightAnimationState.HEROIC_FLIGHT, 20,
-                0.80F, 0.0F, 0.0F, 0.0F);
-        FlightPose climb = FlightPoseLibrary.target(FlightAnimationState.CLIMB, 20,
-                0.80F, 0.60F, -30.0F, 0.0F);
-        FlightPose dive = FlightPoseLibrary.target(FlightAnimationState.DIVE, 20,
-                0.80F, -0.60F, 30.0F, 0.0F);
-
-        helper.assertTrue(climb.bodyPitchDegrees > heroic.bodyPitchDegrees,
-                "Climbing must lift the chest relative to horizontal flight");
-        helper.assertTrue(dive.bodyPitchDegrees < heroic.bodyPitchDegrees,
-                "Diving must point the body further down");
-        helper.assertTrue(dive.bodyPitchDegrees >= FlightPoseLibrary.MIN_BODY_PITCH,
-                "Dive pitch must respect the joint limit");
-        helper.assertTrue(climb.bodyPitchDegrees <= -52.0F,
-                "Climb pitch must respect the joint limit");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void turnRollBanksIntoTheTurnAndStaysBounded(GameTestHelper helper) {
-        FlightPose right = FlightPoseLibrary.target(FlightAnimationState.TURNING, 20,
-                0.50F, 0.0F, 0.0F, 25.0F);
-        FlightPose left = FlightPoseLibrary.target(FlightAnimationState.TURNING, 20,
-                0.50F, 0.0F, 0.0F, -25.0F);
-
-        helper.assertTrue(right.bodyRollDegrees > 0.0F,
-                "A right-hand turn must bank to the right");
-        helper.assertTrue(left.bodyRollDegrees < 0.0F,
-                "A left-hand turn must bank to the left");
-        helper.assertTrue(Math.abs(right.bodyRollDegrees) <= FlightPoseLibrary.MAX_BODY_ROLL
-                        && Math.abs(left.bodyRollDegrees) <= FlightPoseLibrary.MAX_BODY_ROLL,
-                "Turn bank must stay within the configured limit");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void brakingPoseReactsWithoutReplacingFlightMechanics(GameTestHelper helper) {
-        FlightPose heroic = FlightPoseLibrary.target(FlightAnimationState.HEROIC_FLIGHT, 20,
-                0.50F, 0.0F, 0.0F, 0.0F);
-        FlightPose braking = FlightPoseLibrary.target(FlightAnimationState.BRAKING, 20,
-                0.50F, 0.0F, 0.0F, 0.0F);
-
-        helper.assertTrue(braking.bodyPitchDegrees > heroic.bodyPitchDegrees,
-                "Braking must raise the torso out of the horizontal cruise");
-        helper.assertTrue(braking.rightArmXRot > -40.0F && braking.leftArmXRot > -40.0F,
-                "Braking arms must sweep back instead of pointing forward");
-        helper.assertTrue(Math.abs(braking.rightArmZRot) > 12.0F,
-                "Braking arms must flare out for drag");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void takeoffProgressesTowardsTheHeroicSilhouette(GameTestHelper helper) {
-        FlightPose first = FlightPoseLibrary.target(FlightAnimationState.TAKEOFF, 1,
-                0.20F, 0.0F, 0.0F, 0.0F);
-        FlightPose last = FlightPoseLibrary.target(FlightAnimationState.TAKEOFF,
-                FlightPoseLibrary.TAKEOFF_TICKS, 0.20F, 0.0F, 0.0F, 0.0F);
-
-        FlightPose heroic = FlightPoseLibrary.target(FlightAnimationState.HEROIC_FLIGHT, 20,
-                0.20F, 0.0F, 0.0F, 0.0F);
-
-        helper.assertTrue(last.bodyPitchDegrees < first.bodyPitchDegrees,
-                "Takeoff must progressively lower the torso towards horizontal");
-        helper.assertTrue(last.rightArmXRot < first.rightArmXRot,
-                "Takeoff must progressively extend the arms forward");
-        helper.assertTrue(Math.abs(last.bodyPitchDegrees - heroic.bodyPitchDegrees) < 0.001F,
-                "Takeoff must finish exactly on the heroic body pitch");
+    public static void exitTargetReleasesThePoseBackToVanilla(GameTestHelper helper) {
+        FlightPose exit = FlightPoseLibrary.target(FlightAnimationState.EXIT,
+                sample(0.5F, 0.5F, 0.0F, 1.0F, 0.0F, false, false));
+        helper.assertTrue(exit.bodyPitchDegrees == 0.0F && exit.bodyRollDegrees == 0.0F,
+                "Exit must target the vanilla body orientation");
+        helper.assertTrue(exit.rightArmXRot == 0.0F && exit.leftArmXRot == 0.0F,
+                "Exit must target vanilla arm rotations");
+        helper.assertTrue(exit.rightLegXRot == 0.0F && exit.leftLegXRot == 0.0F,
+                "Exit must target vanilla leg rotations");
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
     public static void poseInterpolationKeepsJointsBetweenEndpoints(GameTestHelper helper) {
-        FlightPose hover = FlightPoseLibrary.target(FlightAnimationState.HOVER, 20,
-                0.0F, 0.0F, 0.0F, 0.0F);
-        FlightPose heroic = FlightPoseLibrary.target(FlightAnimationState.HEROIC_FLIGHT, 20,
-                0.35F, 0.0F, 0.0F, 0.0F);
-        FlightPose middle = FlightPose.lerp(hover, heroic, 0.5F);
+        FlightPose hover = FlightPoseLibrary.target(FlightAnimationState.HOVER,
+                sample(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, false, false));
+        FlightPose boost = FlightPoseLibrary.target(FlightAnimationState.BOOST,
+                sample(4.0F, 4.0F, 0.0F, 1.0F, 0.0F, true, false));
+        FlightPose middle = FlightPose.lerp(hover, boost, 0.5F);
 
         helper.assertTrue(middle.bodyPitchDegrees < hover.bodyPitchDegrees
-                        && middle.bodyPitchDegrees > heroic.bodyPitchDegrees,
+                        && middle.bodyPitchDegrees > boost.bodyPitchDegrees,
                 "Interpolated body pitch must stay between the two poses");
-        helper.assertTrue(middle.rightArmXRot < hover.rightArmXRot
-                        && middle.rightArmXRot > heroic.rightArmXRot,
+        helper.assertTrue(middle.rightArmXRot > hover.rightArmXRot
+                        && middle.rightArmXRot < boost.rightArmXRot,
                 "Interpolated arm angle must stay between the two poses");
-        helper.assertTrue(FlightPose.lerp(hover, heroic, 0.0F) == hover,
+        helper.assertTrue(FlightPose.lerp(hover, boost, 0.0F) == hover,
                 "A zero delta must return the source pose");
-        helper.assertTrue(FlightPose.lerp(hover, heroic, 1.0F) == heroic,
+        helper.assertTrue(FlightPose.lerp(hover, boost, 1.0F) == boost,
                 "A full delta must return the target pose");
+
+        float wrapped = FlightPose.lerpAngleDegrees(350.0F, 10.0F, 0.5F);
+        helper.assertTrue(wrapped > 355.0F && wrapped < 365.0F,
+                "Interpolating across the wrap must continue forward instead of unwinding");
+        helper.assertTrue(FlightPose.lerpAngleDegrees(0.0F, 360.0F, 0.5F) == 0.0F,
+                "A full turn is the same orientation and must not interpolate backwards");
         helper.succeed();
     }
 
@@ -557,207 +774,97 @@ public final class FlightGameTests {
 
         PlayerFlightState state = new PlayerFlightState();
         state.setActive(true);
-        helper.assertTrue(!state.startManeuver(0, FlightPoseLibrary.MANEUVER_TICKS),
+        helper.assertTrue(!state.startManeuver(FlightState.MANEUVER_ROLL_360, 0,
+                        FlightPoseLibrary.MANEUVER_TICKS),
                 "Invalid maneuver directions must be rejected");
-        helper.assertTrue(state.startManeuver(1, FlightPoseLibrary.MANEUVER_TICKS),
+        helper.assertTrue(state.startManeuver(FlightState.MANEUVER_ROLL_360, 1,
+                        FlightPoseLibrary.MANEUVER_TICKS),
                 "A valid maneuver must start while flight is active");
-        helper.assertTrue(!state.startManeuver(-1, FlightPoseLibrary.MANEUVER_TICKS),
+        helper.assertTrue(!state.startManeuver(FlightState.MANEUVER_ROLL_360, -1,
+                        FlightPoseLibrary.MANEUVER_TICKS),
                 "A second maneuver must not interrupt the first");
         state.setManeuverCooldownTicks(FlightController.MANEUVER_COOLDOWN_TICKS);
         for (int tick = 0; tick < FlightPoseLibrary.MANEUVER_TICKS; tick++) {
             state.tickManeuver();
         }
-        helper.assertTrue(state.getManeuverTicksRemaining() == 0 && state.getManeuverDirection() == 0,
+        helper.assertTrue(state.getManeuverTicksRemaining() == 0
+                        && state.getManeuverDirection() == 0,
                 "The maneuver must finish and release the direction");
-        helper.assertTrue(!state.startManeuver(-1, FlightPoseLibrary.MANEUVER_TICKS),
+        helper.assertTrue(!state.startManeuver(FlightState.MANEUVER_ROLL_360, -1,
+                        FlightPoseLibrary.MANEUVER_TICKS),
                 "The cooldown must prevent immediate chaining");
         for (int tick = 0; tick < FlightController.MANEUVER_COOLDOWN_TICKS; tick++) {
             state.tickManeuver();
         }
-        helper.assertTrue(state.startManeuver(-1, FlightPoseLibrary.MANEUVER_TICKS),
+        helper.assertTrue(state.startManeuver(FlightState.MANEUVER_ROLL_360, -1,
+                        FlightPoseLibrary.MANEUVER_TICKS),
                 "The maneuver must be available again after the cooldown");
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void exitTargetReleasesThePoseBackToVanilla(GameTestHelper helper) {
-        FlightPose exit = FlightPoseLibrary.target(FlightAnimationState.EXIT, 20,
-                0.50F, 0.0F, 0.0F, 0.0F);
-        helper.assertTrue(exit.bodyPitchDegrees == 0.0F && exit.bodyRollDegrees == 0.0F,
-                "Exit must target the vanilla body orientation");
-        helper.assertTrue(exit.rightArmXRot == 0.0F && exit.leftArmXRot == 0.0F,
-                "Exit must target vanilla arm rotations");
-        helper.assertTrue(exit.rightLegXRot == 0.0F && exit.leftLegXRot == 0.0F,
-                "Exit must target vanilla leg rotations");
-        helper.succeed();
-    }
+    public static void barrelRollOverlayAndPhysicsMatchTheReference(GameTestHelper helper) {
+        helper.assertTrue(FlightPoseLibrary.rollOverlay(1, 0.0F) == FlightPose.VANILLA
+                        && FlightPoseLibrary.rollOverlay(1, 1.0F) == FlightPose.VANILLA,
+                "The barrel-roll accents must start and end neutral");
+        helper.assertTrue(FlightPoseLibrary.rollOverlay(0, 0.5F) == FlightPose.VANILLA,
+                "An invalid direction must not add a barrel-roll accent");
 
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void flightPivotIsAtTheTorsoAndHeadUsesALocalNeckAngle(GameTestHelper helper) {
-        helper.assertTrue(FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y > FlightPoseLibrary.BODY_PIVOT_Y + 0.2F,
-                "Flight must pivot above the locomotion knee-height pivot");
-        helper.assertTrue(FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y >= 0.9F
-                        && FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y <= 1.1F,
-                "The flight pivot should sit at the vanilla torso centre");
+        FlightPose right = FlightPoseLibrary.rollOverlay(1, 0.5F);
+        helper.assertTrue(Math.abs(right.bodyPitchDegrees + 10.0F) < 1.0E-4F,
+                "The mid-roll body pitch must use the reference -10 degrees");
+        helper.assertTrue(Math.abs(right.rightArmXRot - 20.0F) < 1.0E-4F
+                        && Math.abs(right.leftArmXRot + 40.0F) < 1.0E-4F,
+                "A right-hand roll must raise the right arm and fold the left arm, got "
+                        + right.rightArmXRot + " / " + right.leftArmXRot);
+        helper.assertTrue(Math.abs(right.rightLegXRot) < 1.0E-4F
+                        && Math.abs(right.leftLegXRot + 20.0F) < 1.0E-4F,
+                "A right-hand roll must keep the right leg neutral and fold the left leg, got "
+                        + right.rightLegXRot + " / " + right.leftLegXRot);
 
-        float horizontalHead = FlightPoseLibrary.headPitchForBody(-90.0F);
-        helper.assertTrue(horizontalHead >= -50.0F && horizontalHead <= -40.0F,
-                "A horizontal torso must use the vanilla-style local neck angle near -45 degrees");
-        helper.assertTrue(horizontalHead > -90.0F,
-                "The head must not copy the full torso rotation");
-        helper.assertTrue(horizontalHead >= FlightPoseLibrary.MIN_HEAD_PITCH
-                        && horizontalHead <= FlightPoseLibrary.MAX_HEAD_PITCH,
-                "The derived head pitch must respect the neck limit");
-        helper.succeed();
-    }
+        FlightPose left = FlightPoseLibrary.rollOverlay(-1, 0.5F);
+        helper.assertTrue(Math.abs(left.rightArmXRot + 40.0F) < 1.0E-4F
+                        && Math.abs(left.leftArmXRot - 20.0F) < 1.0E-4F,
+                "The opposite roll must mirror the arm accents");
+        helper.assertTrue(Math.abs(left.rightLegXRot + 20.0F) < 1.0E-4F
+                        && Math.abs(left.leftLegXRot) < 1.0E-4F,
+                "The opposite roll must mirror the leg accents");
 
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void selectorUsesHysteresisAndMinimumDwell(GameTestHelper helper) {
-        FlightMotionSample hoverBand = FlightMotionSample.builder()
-                .active(true).activeTicks(20).speed(0.10F).build();
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HOVER, 5, hoverBand)
-                        == FlightAnimationState.HOVER,
-                "Hover must survive inside the exit band instead of flickering at the enter threshold");
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.SLOW_FLIGHT, 5,
-                        hoverBand.withBank(0.0F)) == FlightAnimationState.SLOW_FLIGHT
-                        || hoverBand.speed() >= FlightAnimationSelector.SLOW_EXIT_SPEED,
-                "Hysteresis must keep the prior state while the sample remains in its band");
+        float early = FlightPoseLibrary.maneuverRollProgress(1, 0.1F);
+        helper.assertTrue(Math.abs(early - 360.0F * FlightPoseLibrary.boostBlend(0.1F)) < 1.0E-3F,
+                "The roll must follow the reference eased curve, got " + early);
+        helper.assertTrue(early < 36.0F,
+                "The reference curve must ease into the roll instead of turning linearly");
+        helper.assertTrue(FlightPoseLibrary.maneuverRollProgress(1, 0.5F) == 180.0F,
+                "The eased mid-roll must be exactly half a turn");
 
-        FlightMotionSample cruiseBand = FlightMotionSample.builder()
-                .active(true).activeTicks(20).speed(0.47F).build();
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.CRUISE, 5, cruiseBand)
-                        == FlightAnimationState.CRUISE,
-                "Cruise must survive above its lower exit threshold");
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HEROIC_FLIGHT, 5, cruiseBand)
-                        == FlightAnimationState.HEROIC_FLIGHT,
-                "Heroic flight must not enter cruise below the higher enter threshold");
+        FlightPhysics.BarrelRoll rightRoll = new FlightPhysics.BarrelRoll(1, 0.5F);
+        Vec3 forward = new Vec3(0.0D, 0.0D, 1.0D);
+        FlightPhysics.Step plain = step(forward, 0.0F, 0.0F, 0, false, 0L);
+        FlightPhysics.Step rightStep = FlightPhysics.simulate(forward, 0.0F, 0.0F,
+                0, false, 0L, PARAMS, rightRoll);
+        helper.assertTrue(Math.abs(rightStep.motion().x + 0.15D) < 1.0E-6D,
+                "A right-hand roll must deflect the velocity to the player's right, got "
+                        + rightStep.motion().x);
+        helper.assertTrue(Math.abs(rightStep.motion().z - 0.94D) < 1.0E-6D,
+                "The mid-roll must scrub 6 percent of the horizontal speed, got "
+                        + rightStep.motion().z);
+        helper.assertTrue(Math.abs(rightStep.motion().y - plain.motion().y) < 1.0E-9D,
+                "The barrel-roll impulse must stay horizontal");
 
-        FlightMotionSample slow = FlightMotionSample.builder()
-                .active(true).activeTicks(20).speed(0.02F).build();
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HEROIC_FLIGHT, 1, slow)
-                        == FlightAnimationState.HEROIC_FLIGHT,
-                "A lower-priority state must not replace the current state before the dwell expires");
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HEROIC_FLIGHT, 3, slow)
-                        == FlightAnimationState.HOVER,
-                "The state may change once the minimum dwell has elapsed");
-        helper.succeed();
-    }
+        FlightPhysics.Step leftStep = FlightPhysics.simulate(forward, 0.0F, 0.0F,
+                0, false, 0L, PARAMS, new FlightPhysics.BarrelRoll(-1, 0.5F));
+        helper.assertTrue(Math.abs(leftStep.motion().x - 0.15D) < 1.0E-6D,
+                "The opposite roll must deflect the velocity to the player's left, got "
+                        + leftStep.motion().x);
 
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void criticalStatesInterruptOrdinaryOnes(GameTestHelper helper) {
-        FlightMotionSample maneuver = FlightMotionSample.builder()
-                .active(true).activeTicks(2).speed(0.60F).maneuvering(true).build();
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.TAKEOFF, 1, maneuver)
-                        == FlightAnimationState.MANEUVER,
-                "A server-authorised maneuver must override takeoff and ordinary poses");
-
-        FlightMotionSample landing = FlightMotionSample.builder()
-                .active(true).activeTicks(30).speed(0.60F).braking(true)
-                .landing(0.8F, 0.6F).build();
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.BRAKING, 1, landing)
-                        == FlightAnimationState.LANDING,
-                "Ground approach must override braking when the landing pose is active");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void groundAndAirTakeoffUseDifferentDurationsAndBothReachHeroic(GameTestHelper helper) {
-        FlightMotionSample groundFirst = FlightMotionSample.builder()
-                .active(true).activeTicks(1).launchedFromGround(true).speed(0.20F).build();
-        FlightMotionSample groundLast = FlightMotionSample.builder()
-                .active(true).activeTicks(FlightPoseLibrary.TAKEOFF_GROUND_TICKS)
-                .launchedFromGround(true).speed(0.20F).build();
-        FlightMotionSample airFirst = FlightMotionSample.builder()
-                .active(true).activeTicks(1).launchedFromGround(false).speed(0.20F).build();
-
-        helper.assertTrue(FlightAnimationSelector.takeoffTicks(groundFirst)
-                        == FlightPoseLibrary.TAKEOFF_GROUND_TICKS,
-                "A grounded launch must use the longer anticipation window");
-        helper.assertTrue(FlightAnimationSelector.takeoffTicks(airFirst)
-                        == FlightPoseLibrary.TAKEOFF_AIR_TICKS,
-                "An airborne activation must use the shorter extension window");
-
-        FlightPose first = FlightPoseLibrary.target(FlightAnimationState.TAKEOFF, groundFirst);
-        FlightPose last = FlightPoseLibrary.target(FlightAnimationState.TAKEOFF, groundLast);
-        FlightPose heroic = FlightPoseLibrary.target(FlightAnimationState.HEROIC_FLIGHT, groundLast);
-        helper.assertTrue(last.bodyPitchDegrees < first.bodyPitchDegrees,
-                "Ground takeoff must progressively lower the torso towards horizontal");
-        helper.assertTrue(Math.abs(last.bodyPitchDegrees - heroic.bodyPitchDegrees) < 0.001F,
-                "Ground takeoff must finish exactly on the heroic body pitch");
-        helper.assertTrue(airFirst.launchedFromGround()
-                        == false,
-                "The air sample must remain tagged as an airborne activation");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void landingApproachAndRecoveryEndAtVanillaExactly(GameTestHelper helper) {
-        FlightMotionSample approach = FlightMotionSample.builder()
-                .active(false).landing(0.0F, 0.4F).build();
-        FlightMotionSample contact = FlightMotionSample.builder()
-                .active(false).landing(1.0F, 0.8F).build();
-        FlightMotionSample recovered = FlightMotionSample.builder()
-                .active(false).landing(1.0F, 0.8F).recovery(1.0F).build();
-
-        FlightPose approachPose = FlightPoseLibrary.target(FlightAnimationState.LANDING, approach);
-        FlightPose contactPose = FlightPoseLibrary.target(FlightAnimationState.LANDING, contact);
-        FlightPose recoveredPose = FlightPoseLibrary.target(FlightAnimationState.LANDING, recovered);
-
-        helper.assertTrue(contactPose.bodyPitchDegrees > approachPose.bodyPitchDegrees,
-                "Contact must raise the body from the descending approach");
-        helper.assertTrue(contactPose.bodyPitchDegrees > -20.0F,
-                "The contact pose must be nearly upright");
-        helper.assertTrue(recoveredPose.bodyPitchDegrees == 0.0F
-                        && recoveredPose.bodyRollDegrees == 0.0F
-                        && recoveredPose.rightArmXRot == 0.0F
-                        && recoveredPose.leftLegXRot == 0.0F,
-                "A completed landing recovery must target vanilla exactly, with no exit snap");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void hoverIdleArticulatesLimbsAndHeadWithoutAccumulating(GameTestHelper helper) {
-        FlightMotionSample early = FlightMotionSample.builder()
-                .active(true).activeTicks(10).speed(0.01F).build();
-        FlightMotionSample later = FlightMotionSample.builder()
-                .active(true).activeTicks(40).speed(0.01F).build();
-        FlightPose first = FlightPoseLibrary.target(FlightAnimationState.HOVER, early);
-        FlightPose second = FlightPoseLibrary.target(FlightAnimationState.HOVER, later);
-
-        helper.assertTrue(Math.abs(first.bodyPitchDegrees - second.bodyPitchDegrees) > 0.2F
-                        || Math.abs(first.headYRotDegrees - second.headYRotDegrees) > 0.2F
-                        || Math.abs(first.rightArmXRot - second.rightArmXRot) > 0.2F,
-                "Hover must keep breathing with the body and limbs instead of freezing");
-        helper.assertTrue(first.rightArmXRot >= -40.0F && first.rightArmXRot <= 20.0F,
-                "Hover arms must remain in a relaxed bounded range");
-        helper.assertTrue(Math.abs(first.headZRotDegrees) < 1.0E-6F,
-                "Hover must never roll the head");
-        helper.assertTrue(Math.abs(first.headYRotDegrees) <= FlightPoseLibrary.MAX_HEAD_YAW,
-                "Hover head sway must stay inside the small neck limit");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void boostPoseAndSelectorReflectRealSprintSpeed(GameTestHelper helper) {
-        FlightMotionSample boost = FlightMotionSample.builder()
-                .active(true).activeTicks(30).speed(0.90F).horizontalSpeed(0.90F)
-                .acceleration(0.05F).boosting(true).build();
-        FlightPose pose = FlightPoseLibrary.target(FlightAnimationState.ACCELERATING, boost);
-
-        helper.assertTrue(FlightAnimationSelector.select(FlightAnimationState.HEROIC_FLIGHT, 5, boost)
-                        == FlightAnimationState.ACCELERATING,
-                "Sprint boost must select the acceleration pose");
-        helper.assertTrue(pose.bodyPitchDegrees < -80.0F,
-                "Boost must stretch the body more horizontal than cruise");
-        helper.assertTrue(pose.rightArmXRot < -150.0F && pose.leftArmXRot < -150.0F,
-                "Boost arms must lead in front of the body");
-        helper.assertTrue(Math.abs(pose.rightArmXRot - pose.leftArmXRot) > 2.0F,
-                "The two boost arms must not read as a single rigid bar");
-        helper.assertTrue(Math.abs(pose.rightLegXRot) < 12.0F
-                        && Math.abs(pose.leftLegXRot) < 12.0F,
-                "Boost legs must trail close to the body");
-        helper.assertTrue(pose.headYRotDegrees == 0.0F && pose.headZRotDegrees == 0.0F,
-                "Boost must not twist the neck toward the crosshair");
+        FlightPhysics.Step start = FlightPhysics.simulate(forward, 0.0F, 0.0F,
+                0, false, 0L, PARAMS, new FlightPhysics.BarrelRoll(1, 0.0F));
+        FlightPhysics.Step end = FlightPhysics.simulate(forward, 0.0F, 0.0F,
+                0, false, 0L, PARAMS, new FlightPhysics.BarrelRoll(1, 1.0F));
+        helper.assertTrue(start.motion().equals(plain.motion())
+                        && end.motion().equals(plain.motion()),
+                "The barrel-roll physics must be neutral outside the active envelope");
         helper.succeed();
     }
 
@@ -791,13 +898,13 @@ public final class FlightGameTests {
         FlightNetwork.FlightStateUpdate original = new FlightNetwork.FlightStateUpdate(
                 321, true, true, FlightState.MANEUVER_LOOP, -1,
                 FlightManeuvers.LOOP_TICKS - 2, true, true,
-                FlightState.END_LANDED, 0.32F, 47.5F, 0.62F, true);
+                FlightState.END_LANDED, 0.32F, 47.5F, true);
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         try {
             FlightNetwork.FlightStateUpdate.encode(original, buffer);
             FlightNetwork.FlightStateUpdate decoded = FlightNetwork.FlightStateUpdate.decode(buffer);
             helper.assertTrue(decoded.equals(original),
-                    "The flight state packet must preserve activation, maneuver, launch and landing fields exactly");
+                    "The flight state packet must preserve activation, maneuver and launch fields exactly");
             helper.assertTrue(buffer.readableBytes() == 0,
                     "The decoder must consume the complete state payload");
         } finally {
@@ -807,12 +914,76 @@ public final class FlightGameTests {
     }
 
     @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void angleInterpolationTakesTheShortestArc(GameTestHelper helper) {
-        float wrapped = FlightPose.lerpAngleDegrees(350.0F, 10.0F, 0.5F);
-        helper.assertTrue(wrapped > 355.0F && wrapped < 365.0F,
-                "Interpolating across the wrap must continue forward instead of unwinding");
-        helper.assertTrue(FlightPose.lerpAngleDegrees(0.0F, 360.0F, 0.5F) == 0.0F,
-                "A full turn is the same orientation and must not interpolate backwards");
+    public static void cameraRollMatchesTheReferenceFormula(GameTestHelper helper) {
+        helper.assertTrue(FlightCameraMath.rollTarget(new Vec3(0.0D, 0.0D, 1.0D),
+                        new Vec3(0.0D, 0.0D, 1.0D)) == 0.0F,
+                "A trajectory aligned with the crosshair must not roll the camera");
+        helper.assertTrue(Math.abs(FlightCameraMath.rollTarget(new Vec3(0.0D, 0.0D, 1.0D),
+                        new Vec3(1.0D, 0.0D, 0.0D)) + 36.0F) < 1.0E-4F,
+                "A 90-degree right offset at full speed must target -36 degrees");
+        helper.assertTrue(Math.abs(FlightCameraMath.rollTarget(new Vec3(0.0D, 0.0D, 1.0D),
+                        new Vec3(-1.0D, 0.0D, 0.0D)) - 36.0F) < 1.0E-4F,
+                "A 90-degree left offset at full speed must target +36 degrees");
+        helper.assertTrue(Math.abs(FlightCameraMath.rollTarget(new Vec3(0.0D, 0.0D, 0.5D),
+                        new Vec3(1.0D, 0.0D, 0.0D)) + 9.0F) < 1.0E-4F,
+                "The roll target must scale with min(speed squared, 1)");
+        helper.assertTrue(FlightCameraMath.rollTarget(new Vec3(0.0D, 0.0D, 1.0D),
+                        new Vec3(0.0D, 0.0D, -1.0D)) == 0.0F,
+                "A perfect head-on reversal has no cross product and reports zero");
+        helper.assertTrue(FlightCameraMath.rollTarget(Vec3.ZERO,
+                        new Vec3(0.0D, 0.0D, 1.0D)) == 0.0F,
+                "A stationary player must not roll the camera");
+
+        helper.assertTrue(Math.abs(FlightCameraMath.smooth(30.0F, 0.0F) - 20.0F) < 1.0E-4F,
+                "Camera roll smoothing must use (target + 2 * previous) / 3");
+        helper.assertTrue(Math.abs(FlightCameraMath.smooth(0.0F, 36.0F) - 12.0F) < 1.0E-4F,
+                "A fresh roll target must be approached over several ticks");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void flightPivotAndReferenceConstantsAreStable(GameTestHelper helper) {
+        helper.assertTrue(FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y > FlightPoseLibrary.BODY_PIVOT_Y + 0.2F,
+                "Flight must pivot above the locomotion knee-height pivot");
+        helper.assertTrue(FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y >= 0.9F
+                        && FlightPoseLibrary.FLIGHT_BODY_PIVOT_Y <= 1.1F,
+                "The flight pivot should sit at the vanilla torso centre");
+        helper.assertTrue(FlightPoseLibrary.BOOST_HEAD_PITCH == -50.0F,
+                "The boost head must keep the combined reference -50 degrees");
+        helper.assertTrue(Math.abs(FlightPoseLibrary.boostBodyPitch(0.0F) + 80.0F) < 1.0E-4F,
+                "The reference boost pitch at a level view is -80 degrees");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "ascendant")
+    public static void activeFlightTravelMovesThePlayerAndInactiveTravelDoesNot(GameTestHelper helper) {
+        Player player = helper.makeMockPlayer();
+        BlockPos start = helper.absolutePos(new BlockPos(3, 5, 3));
+        player.setPos(start.getX() + 0.5D, start.getY(), start.getZ() + 0.5D);
+        player.setYRot(0.0F);
+        player.setXRot(0.0F);
+        player.setDeltaMovement(new Vec3(0.0D, 0.0D, 0.70D));
+        FlightState state = FlightController.getState(player);
+        helper.assertTrue(state != null, "Player must have a flight state capability");
+        state.setActive(true);
+
+        double before = player.getZ();
+        helper.assertTrue(FlightController.travel(player),
+                "The travel hook must handle an active flight state");
+        helper.assertTrue(player.getZ() > before + 0.50D,
+                "Active flight must move the player forward");
+        helper.assertTrue(player.getDeltaMovement().z > 0.60D
+                        && player.getDeltaMovement().z < 0.80D,
+                "Travel must store the reference post-move drag, got "
+                        + player.getDeltaMovement().z);
+
+        state.setActive(false);
+        player.setDeltaMovement(Vec3.ZERO);
+        double stoppedZ = player.getZ();
+        helper.assertTrue(!FlightController.travel(player),
+                "Travel must fall back to vanilla when flight is inactive");
+        helper.assertTrue(player.getZ() == stoppedZ,
+                "Inactive travel must not move the player");
         helper.succeed();
     }
 
@@ -866,14 +1037,6 @@ public final class FlightGameTests {
         state.clear();
         helper.assertTrue(!state.wasManeuverAborted(),
                 "Clearing the session must forget a stale abort flag");
-
-        // Kind 4 was the retired scripted 180-degree reversal. It must be
-        // rejected even if an old or modified client asks for it, because the
-        // turn is now ordinary player-controlled flight.
-        helper.assertTrue(FlightManeuvers.duration(4) == 0,
-                "The retired reversal kind must have no controller duration");
-        helper.assertTrue(!state.startManeuver(4, 1, 18),
-                "The retired reversal kind must be rejected by the flight state");
         helper.succeed();
     }
 
@@ -934,172 +1097,6 @@ public final class FlightGameTests {
                 player, FlightState.MANEUVER_LOOP, 1, 0.0F, 0.60D);
         helper.assertTrue(blocked == FlightManeuvers.PROBLEM_OBSTRUCTED,
                 "A block on the loop must fail the sweep, got " + blocked);
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void idleHoverBobIsDeterministicAndBounded(GameTestHelper helper) {
-        Vec3 first = step(Vec3.ZERO, 0.0F, 0.0F, 0, false, 7L);
-        Vec3 sameTick = step(Vec3.ZERO, 0.0F, 0.0F, 0, false, 7L);
-        Vec3 later = step(Vec3.ZERO, 0.0F, 0.0F, 0, false, 12L);
-
-        helper.assertTrue(first.distanceTo(sameTick) < 1.0E-12D,
-                "The hover bob must be deterministic for the same game tick");
-        helper.assertTrue(Math.abs(first.y) <= HOVER_BOB + 1.0E-9D
-                        && Math.abs(later.y) <= HOVER_BOB + 1.0E-9D,
-                "The hover bob must stay inside its configured amplitude");
-        helper.assertTrue(Math.abs(first.y - later.y) > 0.005D,
-                "The hover bob must actually move over time");
-        helper.assertTrue(Math.abs(first.y) > 0.005D,
-                "An idle hover must not freeze the vertical axis at zero");
-        helper.assertTrue(Math.abs(first.x) < 1.0E-12D && Math.abs(first.z) < 1.0E-12D,
-                "The hover bob must be purely vertical");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void boostTurnsTowardTheCrosshairAtABoundedRate(GameTestHelper helper) {
-        Vec3 start = new Vec3(0.0D, 0.0D, CRUISE);
-        Vec3 first = step(start, 180.0F, 0.0F, FlightState.FORWARD, true, 0L);
-        float firstTurn = separationDegrees(start, first);
-        helper.assertTrue(firstTurn > 1.0F && firstTurn <= BOOST_TURN_RATE + 0.01F,
-                "Boost must turn at a bounded rate, got " + firstTurn + " degrees");
-        helper.assertTrue(first.z > 0.0D,
-                "A 180-degree request must not snap the boost direction in one tick");
-        helper.assertTrue(Math.abs(heading(first)) < 90.0F,
-                "The first boosted tick must still point mostly forward");
-
-        Vec3 velocity = start;
-        for (int tick = 0; tick < 25; tick++) {
-            velocity = step(velocity, 180.0F, 0.0F, FlightState.FORWARD, true, tick);
-        }
-        helper.assertTrue(Math.abs(Math.abs(heading(velocity)) - 180.0F) < 2.0F,
-                "After the turn the trajectory must face the reversed crosshair, got "
-                        + heading(velocity));
-        helper.assertTrue(velocity.z < -1.0D,
-                "The reversed boost must carry real speed in the new direction");
-        helper.assertTrue(velocity.length() <= BOOST + 1.0E-6D,
-                "The free turn must still respect the boost speed cap");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void normalFlightCanReverseOneHundredEightyDegreesWithoutAScript(GameTestHelper helper) {
-        Vec3 start = new Vec3(0.0D, 0.0D, CRUISE);
-        Vec3 first = step(start, 180.0F, FlightState.FORWARD);
-        helper.assertTrue(first.z > 0.30D,
-                "Normal flight must decelerate through the turn instead of teleporting backwards");
-        helper.assertTrue(Math.abs(first.x) < 1.0E-9D,
-                "A straight 180-degree turn must not add sideways drift");
-
-        Vec3 velocity = start;
-        double minimumSpeed = velocity.length();
-        for (int tick = 0; tick < 30; tick++) {
-            velocity = step(velocity, 180.0F, FlightState.FORWARD);
-            minimumSpeed = Math.min(minimumSpeed, velocity.length());
-        }
-        helper.assertTrue(velocity.z < -0.60D,
-                "The free 180 must finish moving in the new look direction, got " + velocity.z);
-        helper.assertTrue(minimumSpeed < 0.20D,
-                "The turn must pass through a real slow point instead of a scripted arc");
-        helper.assertTrue(velocity.length() <= CRUISE + 1.0E-6D,
-                "The free turn must respect the normal cruise cap");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void movingPosesKeepTheHeadAlignedWithTheBody(GameTestHelper helper) {
-        FlightAnimationState[] states = {
-                FlightAnimationState.HEROIC_FLIGHT,
-                FlightAnimationState.CRUISE,
-                FlightAnimationState.TURNING,
-                FlightAnimationState.CLIMB,
-                FlightAnimationState.DIVE,
-                FlightAnimationState.ACCELERATING,
-                FlightAnimationState.DECELERATING,
-                FlightAnimationState.BRAKING,
-                FlightAnimationState.TAKEOFF,
-                FlightAnimationState.MANEUVER,
-                FlightAnimationState.LANDING
-        };
-        FlightMotionSample neutral = FlightMotionSample.builder()
-                .active(true).activeTicks(30).speed(0.55F).horizontalSpeed(0.55F)
-                .bank(12.0F).build();
-        FlightMotionSample noisy = FlightMotionSample.builder()
-                .active(true).activeTicks(30).speed(0.55F).horizontalSpeed(0.55F)
-                .bank(12.0F).aimError(45.0F).turnRate(30.0F).build();
-
-        for (FlightAnimationState state : states) {
-            FlightPose base = FlightPoseLibrary.target(state, neutral);
-            FlightPose disturbed = FlightPoseLibrary.target(state, noisy);
-            helper.assertTrue(disturbed.headYRotDegrees == 0.0F
-                            && disturbed.headZRotDegrees == 0.0F,
-                    state + " must not derive head yaw or roll from aim/turn telemetry");
-            helper.assertTrue(base.headXRotDegrees == disturbed.headXRotDegrees,
-                    state + " must not change head pitch when the crosshair turns");
-        }
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void bodyYawOffsetFollowsTheTrajectoryAndFadesAtHover(GameTestHelper helper) {
-        helper.assertTrue(Math.abs(FlightPoseLibrary.bodyYawOffset(
-                        45.0F, 0.65F, FlightPoseLibrary.MAX_BODY_YAW_OFFSET) + 45.0F) < 1.0E-6F,
-                "A crosshair 45 degrees left of the trajectory must turn the body 45 degrees right");
-        helper.assertTrue(Math.abs(FlightPoseLibrary.bodyYawOffset(
-                        -45.0F, 0.65F, FlightPoseLibrary.MAX_BODY_YAW_OFFSET) - 45.0F) < 1.0E-6F,
-                "The body yaw offset must mirror the aim error sign");
-        helper.assertTrue(Math.abs(FlightPoseLibrary.bodyYawOffset(
-                        170.0F, 0.65F, FlightPoseLibrary.MAX_BODY_YAW_OFFSET) + 170.0F) < 1.0E-6F,
-                "A half turn must rotate most of the body instead of clamping at a small angle");
-        helper.assertTrue(FlightPoseLibrary.bodyYawOffset(
-                        45.0F, 0.0F, FlightPoseLibrary.MAX_BODY_YAW_OFFSET) == 0.0F,
-                "A stationary hover must keep the body facing the camera");
-        float lowSpeed = FlightPoseLibrary.bodyYawOffset(
-                45.0F, 0.10F, FlightPoseLibrary.MAX_BODY_YAW_OFFSET);
-        helper.assertTrue(lowSpeed > -45.0F && lowSpeed < 0.0F,
-                "The body lead must fade smoothly as the trajectory slows");
-        helper.assertTrue(Math.abs(FlightPoseLibrary.bodyYawOffset(
-                        180.0F, 0.65F, FlightPoseLibrary.MAX_BODY_YAW_OFFSET)) <= 180.0F,
-                "The body yaw offset must remain a legal yaw");
-        helper.succeed();
-    }
-
-    @GameTest(template = "empty", templateNamespace = "ascendant")
-    public static void landingGateIgnoresHoverAndRequiresARealDescent(GameTestHelper helper) {
-        helper.assertTrue(FlightPoseLibrary.landingProgress(
-                        30, true, 0.40F, -0.010F, false) == 0.0F,
-                "The hover bob must never trigger the landing pose");
-        helper.assertTrue(FlightPoseLibrary.landingProgress(
-                        30, true, 2.00F, -0.025F, false) == 0.0F,
-                "A full hover-bob cycle near the ground must not land");
-        helper.assertTrue(FlightPoseLibrary.landingProgress(
-                        30, true, 3.00F, -0.200F, true) == 0.0F,
-                "A descent far above the ground must not start the landing pose");
-        helper.assertTrue(FlightPoseLibrary.landingProgress(
-                        5, true, 0.30F, -0.200F, true) == 0.0F,
-                "The takeoff window must not be mistaken for a landing");
-        helper.assertTrue(FlightPoseLibrary.landingProgress(
-                        30, true, 0.30F, 0.200F, true) == 0.0F,
-                "A climb must not start the landing pose");
-        float early = FlightPoseLibrary.landingProgress(
-                30, true, 2.00F, -0.200F, false);
-        helper.assertTrue(early > 0.0F && early < 0.25F,
-                "A real descent must begin the landing flare blocks above the ground");
-        float unbraked = FlightPoseLibrary.landingProgress(
-                30, true, 0.90F, -0.200F, false);
-        helper.assertTrue(unbraked > 0.0F && unbraked < 1.0F,
-                "A non-braking descent must also get the landing pose before contact");
-        float braking = FlightPoseLibrary.landingProgress(
-                30, true, 0.90F, -0.200F, true);
-        helper.assertTrue(braking > 0.0F && braking < 1.0F,
-                "Braking may start the approach earlier, with partial progress");
-        float close = FlightPoseLibrary.landingProgress(
-                30, true, 0.20F, -0.200F, false);
-        float far = FlightPoseLibrary.landingProgress(
-                30, true, 1.00F, -0.200F, true);
-        helper.assertTrue(close > far,
-                "Landing progress must grow as the ground gets closer");
         helper.succeed();
     }
 }

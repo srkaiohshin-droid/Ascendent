@@ -1,189 +1,259 @@
 package br.com.ascendant.flight;
 
-import net.minecraft.util.Mth;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Server-authoritative flight physics with two explicit control modes.
+ * Server-authoritative flight kernel ported from the reference superhero flight.
  *
- * <p><strong>Normal flight</strong> is camera-relative and deliberately
- * readable: WASD moves along the horizontal look direction, jump / sneak adds
- * a direct vertical command, and looking up or down while pressing forward
- * biases the vertical target in the same way the reference superhero flight
- * does. Releasing every control lets the horizontal velocity decay and folds
- * the vertical velocity into a small idle bob, which is the real hover state
- * rather than a pose-only flag.</p>
+ * <p>The reference does not apply a velocity target or a turn-rate limiter. It
+ * replaces the entity's {@code travel} method and moves the entity directly:</p>
  *
- * <p><strong>Boost</strong> (sprint) follows the full look vector, including
- * pitch. The trajectory heading and pitch converge towards the crosshair at a
- * bounded angular rate instead of snapping. A 180-degree turn is therefore an
- * ordinary player manoeuvre: the velocity arcs through the turn over several
- * ticks and the presentation layer can show the body leading the camera.</p>
+ * <ul>
+ *   <li><strong>Hover</strong> adds a fixed {@code speed} impulse along the
+ *       horizontal look direction, keeps the body upright and only uses the
+ *       look pitch for vertical control while the forward key is held.</li>
+ *   <li><strong>Boost</strong> (sprint) is a strong impulse along the full look
+ *       vector. A horizontal realignment preserves the current horizontal speed
+ *       while the heading catches up with the crosshair, so a 180-degree turn is
+ *       an ordinary player-controlled arc and never a scripted trajectory.</li>
+ * </ul>
  *
- * <p>All state stays on the server. This class is pure so the same maths can
- * run in GameTests and in the owning client's prediction without giving the
- * client any authority.</p>
+ * <p>The values below are the reference constants: hover impulse {@code 0.1},
+ * hover drag {@code 0.91}, hover gravity {@code 0.08}, boost impulse
+ * {@code 0.2}, boost drag {@code 0.96}, boost realignment {@code 0.1} and the
+ * post-move drag {@code 0.99 / 0.98}. They are deliberately not capped: the
+ * steady-state speeds fall out of the impulse and drag, exactly as in the
+ * reference (about {@code 1.01} blocks/tick hovering and {@code 4.0} boosting).
+ * </p>
+ *
+ * <p>{@link #travel(Player, Params, int, boolean, long)} performs the actual
+ * entity move. It is called from a {@code Player#travel} mixin on both the
+ * logical server and the owning client so the authoritative motion and the
+ * local prediction run the same arithmetic. The client never gains authority:
+ * the server still owns the flight state and every maneuver.</p>
  */
 public final class FlightPhysics {
-    /** Fraction of cruise speed used for the direct vertical command. */
-    private static final double VERTICAL_CRUISE_FACTOR = 0.72D;
-    /** Smallest cosine factor when forward input is projected through pitch. */
-    private static final double MIN_PITCH_HORIZONTAL_FACTOR = 0.20D;
-    /** Horizontal speed below which an idle flight starts its hover bob. */
-    private static final double HOVER_BOB_MAX_HORIZONTAL = 0.10D;
-    /** Speed below which a boost starts directly on the look vector. */
-    private static final double BOOST_ALIGN_FROM_REST = 0.05D;
+    /** Reference boost pre-drag applied to the previous velocity. */
+    public static final double BOOST_DRAG = 0.96D;
+    /** Reference horizontal realignment factor while boosting. */
+    public static final double BOOST_ALIGNMENT = 0.10D;
+    /** Reference boost post-move drag. */
+    public static final double BOOST_POST_HORIZONTAL = 0.99D;
+    public static final double BOOST_POST_VERTICAL = 0.98D;
+    /** Reference hover post-move vertical drag. */
+    public static final double HOVER_POST_VERTICAL = 0.98D;
+    /** Reference barrel-roll speed scrub at the middle of the roll. */
+    public static final double BARREL_ROLL_DRAG = 0.06D;
+    /** Reference barrel-roll lateral impulse as a fraction of horizontal speed. */
+    public static final double BARREL_ROLL_LATERAL = 0.15D;
+    /** Horizontal retention of the optional Ascendant brake key. */
+    public static final double BRAKE_RETENTION = 0.60D;
 
     private FlightPhysics() {
     }
 
     /**
-     * Immutable physical tuning. The values are supplied by
-     * {@link FlightTuning} on the server and travel to clients through Forge's
-     * config synchronisation.
+     * Immutable physical tuning, supplied by {@link FlightTuning} on the server
+     * and synchronized to clients by Forge's config system.
      */
-    public record Params(double maxCruiseSpeed, double maxBoostSpeed,
-                         double acceleration, double boostAcceleration,
-                         double drag, double braking, double hoverStability,
-                         double hoverBob, double boostTurnRateDegrees) {
+    public record Params(double speed, double boostSpeed, double hoverDrag,
+                         double hoverGravity, double hoverBob) {
         public Params {
-            maxCruiseSpeed = positive(maxCruiseSpeed, 0.65D);
-            maxBoostSpeed = Math.max(maxCruiseSpeed, positive(maxBoostSpeed, 1.25D));
-            acceleration = positive(acceleration, 0.045D);
-            boostAcceleration = positive(boostAcceleration, 0.080D);
-            drag = clamp(drag, 0.50D, 0.995D);
-            braking = Math.max(0.0D, finite(braking, 0.12D));
-            hoverStability = Math.max(0.0D, finite(hoverStability, 0.12D));
-            hoverBob = Math.max(0.0D, finite(hoverBob, 0.025D));
-            boostTurnRateDegrees = clamp(boostTurnRateDegrees, 1.0D, 45.0D);
+            speed = clamp(positive(speed, 0.10D), 0.01D, 0.50D);
+            boostSpeed = clamp(positive(boostSpeed, 0.20D), 0.02D, 1.00D);
+            hoverDrag = clamp(hoverDrag, 0.50D, 0.995D);
+            hoverGravity = clamp(finite(hoverGravity, 0.08D), 0.0D, 0.20D);
+            hoverBob = clamp(finite(hoverBob, 0.025D), 0.0D, 0.10D);
         }
     }
 
     /**
-     * Calculates the next velocity for one tick. {@code gameTime} is the level
-     * game time and only drives the deterministic hover bob.
+     * One movement tick. {@code motion} is the velocity handed to
+     * {@code Entity#move}; {@code velocity} is the post-drag velocity stored for
+     * the next tick after an unobstructed move.
      */
-    public static Vec3 nextVelocity(Vec3 current, float yawDegrees, float pitchDegrees,
-                                    int inputMask, boolean sprinting, long gameTime,
-                                    Params params) {
-        int mask = inputMask & FlightState.VALID_INPUT_MASK;
-        if ((mask & FlightState.BRAKE) != 0) {
-            return brake(current, params.braking());
-        }
-        if (sprinting) {
-            return boost(current, yawDegrees, pitchDegrees, params);
-        }
-        return normal(current, yawDegrees, pitchDegrees, mask, gameTime, params);
+    public record Step(Vec3 motion, Vec3 velocity) {
     }
 
-    private static Vec3 normal(Vec3 current, float yawDegrees, float pitchDegrees,
-                               int mask, long gameTime, Params params) {
+    /**
+     * Signed barrel-roll phase. {@code progress} runs from zero to one over the
+     * ten-tick maneuvre. Ascendant direction {@code +1} is a right-hand roll,
+     * which maps to the reference's negative barrel-roll timer.
+     */
+    public record BarrelRoll(int direction, float progress) {
+        public static final BarrelRoll NONE = new BarrelRoll(0, 0.0F);
+
+        public BarrelRoll {
+            direction = direction == -1 || direction == 1 ? direction : 0;
+            progress = (float) clamp(progress, 0.0D, 1.0D);
+            if (direction == 0) {
+                progress = 0.0F;
+            }
+        }
+
+        public boolean active() {
+            return direction != 0 && progress > 0.0F && progress < 1.0F;
+        }
+    }
+
+    /**
+     * Computes one tick without moving an entity. Used by the travel mixin and
+     * by the deterministic GameTests.
+     */
+    public static Step simulate(Vec3 current, float yawDegrees, float pitchDegrees,
+                                int inputMask, boolean boosting, long gameTime,
+                                Params params) {
+        return simulate(current, yawDegrees, pitchDegrees, inputMask, boosting,
+                gameTime, params, BarrelRoll.NONE);
+    }
+
+    public static Step simulate(Vec3 current, float yawDegrees, float pitchDegrees,
+                                int inputMask, boolean boosting, long gameTime,
+                                Params params, BarrelRoll roll) {
+        int mask = inputMask & FlightState.VALID_INPUT_MASK;
+        boolean braking = (mask & FlightState.BRAKE) != 0;
+        Vec3 motion;
+        if (braking) {
+            motion = current.scale(BRAKE_RETENTION);
+        } else if (boosting) {
+            motion = boostMotion(current, yawDegrees, pitchDegrees, params);
+        } else {
+            motion = hoverMotion(current, yawDegrees, pitchDegrees, mask, gameTime, params);
+        }
+        if (!braking) {
+            motion = barrelRollMotion(motion, roll);
+        }
+        return new Step(motion, post(motion, boosting, braking, params));
+    }
+
+    /**
+     * Executes the reference movement on a player: set the motion that the move
+     * uses, let vanilla resolve collisions, then apply the reference post-move
+     * gravity and drag to the actual (collision-adjusted) displacement.
+     */
+    public static Step travel(Player player, Params params, int inputMask,
+                              boolean boosting, long gameTime) {
+        return travel(player, params, inputMask, boosting, gameTime, BarrelRoll.NONE);
+    }
+
+    public static Step travel(Player player, Params params, int inputMask,
+                              boolean boosting, long gameTime, BarrelRoll roll) {
+        Step step = simulate(player.getDeltaMovement(), player.getYRot(), player.getXRot(),
+                inputMask, boosting, gameTime, params, roll);
+        player.setDeltaMovement(step.motion());
+        player.move(MoverType.SELF, step.motion());
+        Vec3 moved = player.getDeltaMovement();
+        boolean braking = (inputMask & FlightState.BRAKE) != 0;
+        Vec3 velocity = post(moved, boosting, braking, params);
+        player.setDeltaMovement(velocity);
+        return new Step(step.motion(), velocity);
+    }
+
+    private static Vec3 hoverMotion(Vec3 current, float yawDegrees, float pitchDegrees,
+                                    int mask, long gameTime, Params params) {
         double forward = bit(mask, FlightState.FORWARD) - bit(mask, FlightState.BACK);
         double strafe = bit(mask, FlightState.RIGHT) - bit(mask, FlightState.LEFT);
-        double verticalInput = bit(mask, FlightState.ASCEND) - bit(mask, FlightState.DESCEND);
-        boolean idle = forward == 0.0D && strafe == 0.0D && verticalInput == 0.0D;
+        double y = current.y;
 
-        if (idle) {
-            return idleHover(current, gameTime, params);
+        if (forward != 0.0D) {
+            // Minecraft pitch is positive downwards. The reference uses
+            // -sin(pitch), so looking up produces a positive climb term.
+            double pitch = -Math.sin(Math.toRadians(pitchDegrees));
+            y += Math.abs(pitch) * pitch * forward * params.speed()
+                    + params.hoverGravity();
+            y *= 0.95D;
+            // Looking up or down removes horizontal speed as the look tilts.
+            forward *= 1.0D - Math.abs(pitch * pitch);
+        } else {
+            if (y < -0.11D) {
+                y += 0.15D;
+            } else if (y > 0.001D) {
+                y -= 0.001D;
+            } else {
+                y = Math.sin(gameTime / 10.0D) * params.hoverBob();
+            }
         }
 
-        double inputLength = Math.sqrt(forward * forward + strafe * strafe);
-        double directionX = 0.0D;
-        double directionZ = 0.0D;
-        if (inputLength > 1.0E-6D) {
-            double yaw = Math.toRadians(yawDegrees);
-            directionX = (-Math.sin(yaw) * forward + Math.cos(yaw) * strafe) / inputLength;
-            directionZ = (Math.cos(yaw) * forward + Math.sin(yaw) * strafe) / inputLength;
-        }
-
-        // Looking up or down while moving forward is a vertical command, as in
-        // the reference hover flight. Direct jump / sneak input wins when held.
-        double pitch = Math.toRadians(pitchDegrees);
-        double pitchVertical = -Math.sin(pitch) * forward;
-        double verticalCommand = verticalInput != 0.0D ? verticalInput : pitchVertical;
-        verticalCommand = clamp(verticalCommand, -1.0D, 1.0D);
-
-        double horizontalFactor = 1.0D;
-        if (verticalInput == 0.0D && forward != 0.0D) {
-            horizontalFactor = Math.max(MIN_PITCH_HORIZONTAL_FACTOR, Math.cos(pitch));
-        }
-
-        double targetHorizontal = params.maxCruiseSpeed() * horizontalFactor;
-        double targetX = directionX * targetHorizontal;
-        double targetZ = directionZ * targetHorizontal;
-        double targetY = verticalCommand * params.maxCruiseSpeed() * VERTICAL_CRUISE_FACTOR;
-
-        double response = clamp(params.acceleration() * 4.0D, 0.14D, 0.32D);
-        double verticalResponse = clamp(params.hoverStability() * 1.6D, 0.10D, 0.35D);
-        double x = current.x + (targetX - current.x) * response;
-        double y = current.y + (targetY - current.y) * verticalResponse;
-        double z = current.z + (targetZ - current.z) * response;
-
-        // Keep the combined vector bounded. The limit is slightly above cruise
-        // so a climb at full forward input still reads as a climb instead of
-        // silently losing all forward speed.
-        double maximum = params.maxCruiseSpeed() * 1.15D;
-        double speed = Math.sqrt(x * x + y * y + z * z);
-        if (speed > maximum) {
-            double scale = maximum / speed;
-            x *= scale;
-            y *= scale;
-            z *= scale;
-        }
-        return new Vec3(x, y, z);
+        Vec3 impulse = inputVector(strafe, forward, params.speed(), yawDegrees);
+        return new Vec3(current.x + impulse.x, y, current.z + impulse.z);
     }
 
-    private static Vec3 idleHover(Vec3 current, long gameTime, Params params) {
-        double x = current.x * params.drag();
-        double z = current.z * params.drag();
-        double horizontal = Math.sqrt(x * x + z * z);
-        if (horizontal < 0.02D) {
-            x = 0.0D;
-            z = 0.0D;
-            horizontal = 0.0D;
-        }
-
-        double y = approach(current.y, 0.0D, params.hoverStability());
-        if (Math.abs(y) < 0.01D) {
-            y = 0.0D;
-        }
-        // A real hover is not a frozen player: once the residual glide is gone
-        // the vertical velocity follows a slow deterministic sine. The server
-        // and every client use the same game time, so the motion stays synced.
-        if (horizontal < HOVER_BOB_MAX_HORIZONTAL && Math.abs(y) < 0.02D) {
-            y = Math.sin(gameTime / 10.0D) * params.hoverBob();
-        }
-        return new Vec3(x, y, z);
-    }
-
-    private static Vec3 boost(Vec3 current, float yawDegrees, float pitchDegrees, Params params) {
+    private static Vec3 boostMotion(Vec3 current, float yawDegrees, float pitchDegrees,
+                                    Params params) {
         Vec3 look = lookVector(yawDegrees, pitchDegrees);
-        double speed = current.length();
-        if (speed < BOOST_ALIGN_FROM_REST) {
-            double next = Math.min(params.maxBoostSpeed(),
-                    speed * params.drag() + params.boostAcceleration());
-            return look.scale(next);
+        Vec3 motion = current.scale(BOOST_DRAG).add(look.scale(params.boostSpeed()));
+
+        double horizontal = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+        double cosPitch = Math.cos(Math.toRadians(pitchDegrees));
+        if (cosPitch > 1.0E-4D) {
+            // Preserve the horizontal speed while the heading converges on the
+            // crosshair. There is no angular cap: a 180-degree request simply
+            // takes several ticks and never snaps.
+            double targetX = look.x / cosPitch * horizontal;
+            double targetZ = look.z / cosPitch * horizontal;
+            motion = new Vec3(
+                    motion.x + (targetX - motion.x) * BOOST_ALIGNMENT,
+                    motion.y,
+                    motion.z + (targetZ - motion.z) * BOOST_ALIGNMENT);
         }
 
-        double horizontal = Math.sqrt(current.x * current.x + current.z * current.z);
-        float trajectoryYaw = horizontal > 0.02D
-                ? (float) Math.toDegrees(Math.atan2(-current.x, current.z))
-                : yawDegrees;
-        float trajectoryPitch = (float) Math.toDegrees(Math.atan2(current.y, horizontal));
+        double sinPitch = Math.sin(Math.toRadians(pitchDegrees));
+        if (sinPitch > 0.0D) {
+            // Looking down aligns the vertical speed with the downward look
+            // without changing its magnitude, matching the reference.
+            motion = new Vec3(motion.x,
+                    motion.y + (look.y / sinPitch * Math.abs(motion.y) - motion.y)
+                            * BOOST_ALIGNMENT,
+                    motion.z);
+        }
+        return motion;
+    }
 
-        float maximumStep = (float) params.boostTurnRateDegrees();
-        // Minecraft pitch is positive downwards; the trajectory pitch used here
-        // is positive upwards, so the look pitch is negated once.
-        float lookPitch = -pitchDegrees;
-        float yawStep = Mth.clamp(Mth.wrapDegrees(yawDegrees - trajectoryYaw),
-                -maximumStep, maximumStep);
-        float pitchStep = Mth.clamp(lookPitch - trajectoryPitch, -maximumStep, maximumStep);
+    /**
+     * Reference barrel-roll kernel: scrub the complete velocity by
+     * {@code 1 - 0.06 * |sin(pi * timer)|}, then add
+     * {@code 0.15 * sin(pi * timer) * horizontalSpeed} perpendicular to the
+     * velocity. The perpendicular direction follows the roll sign, so a
+     * right-hand roll deflects right while the body turns.
+     */
+    private static Vec3 barrelRollMotion(Vec3 motion, BarrelRoll roll) {
+        if (roll == null || !roll.active()) {
+            return motion;
+        }
+        double envelope = Math.sin(Math.PI * roll.progress());
+        if (envelope <= 1.0E-6D) {
+            return motion;
+        }
+        double horizontal = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+        double scrub = 1.0D - BARREL_ROLL_DRAG * envelope;
+        Vec3 scrubbed = motion.scale(scrub);
+        if (horizontal <= 1.0E-6D) {
+            return scrubbed;
+        }
+        // Fisk computes the amount from the pre-scrub horizontal speed and the
+        // left-perpendicular (z, -x). Ascendant direction +1 maps to Fisk's
+        // negative timer, so the signed amount is negated.
+        double amount = BARREL_ROLL_LATERAL * -roll.direction() * envelope * horizontal;
+        return new Vec3(scrubbed.x + amount * motion.z / horizontal,
+                scrubbed.y,
+                scrubbed.z - amount * motion.x / horizontal);
+    }
 
-        float nextYaw = trajectoryYaw + yawStep;
-        float nextPitch = Mth.clamp(trajectoryPitch + pitchStep, -90.0F, 90.0F);
-        double nextSpeed = Math.min(params.maxBoostSpeed(),
-                speed * params.drag() + params.boostAcceleration());
-        return direction(nextYaw, nextPitch).scale(nextSpeed);
+    /** Applies the reference post-move gravity and drag. */
+    public static Vec3 post(Vec3 moved, boolean boosting, boolean braking, Params params) {
+        if (braking) {
+            return moved;
+        }
+        if (boosting) {
+            return new Vec3(moved.x * BOOST_POST_HORIZONTAL,
+                    moved.y * BOOST_POST_VERTICAL,
+                    moved.z * BOOST_POST_HORIZONTAL);
+        }
+        return new Vec3(moved.x * params.hoverDrag(),
+                (moved.y - params.hoverGravity()) * HOVER_POST_VERTICAL,
+                moved.z * params.hoverDrag());
     }
 
     /** Unit look vector for a Minecraft yaw / pitch pair. */
@@ -194,40 +264,40 @@ public final class FlightPhysics {
         return new Vec3(-Math.sin(yaw) * cosPitch, -Math.sin(pitch), Math.cos(yaw) * cosPitch);
     }
 
-    private static Vec3 direction(float yawDegrees, float trajectoryPitchDegrees) {
-        double yaw = Math.toRadians(yawDegrees);
-        double pitch = Math.toRadians(trajectoryPitchDegrees);
-        double cosPitch = Math.cos(pitch);
-        return new Vec3(-Math.sin(yaw) * cosPitch, Math.sin(pitch), Math.cos(yaw) * cosPitch);
-    }
-
-    private static Vec3 brake(Vec3 current, double braking) {
-        double speed = current.length();
-        if (speed <= 1.0E-5D) {
+    /**
+     * Horizontal input impulse. The diagonal is normalized only when its length
+     * exceeds one, which mirrors {@code moveFlying} in the reference.
+     */
+    private static Vec3 inputVector(double strafeRight, double forward, double speed,
+                                    float yawDegrees) {
+        double length = Math.sqrt(strafeRight * strafeRight + forward * forward);
+        if (length < 1.0E-7D) {
             return Vec3.ZERO;
         }
-        double nextSpeed = Math.max(0.0D, speed - braking);
-        return current.scale(nextSpeed / speed);
+        double scale = speed / Math.max(length, 1.0D);
+        double strafe = strafeRight * scale;
+        double move = forward * scale;
+        double yaw = Math.toRadians(yawDegrees);
+        double sin = Math.sin(yaw);
+        double cos = Math.cos(yaw);
+        // Positive strafe means the player's right. At yaw 0 the look vector is
+        // +Z and the right vector is -X, so both signs are explicit here.
+        return new Vec3(-move * sin - strafe * cos, 0.0D, move * cos - strafe * sin);
     }
 
     private static double bit(int mask, int bit) {
         return (mask & bit) == 0 ? 0.0D : 1.0D;
     }
 
-    private static double approach(double value, double target, double amount) {
-        return value < target ? Math.min(value + amount, target)
-                : Math.max(value - amount, target);
-    }
-
     private static double clamp(double value, double minimum, double maximum) {
         return Math.max(minimum, Math.min(maximum, value));
     }
 
-    private static double positive(double value, double fallback) {
-        return Double.isFinite(value) && value > 0.0D ? value : fallback;
-    }
-
     private static double finite(double value, double fallback) {
         return Double.isFinite(value) ? value : fallback;
+    }
+
+    private static double positive(double value, double fallback) {
+        return Double.isFinite(value) && value > 0.0D ? value : fallback;
     }
 }

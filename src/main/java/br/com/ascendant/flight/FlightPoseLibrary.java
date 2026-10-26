@@ -1,75 +1,86 @@
 package br.com.ascendant.flight;
 
+import net.minecraft.util.Mth;
+
 /**
- * Turns flight telemetry into a target pose and classifies the animation state.
+ * Turns flight telemetry into a target pose. All angles are in degrees and all
+ * distances are in model/render units, matching the vanilla 1.20.1 humanoid
+ * joints.
  *
- * <p>All angles are in degrees and all distances in model/render units, matching
- * the vanilla 1.20.1 humanoid joints. The numbers are original values for that
- * model. The only external visual reference is the general superhero silhouette
- * (horizontal torso, arms leading, head lifted); no asset or animation code from
- * another mod is copied.</p>
+ * <p>The silhouette follows the reference flight animation:</p>
+ * <ul>
+ *   <li><strong>Hover</strong> is upright with the arms down and a small
+ *       3-degree outward arm offset. The whole body leans up to 15 degrees into
+ *       the raw horizontal velocity, scaled by {@code min(1.5 * speed, 1)}, so
+ *       releasing boost produces the reference deceleration lean. The head
+ *       keeps the player's real look pitch and adds the speed-scaled forward
+ *       projection, exactly like the reference layers its hover offset over the
+ *       vanilla head angle. Arms and legs receive the reference's
+ *       velocity-scaled radian offsets, converted to degrees, so the pose
+ *       trails naturally instead of staying rigid. A second low-speed layer
+ *       adds the reference idle sway, asymmetric arm/leg tuck and small torso
+ *       pitch; its head and body-yaw terms are deliberately omitted so the
+ *       neck keeps the real crosshair.</li>
+ *   <li><strong>Boost</strong> is the reference horizontal pose:
+ *       {@code -(viewPitch + 80)} body pitch, the header's -40-degree neck
+ *       lift plus the boost animation's -10-degree offset, arms at the sides
+ *       and slightly back, and trailing legs. The reference turn layer adds
+ *       asymmetric arm/leg offsets, a body bank, a neck counter-roll and a
+ *       small vertical body drop; those details are reproduced here, and the
+ *       hover/boost silhouettes are blended over the reference eight-tick
+ *       boost timer.</li>
+ *   <li><strong>Maneuver</strong> reuses the blended ordinary silhouette; the
+ *       server-synced loop or roll is applied by the renderer outside the pose
+ *       blend. The roll also adds the reference barrel-roll arm/leg/pitch
+ *       overlay.</li>
+ * </ul>
  *
- * <p>The head is deliberately <strong>not</strong> rotated by the same local
- * angle as the torso. Vanilla elytra flight uses a horizontal body with a local
- * head pitch near -45 degrees; copying the body angle into the neck folds the
- * head into the chest and produces the displacement that this revision fixes.
- * The helpers below derive a smaller local pitch from the body pitch and clamp
- * it to a safe neck range.</p>
+ * <p>There is deliberately no motion-headed yaw or scripted takeoff, landing,
+ * cruise, turn, climb or dive pose. The renderer counter-rotates the vanilla
+ * movement yaw so the body faces the player's real look yaw; only the look and
+ * the reference velocity offsets orient the pose.</p>
  */
 public final class FlightPoseLibrary {
-    /** Ticks spent in the launch pose when the player leaves the ground. */
-    public static final int TAKEOFF_GROUND_TICKS = 14;
-    /** Ticks spent in the launch pose when flight starts already airborne. */
-    public static final int TAKEOFF_AIR_TICKS = 8;
-    /** Backwards-compatible name for the ground launch duration. */
-    public static final int TAKEOFF_TICKS = TAKEOFF_GROUND_TICKS;
     /** Ticks used to return to vanilla when flight stops. */
     public static final int EXIT_TICKS = 8;
     /** Ticks in one full 360-degree aerial roll. */
-    public static final int MANEUVER_TICKS = 14;
-    /** Ticks of contact/recovery after a landed flight ends. */
-    public static final int LANDING_RECOVERY_TICKS = 12;
+    public static final int MANEUVER_TICKS = 10;
+    /** Reference idle loop length in ticks: {@code entity.loop(20 * pi)}. */
+    public static final float IDLE_LOOP_TICKS = (float) (Math.PI * 20.0D);
+    /** Reference idle phase offset, applied on top of the tick counter. */
+    public static final float IDLE_PHASE_OFFSET = 0.4F;
+    /** Reference idle sway amplitude as a fraction of the gate. */
+    public static final float IDLE_SWAY_SCALE = 0.2F;
 
-    public static final float HOVER_SPEED = FlightAnimationSelector.HOVER_ENTER_SPEED;
-    public static final float CRUISE_SPEED = FlightAnimationSelector.CRUISE_ENTER_SPEED;
-    public static final float TURN_THRESHOLD_DEGREES = FlightAnimationSelector.TURN_ENTER_DEGREES;
-    public static final float CLIMB_VERTICAL_SPEED = 0.06F;
-    public static final float DIVE_VERTICAL_SPEED = -0.08F;
-    /** Minimum trajectory pitch for the climb/dive classification. */
-    public static final float TRAJECTORY_PITCH_THRESHOLD =
-            FlightAnimationSelector.CLIMB_ENTER_DEGREES;
-
-    public static final float MIN_BODY_PITCH = -138.0F;
-    public static final float MAX_BODY_PITCH = -5.0F;
-    public static final float MAX_BODY_ROLL = 34.0F;
+    /** Maximum hover lean towards the horizontal velocity. */
+    public static final float HOVER_LEAN_DEGREES = 15.0F;
+    /** Reference boost body pitch at a level view: {@code -(viewPitch + 80)}. */
+    public static final float BOOST_BASE_PITCH = 80.0F;
     /**
-     * Maximum visual yaw offset between the body and the camera. The body
-     * follows the trajectory while the camera looks elsewhere; a full half
-     * turn is allowed, so a free 180-degree reversal keeps the model facing
-     * its real direction of travel instead of stopping at a fixed angle.
+     * Local neck lift used by the horizontal boost silhouette. The reference
+     * header interpolates the head to -40 degrees while the boost timer fills,
+     * and the boost animation subtracts another 10 degrees.
      */
-    public static final float MAX_BODY_YAW_OFFSET = 180.0F;
-
-    /** Local neck limits. The head never copies the full torso rotation. */
-    public static final float MIN_HEAD_PITCH = -75.0F;
-    public static final float MAX_HEAD_PITCH = 0.0F;
+    public static final float BOOST_HEAD_PITCH = -50.0F;
+    /** Reference hover arms sit 3 degrees outward from the vanilla pose. */
+    public static final float HOVER_ARM_BASELINE_Z = 3.0F;
+    /** Divisor that converts the turn angle into the reference boost offsets. */
+    public static final float BOOST_TURN_OFFSET_DIVISOR = 2.5F;
+    /** Reference tick ramp used by the boost timer. */
+    public static final int BOOST_BLEND_TICKS = 8;
+    /** Fraction of the reference turn bank kept for third-person readability. */
+    public static final float BOOST_TURN_BANK_SCALE = 0.55F;
+    /** Maximum body bank during a boost turn. */
+    public static final float BOOST_TURN_BANK_MAX_DEGREES = 28.0F;
+    /** Fraction of the bank counter-rotated into the neck. */
+    public static final float BOOST_HEAD_COUNTER_ROLL = 0.5F;
     /**
-     * Local head yaw is reserved for the gentle hover idle. Every moving
-     * flight pose keeps it at zero, so turning the camera cannot twist the
-     * neck while the body follows the trajectory.
+     * Vertical component of the reference boost translation. The reference
+     * rotates around the feet and then shifts the body along its local axis;
+     * this renderer already rotates around the torso centre, so only the small
+     * world-space drop is left to reproduce.
      */
-    public static final float MAX_HEAD_YAW = 4.0F;
-    /** Head pitch as a fraction of the body pitch (vanilla horizontal reference ≈ 0.5). */
-    public static final float HEAD_PITCH_FRACTION = 0.52F;
-
-    /**
-     * Ground distance at which a real descent may start the landing pose.
-     * This is deliberately several blocks so the body has time to flare out
-     * of cruise before contact instead of snapping upright on the last tick.
-     */
-    public static final float LANDING_PROBE_HEIGHT = 2.40F;
-    /** Vertical speed that distinguishes a landing descent from the hover bob. */
-    public static final float LANDING_DESCENT_SPEED = -0.035F;
+    public static final float BOOST_BODY_LIFT = 0.14F;
 
     /** Pivot used by the running lean, kept at the legacy knee height. */
     public static final float BODY_PIVOT_Y = 6.0F / 16.0F;
@@ -81,132 +92,232 @@ public final class FlightPoseLibrary {
      */
     public static final float FLIGHT_BODY_PIVOT_Y = 1.0F;
 
-    private static final float HOVER_CYCLE_SPEED = 0.085F;
-
     private FlightPoseLibrary() {
     }
 
-    /** Stateless classification, kept for callers that do not track hysteresis. */
-    public static FlightAnimationState selectState(boolean active, int activeTicks,
-                                                   float speed, float verticalSpeed,
-                                                   float viewPitch, boolean braking,
-                                                   float turnDegrees) {
-        return selectState(active, activeTicks, speed, verticalSpeed, viewPitch, braking,
-                turnDegrees, false);
-    }
-
-    /** Stateless classification, kept for callers that do not track hysteresis. */
-    public static FlightAnimationState selectState(boolean active, int activeTicks,
-                                                   float speed, float verticalSpeed,
-                                                   float viewPitch, boolean braking,
-                                                   float turnDegrees, boolean maneuvering) {
-        FlightMotionSample sample = FlightMotionSample.builder()
-                .active(active)
-                .activeTicks(activeTicks)
-                .launchedFromGround(true)
-                .speed(speed)
-                .verticalSpeed(verticalSpeed)
-                .turnRate(turnDegrees)
-                .bank(turnRoll(turnDegrees, 0.9F, MAX_BODY_ROLL))
-                .braking(braking)
-                .maneuvering(maneuvering)
-                .build();
-        return FlightAnimationSelector.select(null, 0, sample);
-    }
-
-    /**
-     * Hysteresis-aware classification. The client controller owns
-     * {@code previous} and {@code ticksInState}; tests can drive it directly.
-     */
-    public static FlightAnimationState selectState(FlightAnimationState previous, int ticksInState,
-                                                   FlightMotionSample sample) {
-        return FlightAnimationSelector.select(previous, ticksInState, sample);
-    }
-
-    /** Backwards-compatible target builder that derives a telemetry sample. */
-    public static FlightPose target(FlightAnimationState state, int activeTicks,
-                                    float speed, float verticalSpeed,
-                                    float viewPitch, float turnDegrees) {
-        FlightMotionSample sample = FlightMotionSample.builder()
-                .active(state != FlightAnimationState.EXIT)
-                .activeTicks(activeTicks)
-                .launchedFromGround(true)
-                .speed(speed)
-                .verticalSpeed(verticalSpeed)
-                .turnRate(turnDegrees)
-                .bank(turnRoll(turnDegrees, 0.9F, MAX_BODY_ROLL))
-                .build();
-        return target(state, sample);
-    }
-
-    /** Main pose entry point. */
     public static FlightPose target(FlightAnimationState state, FlightMotionSample sample) {
         return switch (state) {
             case HOVER -> hover(sample);
-            case SLOW_FLIGHT -> slowFlight(sample);
-            case TAKEOFF -> takeoff(sample);
-            case ACCELERATING -> sample.boosting() ? boost(sample) : accelerating(sample);
-            case DECELERATING -> decelerating(sample);
-            case BRAKING -> braking(sample);
-            case DIVE -> dive(sample);
-            case CLIMB -> climb(sample);
-            case TURNING -> turning(sample);
-            case CRUISE -> cruise(sample);
-            case HEROIC_FLIGHT -> heroic(sample);
+            case BOOST -> boost(sample);
             case MANEUVER -> maneuver(sample);
-            case LANDING -> landing(sample);
             case EXIT -> FlightPose.VANILLA;
         };
     }
 
     /**
-     * Local neck pitch for a body pitch. At a horizontal body (-90) this stays
-     * near the vanilla elytra neck angle instead of copying the torso. The
-     * result is always inside {@link #MIN_HEAD_PITCH}..{@link #MAX_HEAD_PITCH}.
+     * Eased boost weight from the reference timer. The reference computes
+     * {@code curve(flight_boost_timer)}, where the timer fills or drains by
+     * {@code 1 / 8} per tick and {@code curve(x) = (sin((2x - 1) * pi / 2) + 1) / 2}.
+     * A value of zero is pure hover and one is pure boost.
      */
-    public static float headPitchForBody(float bodyPitchDegrees) {
-        return clamp(bodyPitchDegrees * HEAD_PITCH_FRACTION, MIN_HEAD_PITCH, MAX_HEAD_PITCH);
+    public static float boostBlend(float timer) {
+        float clamped = clamp(timer, 0.0F, 1.0F);
+        return (Mth.sin((clamped * 2.0F - 1.0F) * (float) (Math.PI / 2.0D)) + 1.0F) * 0.5F;
+    }
+
+    /** Advances the reference eight-tick boost timer by one client tick. */
+    public static float advanceBoostTimer(float timer, boolean boosting) {
+        float step = 1.0F / BOOST_BLEND_TICKS;
+        return clamp(timer + (boosting ? step : -step), 0.0F, 1.0F);
     }
 
     /**
-     * Visual body yaw relative to the camera. {@code aimError} is positive when
-     * the crosshair is left of the trajectory, so the body is rotated right of
-     * the camera by the opposite amount. The offset fades out at hover speed,
-     * where the body should simply face the camera.
+     * Blends the ordinary hover and boost silhouettes using the reference boost
+     * timer. Maneuvre pitch/roll is authoritative and is applied separately by
+     * the renderer, so it is deliberately absent here.
      */
-    public static float bodyYawOffset(float aimErrorDegrees, float horizontalSpeed,
-                                      float maximum) {
-        float speedWeight = smoothstep(clamp(horizontalSpeed / 0.25F, 0.0F, 1.0F));
-        return clamp(-aimErrorDegrees * speedWeight, -maximum, maximum);
+    public static FlightPose ordinaryPose(FlightMotionSample sample, float boostBlend) {
+        float blend = clamp(boostBlend, 0.0F, 1.0F);
+        if (blend <= 1.0E-4F) {
+            return hover(sample);
+        }
+        if (blend >= 1.0F - 1.0E-4F) {
+            return boost(sample);
+        }
+        return FlightPose.lerp(hover(sample), boost(sample), blend);
+    }
+
+    /** Reference boost body pitch for a Minecraft view pitch. */
+    public static float boostBodyPitch(float viewPitchDegrees) {
+        return -(viewPitchDegrees + BOOST_BASE_PITCH);
     }
 
     /**
-     * Ground-approach progress for a real landing. A hover near the ground is
-     * explicitly excluded because it has no real descent: the downward half
-     * of the hover bob never reaches {@link #LANDING_DESCENT_SPEED}. The
-     * unchanged {@code braking} argument is kept for call-site compatibility;
-     * both braking and unbraked descents get the same early flare.
+     * Yaw applied on top of the vanilla movement-body yaw while the pose is
+     * active. Vanilla already applied {@code 180 - bodyYaw}; adding
+     * {@code bodyYaw - lookYaw} yields the {@code 180 - lookYaw} frame, so the
+     * body pitch/roll axes follow the crosshair instead of the last movement
+     * direction. The shortest arc keeps a 180-degree turn continuous.
+     */
+    public static float lookYawCorrectionDegrees(float bodyYawDegrees, float lookYawDegrees) {
+        return Mth.wrapDegrees(bodyYawDegrees - lookYawDegrees);
+    }
+
+    /**
+     * Reference low-speed hover phase in {@code [0, 1)}. Fisk derives it from
+     * {@code entity.loop(20 * pi) + 0.4}; the tick counter is the same
+     * deterministic clock on both sides.
+     */
+    public static float idlePhase(int tickCount) {
+        float phase = tickCount / IDLE_LOOP_TICKS + IDLE_PHASE_OFFSET;
+        return phase - (float) Math.floor(phase);
+    }
+
+    /**
+     * Velocity gate for the reference idle layer:
+     * {@code 1 - curve(min(1.5 * (horizontal + (0.3 * vertical)^2), 1))}.
+     * The layer fades out once ordinary motion owns the silhouette.
+     */
+    static float idleGate(FlightMotionSample sample) {
+        float vertical = 0.3F * sample.verticalSpeed();
+        float motion = sample.horizontalSpeed() + vertical * vertical;
+        return 1.0F - boostBlend(Math.min(1.5F * motion, 1.0F));
+    }
+
+    /**
+     * Upright hover that leans with the real horizontal velocity. The velocity
+     * direction is already expressed in the player's yaw frame, so a strafe or
+     * a reversal tilts the body without any scripted yaw.
      *
-     * @return 0 for no landing approach, or a value in (0, 1] as the ground nears
+     * <p>This reproduces the reference hover animation:</p>
+     * <ul>
+     *   <li>the whole-body lean is scaled by {@code min(1.5 * speed, 1)}, so a
+     *       slow drift only tilts the torso slightly;</li>
+     *   <li>the head keeps the real look pitch and adds the speed-scaled
+     *       {@code -15 * forward} projection, with the same raw-velocity read as
+     *       the body lean;</li>
+     *   <li>arms and legs receive the small velocity-scaled offsets that stop
+     *       the upright pose from reading as a rigid mannequin;</li>
+     *   <li>a low-speed idle layer adds the reference's slow sway and
+     *       asymmetric tuck. Its head pitch/yaw and body yaw offsets are
+     *       deliberately omitted so the neck keeps the real crosshair.</li>
+     * </ul>
      */
-    public static float landingProgress(int activeTicks, boolean launchedFromGround,
-                                        float groundDistance, float verticalSpeed,
-                                        boolean braking) {
-        int takeoffTicks = launchedFromGround ? TAKEOFF_GROUND_TICKS : TAKEOFF_AIR_TICKS;
-        if (activeTicks <= takeoffTicks || !Float.isFinite(groundDistance)
-                || groundDistance >= LANDING_PROBE_HEIGHT
-                || !Float.isFinite(verticalSpeed)
-                || verticalSpeed >= LANDING_DESCENT_SPEED) {
+    private static FlightPose hover(FlightMotionSample sample) {
+        float speed = sample.horizontalSpeed();
+        float forward = clamp(sample.bodyForward(), -1.0F, 1.0F) * speed;
+        float strafe = clamp(sample.bodyRight(), -1.0F, 1.0F) * speed;
+        float bodyLeanScale = Math.min(1.5F * speed, 1.0F);
+        float limbScale = Math.min(2.0F * speed, 1.0F);
+        float limbForward = forward * limbScale;
+        float limbStrafe = strafe * limbScale;
+        float absForward = Math.abs(limbForward);
+        // Reference idle layer. data_0 is the velocity gate and data_1 is the
+        // slow secondary sine; x is their sum for the limbs and torso pitch.
+        float idleGate = idleGate(sample);
+        float idleSway = IDLE_SWAY_SCALE * idleGate
+                * Mth.sin((float) (Math.PI * 2.0D) * sample.idlePhase());
+        float idle = idleGate + idleSway;
+        float bodyPitch = -HOVER_LEAN_DEGREES * bodyLeanScale * clamp(forward, -2.0F, 2.0F)
+                - 3.5F * idleGate + 5.0F * idleSway;
+        float bodyRoll = HOVER_LEAN_DEGREES * bodyLeanScale * clamp(strafe, -2.0F, 2.0F);
+        // The reference hovers with an upright torso but lets the neck keep the
+        // real look pitch; it then layers the speed-scaled forward offset on
+        // top. A fixed local angle would make the head stare past the crosshair.
+        //
+        // The reference stores model joint angles in radians, while FlightPose
+        // exposes degrees. The coefficients below are deliberately converted;
+        // treating them as degrees would erase almost all of the reference's
+        // limb motion and leave the hover looking like a rigid mannequin.
+        float headPitch = sample.viewPitch()
+                - HOVER_LEAN_DEGREES * clamp(limbForward, -2.0F, 2.0F);
+        float rightArmX = Mth.RAD_TO_DEG * (0.1F * limbForward + 0.1F * limbStrafe)
+                - (10.0F * idleGate + 0.1F * Mth.RAD_TO_DEG * idleSway);
+        float leftArmX = Mth.RAD_TO_DEG * (0.1F * limbForward - 0.1F * limbStrafe)
+                + 5.0F * idleGate + 0.08F * Mth.RAD_TO_DEG * idleSway;
+        float rightArmZ = HOVER_ARM_BASELINE_Z
+                + Mth.RAD_TO_DEG * (0.1F * absForward + 0.2F * limbStrafe)
+                + 6.0F * idle;
+        float leftArmZ = -(HOVER_ARM_BASELINE_Z
+                + Mth.RAD_TO_DEG * (0.1F * absForward - 0.2F * limbStrafe))
+                - 10.0F * idle;
+        float rightLegX = Mth.RAD_TO_DEG * (0.3F * limbForward) + 20.0F * idle;
+        float leftLegX = Mth.RAD_TO_DEG * (0.2F * limbForward)
+                + 5.0F * idleGate - 15.0F * idleSway;
+        float rightLegZ = Mth.RAD_TO_DEG * (0.05F * absForward + 0.4F * limbStrafe);
+        float leftLegZ = -Mth.RAD_TO_DEG * (0.05F * absForward - 0.4F * limbStrafe);
+        return new FlightPose(
+                bodyPitch, bodyRoll, 0.0F,
+                headPitch, 0.0F, 0.0F,
+                rightArmX, 10.0F * idleGate, rightArmZ,
+                leftArmX, -20.0F * idleGate, leftArmZ,
+                rightLegX, 5.0F * idleGate, rightLegZ,
+                leftLegX, -8.0F * idleGate, leftLegZ);
+    }
+
+    /** Reference horizontal boost pose, including its turn layer. */
+    private static FlightPose boost(FlightMotionSample sample) {
+        float turnOffset = boostTurnOffset(sample);
+        float bank = boostTurnBank(sample, turnOffset);
+        return horizontalPose(boostBodyPitch(sample.viewPitch()), bank, BOOST_BODY_LIFT,
+                BOOST_HEAD_PITCH, -bank * BOOST_HEAD_COUNTER_ROLL,
+                0.5F * Math.abs(turnOffset), 0.3F * turnOffset, -0.3F * turnOffset);
+    }
+
+    /**
+     * Signed turn angle used by the reference boost animation, in degrees:
+     * {@code sign(cross) * degrees(acos(dot)) * min(speed, 1) / 2.5}. The cross
+     * product is expressed with the player's right vector, which is the mirror
+     * of the reference's left-positive strafe axis.
+     *
+     * <p>The reference adds this value to radian model joints, so converting it
+     * to degrees here is what gives the turn its visible arm and leg offsets.
+     * A 90-degree velocity/crosshair mismatch produces a 36-degree offset at
+     * full speed: 18 degrees on each arm and 10.8 degrees on each leg.</p>
+     */
+    static float boostTurnOffset(FlightMotionSample sample) {
+        float speed = sample.horizontalSpeed();
+        if (speed <= 1.0E-4F) {
             return 0.0F;
         }
-        return clamp(1.0F - (groundDistance - 0.05F)
-                / (LANDING_PROBE_HEIGHT - 0.05F), 0.0F, 1.0F);
+        float forward = clamp(sample.bodyForward(), -1.0F, 1.0F);
+        float right = clamp(sample.bodyRight(), -1.0F, 1.0F);
+        double angleDegrees = Math.toDegrees(Math.acos(clamp(forward, -1.0F, 1.0F)));
+        double sign = Math.signum(-right);
+        return (float) (sign * angleDegrees * Math.min(speed, 1.0F)
+                / BOOST_TURN_OFFSET_DIVISOR);
     }
 
     /**
-     * Full 360-degree roll offset for an aerial maneuver. Progress is derived
+     * Reference boost bank. The reference rotates the body by half of the raw
+     * velocity/crosshair angle, gated by {@code min(speed / 2, 1)}. That can
+     * exceed 45 degrees during an ordinary 90-degree turn, so Ascendant keeps a
+     * readable fraction and caps it; the neck counter-rotates by half the bank
+     * to keep the crosshair readable. The sign banks into the turn.
+     */
+    static float boostTurnBank(FlightMotionSample sample, float turnOffsetDegrees) {
+        float speedGate = Math.min(sample.horizontalSpeed() / 2.0F, 1.0F);
+        float reference = -turnOffsetDegrees * BOOST_TURN_OFFSET_DIVISOR * 0.5F * speedGate;
+        return clamp(reference * BOOST_TURN_BANK_SCALE,
+                -BOOST_TURN_BANK_MAX_DEGREES, BOOST_TURN_BANK_MAX_DEGREES);
+    }
+
+    /**
+     * Neutral silhouette under a scripted loop or roll. The loop pitch and roll
+     * angle are supplied separately by {@link FlightPoseSample}, so the pose
+     * itself stays constant for the whole maneuvre.
+     */
+    private static FlightPose maneuver(FlightMotionSample sample) {
+        return horizontalPose(boostBodyPitch(sample.viewPitch()), 0.0F, BOOST_BODY_LIFT,
+                BOOST_HEAD_PITCH, 0.0F, 0.0F, 0.0F, 0.0F);
+    }
+
+    private static FlightPose horizontalPose(float bodyPitch, float bodyRoll, float bodyLift,
+                                             float headPitch, float headRoll, float armLift,
+                                             float rightLegOffset, float leftLegOffset) {
+        return new FlightPose(
+                bodyPitch, bodyRoll, bodyLift,
+                headPitch, 0.0F, headRoll,
+                8.0F + armLift, 18.0F, 12.0F,
+                8.0F + armLift, -18.0F, -12.0F,
+                15.0F + rightLegOffset, 2.0F, 3.0F,
+                15.0F + leftLegOffset, -2.0F, -3.0F);
+    }
+
+    /**
+     * Full 360-degree roll offset for an aerial maneuvre. Progress is derived
      * from the server-synced ticks remaining, so every client sees the same
-     * rotation without any client-side authority over the maneuver.
+     * rotation without any client-side authority over the maneuvre.
      */
     public static float maneuverRoll(int direction, int ticksRemaining) {
         float progress = 1.0F - clamp(ticksRemaining / (float) MANEUVER_TICKS, 0.0F, 1.0F);
@@ -215,273 +326,46 @@ public final class FlightPoseLibrary {
 
     /**
      * Progress-based version used by deterministic client playback. Kept
-     * separate from the tick-count helper so a maneuver can be replayed from a
-     * synced phase without depending on local authority.
+     * separate from the tick-count helper so a maneuvre can be replayed from a
+     * synced phase without depending on local authority. Fisk's barrel roll
+     * uses its eased {@code curve} rather than a linear turn.
      */
     public static float maneuverRollProgress(int direction, float progress) {
         if (direction != -1 && direction != 1) {
             return 0.0F;
         }
-        return direction * 360.0F * smoothstep(clamp(progress, 0.0F, 1.0F));
+        return direction * 360.0F * boostBlend(clamp(progress, 0.0F, 1.0F));
     }
 
-    private static FlightPose hover(FlightMotionSample sample) {
-        float phase = sample.activeTicks() * HOVER_CYCLE_SPEED;
-        float breathing = (float) Math.sin(phase);
-        float settle = (float) Math.sin(phase * 0.63F + 1.2F);
-
-        float bodyPitch = -9.0F + settle * 1.8F;
-        float bodyRoll = clamp(sample.bankDegrees() * 0.25F + breathing * 2.2F,
-                -MAX_BODY_ROLL, MAX_BODY_ROLL);
-        float headPitch = headPitchForBody(bodyPitch) - 2.0F + settle * 1.0F;
-        // Keep the idle sway almost imperceptible; a hover must read as a
-        // settled body, not as the head scanning around.
-        float headYaw = clamp((float) Math.sin(phase * 0.51F + 0.8F) * 1.2F,
-                -MAX_HEAD_YAW, MAX_HEAD_YAW);
-
-        return new FlightPose(
-                bodyPitch, bodyRoll, breathing * 0.010F,
-                headPitch, headYaw, 0.0F,
-                -12.0F + (float) Math.sin(phase + 0.4F) * 4.0F, 8.0F, 10.0F,
-                -10.0F + (float) Math.sin(phase + 2.2F) * 4.0F, -8.0F, -10.0F,
-                3.0F + (float) Math.sin(phase + 1.0F) * 2.0F, 1.5F, 2.0F,
-                -2.0F + (float) Math.sin(phase + 2.6F) * 2.0F, -1.5F, -2.0F);
-    }
-
-    private static FlightPose slowFlight(FlightMotionSample sample) {
-        float factor = smoothstep(clamp(
-                (sample.speed() - FlightAnimationSelector.HOVER_EXIT_SPEED)
-                        / (FlightAnimationSelector.SLOW_ENTER_SPEED
-                        - FlightAnimationSelector.HOVER_EXIT_SPEED), 0.0F, 1.0F));
-        return FlightPose.lerp(hover(sample), heroic(sample), factor);
-    }
-
-    private static FlightPose takeoff(FlightMotionSample sample) {
-        int duration = sample.launchedFromGround() ? TAKEOFF_GROUND_TICKS : TAKEOFF_AIR_TICKS;
-        float progress = smoothstep(clamp(sample.activeTicks() / (float) duration, 0.0F, 1.0F));
-        FlightPose extended = extension(sample);
-        if (!sample.launchedFromGround()) {
-            return FlightPose.lerp(extended, heroic(sample), progress);
+    /**
+     * Additive limb and body-pitch layer from {@code barrel_roll.fsk}. The full
+     * body rotation stays in the separate maneuvre channel; this layer only
+     * accents the arms, legs and torso so the roll reads as a whole-body move.
+     *
+     * <p>Fisk evaluates {@code curved = curve(timer)} and
+     * {@code envelope = sin(|curved| * pi)}, with a signed value that follows
+     * the roll direction. Ascendant uses progress 0..1 directly, so the same
+     * envelope is {@code sin(pi * curve(progress))}. The direction sign maps
+     * Ascendant's +1 (right-hand roll) to Fisk's negative barrel-roll timer.</p>
+     */
+    public static FlightPose rollOverlay(int direction, float progress) {
+        if (direction != -1 && direction != 1) {
+            return FlightPose.VANILLA;
         }
-
-        FlightPose anticipation = anticipation(sample);
-        float launchProgress = smoothstep(clamp(progress / 0.24F, 0.0F, 1.0F));
-        FlightPose launched = FlightPose.lerp(anticipation, extended, launchProgress);
-        float stabilize = smoothstep(clamp((progress - 0.24F) / 0.76F, 0.0F, 1.0F));
-        return FlightPose.lerp(launched, heroic(sample), stabilize);
-    }
-
-    private static FlightPose anticipation(FlightMotionSample sample) {
-        float headPitch = headPitchForBody(-8.0F) - 1.0F;
-        return new FlightPose(
-                -8.0F, bank(sample) * 0.20F, 0.055F,
-                headPitch, 0.0F, 0.0F,
-                26.0F, 10.0F, 14.0F,
-                26.0F, -10.0F, -14.0F,
-                -18.0F, 3.0F, 4.0F,
-                -18.0F, -3.0F, -4.0F);
-    }
-
-    private static FlightPose extension(FlightMotionSample sample) {
-        float bodyPitch = -58.0F;
-        float headPitch = headPitchForBody(bodyPitch) - 3.0F;
-        return new FlightPose(
-                bodyPitch, bank(sample) * 0.55F, 0.035F,
-                headPitch, 0.0F, -bank(sample) * 0.25F,
-                // The reference launch raises the arms forward while the body
-                // is still climbing, then the full flight pose takes over.
-                -132.0F, 13.0F, -8.0F,
-                -128.0F, -13.0F, 8.0F,
-                14.0F, 5.0F, -5.0F,
-                10.0F, -5.0F, 5.0F);
-    }
-
-    private static FlightPose heroic(FlightMotionSample sample) {
-        // The reference pose is a nearly level body with both arms leading
-        // forward. The trajectory term tilts the chest for a real climb or
-        // dive instead of letting the camera twist the whole model.
-        float bodyPitch = clamp(-78.0F + sample.trajectoryPitchDegrees() * 0.45F,
-                MIN_BODY_PITCH, -58.0F);
-        float bodyRoll = bank(sample);
-        float headPitch = headPitchForBody(bodyPitch) - 2.0F;
-
-        return new FlightPose(
-                bodyPitch, bodyRoll, 0.020F,
-                headPitch, 0.0F, 0.0F,
-                -168.0F, 14.0F, -8.0F,
-                -164.0F, -14.0F, 8.0F,
-                10.0F, 6.0F, -6.0F,
-                6.0F, -6.0F, 6.0F);
-    }
-
-    private static FlightPose cruise(FlightMotionSample sample) {
-        FlightPose heroic = heroic(sample);
-        float bodyRoll = bank(sample) * 0.85F;
-        return new FlightPose(
-                heroic.bodyPitchDegrees, bodyRoll, heroic.bodyLift,
-                heroic.headXRotDegrees, 0.0F, 0.0F,
-                -170.0F, 12.0F, -6.0F,
-                -166.0F, -12.0F, 6.0F,
-                8.0F, 5.0F, -5.0F,
-                5.0F, -5.0F, 5.0F);
-    }
-
-    private static FlightPose turning(FlightMotionSample sample) {
-        float bodyPitch = heroic(sample).bodyPitchDegrees;
-        float bodyRoll = bank(sample);
-        float turn = clamp(sample.turnRateDegrees() * 0.5F, -10.0F, 10.0F);
-        return new FlightPose(
-                bodyPitch, bodyRoll, 0.018F,
-                headPitchForBody(bodyPitch) - 1.0F, 0.0F, 0.0F,
-                -164.0F, 14.0F + turn * 0.35F, -8.0F,
-                -160.0F, -14.0F + turn * 0.35F, 8.0F,
-                12.0F, 6.0F, -6.0F - turn * 0.25F,
-                8.0F, -6.0F, 6.0F - turn * 0.25F);
-    }
-
-    private static FlightPose climb(FlightMotionSample sample) {
-        float climb = clamp(sample.verticalSpeed() / 0.75F, 0.0F, 1.0F);
-        float bodyPitch = clamp(-78.0F + 22.0F * climb
-                        + sample.trajectoryPitchDegrees() * 0.25F,
-                -112.0F, -52.0F);
-        float bodyRoll = bank(sample);
-        return new FlightPose(
-                bodyPitch, bodyRoll, 0.016F,
-                headPitchForBody(bodyPitch) - 6.0F, 0.0F, 0.0F,
-                -154.0F, 13.0F, -8.0F,
-                -150.0F, -13.0F, 8.0F,
-                16.0F, 5.0F, -6.0F,
-                12.0F, -5.0F, 6.0F);
-    }
-
-    private static FlightPose dive(FlightMotionSample sample) {
-        float dive = clamp(-sample.verticalSpeed() / 0.90F, 0.0F, 1.0F);
-        float bodyPitch = clamp(-78.0F - 26.0F * dive
-                        + sample.trajectoryPitchDegrees() * 0.30F,
-                MIN_BODY_PITCH, -74.0F);
-        float bodyRoll = bank(sample);
-        return new FlightPose(
-                bodyPitch, bodyRoll, 0.016F,
-                headPitchForBody(bodyPitch) + 4.0F, 0.0F, 0.0F,
-                -182.0F, 12.0F, -8.0F,
-                -178.0F, -12.0F, 8.0F,
-                -4.0F, 4.0F, -6.0F,
-                2.0F, -4.0F, 6.0F);
-    }
-
-    private static FlightPose accelerating(FlightMotionSample sample) {
-        float bodyPitch = -82.0F;
-        float bodyRoll = bank(sample);
-        return new FlightPose(
-                bodyPitch, bodyRoll, 0.012F,
-                headPitchForBody(bodyPitch) - 6.0F, 0.0F, 0.0F,
-                -174.0F, 10.0F, -5.0F,
-                -170.0F, -10.0F, 5.0F,
-                7.0F, 4.0F, -4.0F,
-                4.0F, -4.0F, 4.0F);
-    }
-
-    private static FlightPose boost(FlightMotionSample sample) {
-        float bodyPitch = -90.0F;
-        float bodyRoll = bank(sample) * 0.85F;
-        return new FlightPose(
-                bodyPitch, bodyRoll, 0.008F,
-                headPitchForBody(bodyPitch) - 6.0F, 0.0F, 0.0F,
-                // Boost is the one state where the arms lead the silhouette.
-                // The small asymmetry keeps the pose readable instead of
-                // looking like a single rigid bar.
-                -164.0F, 14.0F, -5.0F,
-                -160.0F, -14.0F, 5.0F,
-                8.0F, 4.0F, -4.0F,
-                5.0F, -4.0F, 4.0F);
-    }
-
-    private static FlightPose decelerating(FlightMotionSample sample) {
-        float bodyPitch = -64.0F;
-        float bodyRoll = bank(sample) * 0.65F;
-        return new FlightPose(
-                bodyPitch, bodyRoll, 0.030F,
-                headPitchForBody(bodyPitch) - 2.0F, 0.0F, 0.0F,
-                -30.0F, 32.0F, 22.0F,
-                -26.0F, -32.0F, -22.0F,
-                -12.0F, 6.0F, 5.0F,
-                -8.0F, -6.0F, -5.0F);
-    }
-
-    private static FlightPose braking(FlightMotionSample sample) {
-        float bodyPitch = -70.0F;
-        float bodyRoll = bank(sample) * 0.40F;
-        return new FlightPose(
-                bodyPitch, bodyRoll, 0.025F,
-                headPitchForBody(bodyPitch) - 1.0F, 0.0F, 0.0F,
-                -8.0F, 14.0F, 20.0F,
-                -8.0F, -14.0F, -20.0F,
-                -5.0F, 4.0F, 3.0F,
-                1.0F, -4.0F, -3.0F);
-    }
-
-    private static FlightPose maneuver(FlightMotionSample sample) {
-        float bodyPitch = -80.0F;
-        return new FlightPose(
-                bodyPitch, 0.0F, 0.010F,
-                headPitchForBody(bodyPitch) - 2.0F, 0.0F, 0.0F,
-                -176.0F, 8.0F, -5.0F,
-                -172.0F, -8.0F, 5.0F,
-                4.0F, 2.0F, -2.0F,
-                2.0F, -2.0F, 2.0F);
-    }
-
-    private static FlightPose landing(FlightMotionSample sample) {
-        float impact = clamp(sample.landingImpact(), 0.0F, 1.0F);
-        FlightPose contact = landingContact(impact);
-        if (sample.recoveryProgress() > 0.0F) {
-            return FlightPose.lerp(contact, FlightPose.VANILLA,
-                    smoothstep(clamp(sample.recoveryProgress(), 0.0F, 1.0F)));
+        float curved = boostBlend(clamp(progress, 0.0F, 1.0F));
+        float envelope = Mth.sin((float) Math.PI * curved);
+        if (envelope <= 1.0E-4F) {
+            return FlightPose.VANILLA;
         }
-
-        float progress = smoothstep(clamp(sample.landingProgress(), 0.0F, 1.0F));
-        return FlightPose.lerp(landingApproach(sample, impact), contact, progress);
-    }
-
-    private static FlightPose landingApproach(FlightMotionSample sample, float impact) {
-        float bodyPitch = -34.0F + 12.0F * impact;
-        float bodyRoll = bank(sample) * 0.35F;
+        // Fisk's signed y term: positive timer (Ascendant -1/left) uses +y.
+        float signed = -direction * envelope;
         return new FlightPose(
-                bodyPitch, bodyRoll, 0.018F,
-                headPitchForBody(bodyPitch) + 2.0F, 0.0F, 0.0F,
-                // Open the arms to the sides for balance and lead with one
-                // knee, instead of dropping both legs into a generic crouch.
-                -20.0F, 18.0F, 24.0F,
-                -24.0F, -18.0F, -24.0F,
-                -26.0F, 6.0F, 5.0F,
-                8.0F, -6.0F, -5.0F);
-    }
-
-    private static FlightPose landingContact(float impact) {
-        float bodyPitch = -6.0F + 4.0F * impact;
-        float leadKnee = -46.0F - 10.0F * impact;
-        return new FlightPose(
-                bodyPitch, 0.0F, 0.055F + 0.025F * impact,
-                headPitchForBody(bodyPitch) - 2.0F, 0.0F, 0.0F,
-                // The right arm guards high, the left crosses the body. One
-                // knee lands forward while the other leg trails, matching the
-                // heroic three-point landing silhouette without copying it.
-                -34.0F, 26.0F, 34.0F,
-                -52.0F, -14.0F, -24.0F,
-                leadKnee, 5.0F, 4.0F,
-                12.0F, -5.0F, -4.0F);
-    }
-
-    private static float bank(FlightMotionSample sample) {
-        return clamp(sample.bankDegrees(), -MAX_BODY_ROLL, MAX_BODY_ROLL);
-    }
-
-    private static float turnRoll(float turnDegrees, float gain, float max) {
-        return clamp(turnDegrees * gain, -max, max);
-    }
-
-    private static float smoothstep(float value) {
-        return value * value * (3.0F - 2.0F * value);
+                -10.0F * envelope, 0.0F, 0.0F,
+                0.0F, 0.0F, 0.0F,
+                -30.0F * signed - 10.0F * envelope, 0.0F, 0.0F,
+                30.0F * signed - 10.0F * envelope, 0.0F, 0.0F,
+                -10.0F * signed - 10.0F * envelope, 0.0F, 0.0F,
+                10.0F * signed - 10.0F * envelope, 0.0F, 0.0F);
     }
 
     /** Package-visible for tests. */

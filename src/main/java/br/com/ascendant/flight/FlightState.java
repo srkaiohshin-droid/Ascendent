@@ -7,16 +7,13 @@ import net.minecraftforge.common.capabilities.AutoRegisterCapability;
 public interface FlightState {
     int FORWARD = 1;
     int BACK = 1 << 1;
-    /** Aircraft-style bank / turn to the left while flying. */
+    /** Horizontal strafe to the player's left, matching the reference moveFlying input. */
     int LEFT = 1 << 2;
-    /** Aircraft-style bank / turn to the right while flying. */
+    /** Horizontal strafe to the player's right, matching the reference moveFlying input. */
     int RIGHT = 1 << 3;
-    /** Nose-up pitch control while flying (also the classic ascend request). */
-    int ASCEND = 1 << 4;
-    /** Nose-down pitch control while flying (also the classic descend request). */
-    int DESCEND = 1 << 5;
-    int BRAKE = 1 << 6;
-    int VALID_INPUT_MASK = FORWARD | BACK | LEFT | RIGHT | ASCEND | DESCEND | BRAKE;
+    /** Ascendant-only brake; the reference flight has no brake key. */
+    int BRAKE = 1 << 4;
+    int VALID_INPUT_MASK = FORWARD | BACK | LEFT | RIGHT | BRAKE;
 
     int MANEUVER_NONE = 0;
     /** Aileron roll: one complete rotation about the longitudinal (travel) axis. */

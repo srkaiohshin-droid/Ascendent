@@ -275,3 +275,32 @@
 - Sem homologacao visual humana; as capturas sao evidencia, nao aprovacao. Tambem nao
   foi medido se o atrito de `LivingEntity.travel` amortece de forma perceptivel a
   velocidade aplicada e o bob.
+
+## 0.1.0 - Polimento do voo, idle de hover e barrel roll (2026-10-25)
+- Boost levemente mais lento: `DEFAULT_BOOST_SPEED = 0.185` (referencia 0.20), terminal
+  de ~3.69 blocos/tick em vez de ~4.0, mantendo aceleracao, drag e realinhamento.
+- Hover ganhou a camada idle de `flight/idle/default.fsk`: fase derivada do tick,
+  offset 0.4, gate de velocidade, sway de 0.2, pitch `-3.5*gate + 5*sway`, pernas
+  20/5/15 graus e bracos 10/5/6/10 graus. Cabeca e yaw do corpo seguem a mira real,
+  inclusive olhando para cima.
+- Hover e boost sao misturados pelo timer eased de 8 ticks; boost usa
+  `-(viewPitch + 80)`, cabeca local -50, lift de corpo 0.14, offset de curva e banco
+  limitado a 28 graus com contra-roll de 50% no pescoco.
+- Barrel roll C/V portado do Fisk: duracao 10 ticks, envelope `sin(pi*curve(p))`, scrub
+  `1 - 0.06*|sin(pi*p)|` e impulso lateral `0.15*sin(pi*p)*horizontal`, ativo durante o
+  roll mesmo sem boost. Overlay de bracos/pernas/pitch desenhado fora do smoothing; o
+  corpo de 360 graus permanece no canal de manobra. Timer avanca apos o movimento.
+- Renderer aplica o yaw real interpolado da mira e o overlay do roll fora de
+  `POSE_SMOOTHING`, com o corpo seguindo o crosshair em qualquer pitch.
+- Harness de captura corrigido: hover frontal isolado, boost reto antes de girar a mira,
+  teclas reafirmadas a cada tick, olhar/sprint travados no pouso, timeout de 160 ticks
+  com 2 retentativas e telemetria de overlay. Sessao 20261025-212903 gerou 30 PNGs sem
+  recusa nem timeout.
+- Testes de idle, overlay e fisica do barrel roll, alem de ajustes nos asserts de hover;
+  suite em 77/77. `runGameTestServer` "All 77 required tests passed" e `build` BUILD
+  SUCCESSFUL.
+- Telemetria: hover -15.4/-16.2; boost -80.0/cabeca -50.0; release -69.9; roll 23.6 ->
+  140.0 -> 260.7 -> 330.2 com overlay -2.0/-9.2/-7.4/-2.6 e braco 4.1/18.3/14.9/5.1;
+  boost-turn banco -11.7; pouso 221.55 -> 220.00 -> recuperacao -> vanilla.
+- Sem homologacao visual humana nem inspecao interativa; a velocidade terminal do boost
+  ainda nao foi medida em gameplay real com chunk loading e render distance.

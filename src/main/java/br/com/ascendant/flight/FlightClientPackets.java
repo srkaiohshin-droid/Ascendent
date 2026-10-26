@@ -10,7 +10,7 @@ final class FlightClientPackets {
 
     static void update(int entityId, boolean active, boolean noGravity, int maneuverKind,
                        int maneuverDirection, int maneuverTicksRemaining, boolean inverted,
-                       boolean launchedFromGround, int endReason, float takeoffImpulse,
+                       boolean launchedFromGround, int endReason,
                        float maneuverYaw, float maneuverSpeed, boolean maneuverAborted) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {
@@ -19,7 +19,6 @@ final class FlightClientPackets {
         Entity entity = minecraft.level.getEntity(entityId);
         if (entity instanceof Player player) {
             player.getCapability(FlightStateProvider.CAPABILITY).ifPresent(state -> {
-                boolean wasActive = state.isActive();
                 int previousKind = state.getManeuverKind();
                 int previousDirection = state.getManeuverDirection();
                 int previousRemaining = state.getManeuverTicksRemaining();
@@ -54,12 +53,6 @@ final class FlightClientPackets {
                     if (player == minecraft.player) {
                         FlightController.abortClientManeuver();
                     }
-                }
-                if (!wasActive && active && launchedFromGround && takeoffImpulse > 0.0F
-                        && player == minecraft.player) {
-                    // The owning client applies the exact same impulse as the
-                    // server so local prediction and the server copy agree.
-                    FlightController.applyTakeoffImpulse(player, takeoffImpulse);
                 }
             });
         }

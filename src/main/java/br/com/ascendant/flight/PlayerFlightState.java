@@ -58,13 +58,9 @@ final class PlayerFlightState implements FlightState {
         if ((inputMask & ~VALID_INPUT_MASK) != 0 || gameTick == lastInputGameTick) {
             return false;
         }
-        // A/D are steering inputs while flying, never vanilla strafing. The
-        // opposing directions cancel instead of both being held down.
+        // Opposing strafe directions cancel instead of both being held down.
         if ((inputMask & LEFT) != 0 && (inputMask & RIGHT) != 0) {
             inputMask &= ~(LEFT | RIGHT);
-        }
-        if ((inputMask & ASCEND) != 0 && (inputMask & DESCEND) != 0) {
-            inputMask &= ~(ASCEND | DESCEND);
         }
         this.inputMask = inputMask;
         lastInputGameTick = gameTick;

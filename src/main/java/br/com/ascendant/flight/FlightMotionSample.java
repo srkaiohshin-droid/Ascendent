@@ -8,105 +8,70 @@ package br.com.ascendant.flight;
  * consume this snapshot, which keeps state decisions deterministic, testable
  * and independent of the render frame rate.</p>
  *
- * <p>All speeds are blocks per tick. Angles are degrees. {@code bankDegrees}
- * is the already smoothed bank around the body's longitudinal axis;
- * {@code turnRateDegrees} is the actual horizontal heading change for the
- * tick, not the camera yaw. Keeping both values separate makes it possible to
- * bank into a curve while the velocity is still catching up with the look
- * direction.</p>
+ * <p>All speeds are blocks per tick and all angles are degrees.
+ * {@code bodyForward} and {@code bodyRight} are the horizontal velocity
+ * direction expressed in the player's yaw frame, so they are in
+ * {@code [-1, 1]}. {@code viewPitch} follows Minecraft's convention: positive
+ * values look downwards. {@code idlePhase} is the reference low-speed hover
+ * loop in {@code [0, 1)}, derived from the player's tick counter.</p>
  */
 public record FlightMotionSample(
         boolean active,
         int activeTicks,
-        boolean launchedFromGround,
         float speed,
         float horizontalSpeed,
         float verticalSpeed,
-        float trajectoryPitchDegrees,
-        float accelerationPerTick,
-        float turnRateDegrees,
-        float aimErrorDegrees,
-        float bankDegrees,
-        boolean braking,
+        float viewPitch,
+        float bodyForward,
+        float bodyRight,
         boolean boosting,
         boolean maneuvering,
-        float landingProgress,
-        float landingImpact,
-        float recoveryProgress) {
+        float idlePhase) {
 
     public FlightMotionSample {
         activeTicks = Math.max(0, activeTicks);
         speed = finite(speed);
         horizontalSpeed = Math.max(0.0F, finite(horizontalSpeed));
         verticalSpeed = finite(verticalSpeed);
-        trajectoryPitchDegrees = finite(trajectoryPitchDegrees);
-        accelerationPerTick = finite(accelerationPerTick);
-        turnRateDegrees = finite(turnRateDegrees);
-        aimErrorDegrees = finite(aimErrorDegrees);
-        bankDegrees = finite(bankDegrees);
-        landingProgress = clamp01(landingProgress);
-        landingImpact = clamp01(landingImpact);
-        recoveryProgress = clamp01(recoveryProgress);
+        viewPitch = finite(viewPitch);
+        bodyForward = clampUnit(bodyForward);
+        bodyRight = clampUnit(bodyRight);
+        idlePhase = wrapUnit(idlePhase);
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
-    /** Returns a copy with the smoothed body/camera bank replaced. */
-    public FlightMotionSample withBank(float bank) {
-        return new FlightMotionSample(active, activeTicks, launchedFromGround, speed,
-                horizontalSpeed, verticalSpeed, trajectoryPitchDegrees, accelerationPerTick,
-                turnRateDegrees, aimErrorDegrees, bank, braking, boosting, maneuvering,
-                landingProgress, landingImpact, recoveryProgress);
-    }
-
-    /** Returns a copy carrying the ground-approach progress for landing poses. */
-    public FlightMotionSample withLanding(float progress, float impact) {
-        return new FlightMotionSample(active, activeTicks, launchedFromGround, speed,
-                horizontalSpeed, verticalSpeed, trajectoryPitchDegrees, accelerationPerTick,
-                turnRateDegrees, aimErrorDegrees, bankDegrees, braking, boosting, maneuvering,
-                progress, impact, recoveryProgress);
-    }
-
-    /** Returns a copy carrying the post-contact recovery progress. */
-    public FlightMotionSample withRecovery(float progress) {
-        return new FlightMotionSample(active, activeTicks, launchedFromGround, speed,
-                horizontalSpeed, verticalSpeed, trajectoryPitchDegrees, accelerationPerTick,
-                turnRateDegrees, aimErrorDegrees, bankDegrees, braking, boosting, maneuvering,
-                landingProgress, landingImpact, progress);
-    }
-
     private static float finite(float value) {
         return Float.isFinite(value) ? value : 0.0F;
     }
 
-    private static float clamp01(float value) {
-        return Math.max(0.0F, Math.min(1.0F, finite(value)));
+    private static float clampUnit(float value) {
+        return Math.max(-1.0F, Math.min(1.0F, finite(value)));
     }
 
-    /**
-     * Small explicit builder. A sample has enough independent telemetry that
-     * positional construction would make call sites and tests error-prone.
-     */
+    private static float wrapUnit(float value) {
+        if (!Float.isFinite(value)) {
+            return 0.0F;
+        }
+        float wrapped = value % 1.0F;
+        return wrapped < 0.0F ? wrapped + 1.0F : wrapped;
+    }
+
+    /** Small explicit builder; a sample has too many fields for positional calls. */
     public static final class Builder {
         private boolean active;
         private int activeTicks;
-        private boolean launchedFromGround;
         private float speed;
         private float horizontalSpeed = Float.NaN;
         private float verticalSpeed;
-        private float trajectoryPitchDegrees = Float.NaN;
-        private float accelerationPerTick;
-        private float turnRateDegrees;
-        private float aimErrorDegrees;
-        private float bankDegrees;
-        private boolean braking;
+        private float viewPitch;
+        private float bodyForward;
+        private float bodyRight;
         private boolean boosting;
         private boolean maneuvering;
-        private float landingProgress;
-        private float landingImpact;
-        private float recoveryProgress;
+        private float idlePhase;
 
         private Builder() {
         }
@@ -118,11 +83,6 @@ public record FlightMotionSample(
 
         public Builder activeTicks(int activeTicks) {
             this.activeTicks = activeTicks;
-            return this;
-        }
-
-        public Builder launchedFromGround(boolean launchedFromGround) {
-            this.launchedFromGround = launchedFromGround;
             return this;
         }
 
@@ -141,33 +101,18 @@ public record FlightMotionSample(
             return this;
         }
 
-        public Builder trajectoryPitch(float pitchDegrees) {
-            this.trajectoryPitchDegrees = pitchDegrees;
+        public Builder viewPitch(float viewPitch) {
+            this.viewPitch = viewPitch;
             return this;
         }
 
-        public Builder acceleration(float accelerationPerTick) {
-            this.accelerationPerTick = accelerationPerTick;
+        public Builder bodyForward(float bodyForward) {
+            this.bodyForward = bodyForward;
             return this;
         }
 
-        public Builder turnRate(float turnRateDegrees) {
-            this.turnRateDegrees = turnRateDegrees;
-            return this;
-        }
-
-        public Builder aimError(float aimErrorDegrees) {
-            this.aimErrorDegrees = aimErrorDegrees;
-            return this;
-        }
-
-        public Builder bank(float bankDegrees) {
-            this.bankDegrees = bankDegrees;
-            return this;
-        }
-
-        public Builder braking(boolean braking) {
-            this.braking = braking;
+        public Builder bodyRight(float bodyRight) {
+            this.bodyRight = bodyRight;
             return this;
         }
 
@@ -181,14 +126,8 @@ public record FlightMotionSample(
             return this;
         }
 
-        public Builder landing(float progress, float impact) {
-            this.landingProgress = progress;
-            this.landingImpact = impact;
-            return this;
-        }
-
-        public Builder recovery(float progress) {
-            this.recoveryProgress = progress;
+        public Builder idlePhase(float idlePhase) {
+            this.idlePhase = idlePhase;
             return this;
         }
 
@@ -199,26 +138,9 @@ public record FlightMotionSample(
                     ? (float) Math.sqrt(Math.max(0.0D,
                     resolvedSpeed * resolvedSpeed - resolvedVertical * resolvedVertical))
                     : Math.max(0.0F, finite(horizontalSpeed));
-            float trajectory = Float.isNaN(trajectoryPitchDegrees)
-                    ? trajectoryPitch(resolvedVertical, resolvedHorizontal)
-                    : trajectoryPitchDegrees;
-            return new FlightMotionSample(active, activeTicks, launchedFromGround, resolvedSpeed,
-                    resolvedHorizontal, resolvedVertical, trajectory, accelerationPerTick,
-                    turnRateDegrees, aimErrorDegrees, bankDegrees, braking, boosting,
-                    maneuvering, landingProgress, landingImpact, recoveryProgress);
-        }
-
-        private static float trajectoryPitch(float verticalSpeed, float horizontalSpeed) {
-            if (horizontalSpeed <= 0.02F) {
-                if (verticalSpeed > 0.02F) {
-                    return 90.0F;
-                }
-                if (verticalSpeed < -0.02F) {
-                    return -90.0F;
-                }
-                return 0.0F;
-            }
-            return (float) Math.toDegrees(Math.atan2(verticalSpeed, horizontalSpeed));
+            return new FlightMotionSample(active, activeTicks, resolvedSpeed,
+                    resolvedHorizontal, resolvedVertical, viewPitch,
+                    bodyForward, bodyRight, boosting, maneuvering, idlePhase);
         }
     }
 }

@@ -182,3 +182,21 @@
   cabeca/torso pelos 24 frames de 20261025-153345 e por inspecao interativa.
 - [ ] Medir em cliente real se o atrito de `LivingEntity.travel` amortece de forma
   perceptivel a velocidade aplicada e o bob do hover.
+
+## Polimento do voo, idle de hover e barrel roll (2026-10-25)
+- [x] Reduzir o boost para `0.185` (terminal ~3.69 blocos/tick) sem alterar o kernel.
+- [x] Portar a camada idle de `flight/idle/default.fsk` para o hover (fase, gate, sway,
+  pitch de torso e offsets assimetricos), preservando a cabeca na mira real.
+- [x] Misturar hover/boost pelo timer eased de 8 ticks e refinar boost, curva, banco e
+  lift conforme as camadas do Fisk.
+- [x] Portar o barrel roll: 10 ticks, curva eased, scrub de 6%, impulso lateral de 0.15,
+  overlay de bracos/pernas/pitch e fisica ativa durante o roll.
+- [x] Aplicar o yaw real da mira e o overlay fora do smoothing no renderer.
+- [x] Corrigir o harness (hover frontal isolado, boost reto antes da curva, teclas
+  reafirmadas, pouso travado, watchdog e telemetria) e gerar 30 frames em 20261025-212903.
+- [x] Atualizar GameTests de idle, overlay e fisica do roll; suite em 77/77.
+- [x] Validar `runGameTestServer` (77/77), `build` e `git diff --check`.
+- [ ] Homologacao visual humana dos 30 frames de 20261025-212903 e inspecao interativa
+  de mouse e teclado.
+- [ ] Medir a velocidade terminal do boost em gameplay real, com chunk loading e render
+  distance ativos.

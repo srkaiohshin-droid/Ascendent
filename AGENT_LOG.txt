@@ -744,3 +744,39 @@ LOOP VERTICAL, REVERSAO 180 E CAPTURA VISUAL DE VOO (2026-10-23)
     perceptivel a velocidade aplicada e o bob. As capturas sao evidencia, nao aprovacao.
   - Proximo passo: revisar os 24 frames de 20261025-153345 e conceder ou recusar a
     homologacao visual de decolagem, hover, voo nivelado, meia-volta e pouso.
+
+- Lote de polimento do voo, idle de hover e barrel roll (2026-10-25, sobre 62787f9):
+  - Boost reduzido de 0.20 para `DEFAULT_BOOST_SPEED = 0.185`: terminal de ~3.69
+    blocos/tick contra ~4.0 da referencia, mantendo aceleracao e drag do kernel.
+  - Hover recebeu a camada idle de `flight/idle/default.fsk`: fase `tick/(20*pi)+0.4`,
+    gate de velocidade, sway de 0.2, pitch `-3.5*gate+5*sway`, pernas 20/5/15 e bracos
+    10/5/6/10 graus. Os termos de cabeca e yaw do corpo foram omitidos para preservar a
+    mira real, inclusive em -60 graus.
+  - Hover e boost sao misturados pelo timer eased de 8 ticks; boost usa
+    `-(viewPitch+80)`, cabeca -50, lift 0.14, offset de curva e banco limitado a 28
+    graus com contra-roll de 50% no pescoco.
+  - Barrel roll C/V portado do Fisk: 10 ticks, curva eased, scrub
+    `1-0.06*|sin(pi*p)|`, impulso lateral `0.15*sin(pi*p)*horizontal`, overlay de
+    bracos/pernas/pitch fora do smoothing e corpo de 360 no canal de manobra. O timer
+    avanca depois do movimento (progresso 0..0.9).
+  - `FlightPoseRenderer` aplica o yaw real da mira e o overlay fora de `POSE_SMOOTHING`.
+  - Harness: hover frontal separado do boost, boost reto antes da curva de 75 graus,
+    teclas reafirmadas por tick, olhar/sprint travados no pouso, timeout de 160 ticks
+    com 2 retentativas e telemetria de overlay.
+  - GameTests novos: camada idle com sway, overlay e fisica do barrel roll, roll eased;
+    asserts de hover ajustados. Suite em 77/77.
+  - Validacao:
+    - `runGameTestServer`: "All 77 required tests passed" (BUILD SUCCESSFUL).
+    - `build`: BUILD SUCCESSFUL.
+    - Captura `runClient` sessao 20261025-212903: 30 PNGs, "complete", sem recusa,
+      sem timeout de pouso; BUILD SUCCESSFUL.
+    - Telemetria: hover nivelado -15.4/-16.2; boost -80.0/cabeca -50.0; release -69.9;
+      roll 23.6 -> 140.0 -> 260.7 -> 330.2 (overlay -2.0/-9.2/-7.4/-2.6, braco
+      4.1/18.3/14.9/5.1); hover olhando para cima corpo -3.2/cabeca -61.5; boost com
+      olhar para cima corpo -20.0; boost-turn banco -11.7; meia-volta livre -1.2 ->
+      -5.2 -> -7.9; pouso 221.55 -> 220.00 -> recuperacao 0.39 -> vanilla.
+  - Limitacoes: sem homologacao visual humana nem inspecao interativa; a velocidade
+    terminal do boost ainda nao foi medida com chunk loading e render distance reais;
+    agua/lava seguem sem ativacao por seguranca, divergindo do voo reduzido do Fisk.
+  - Proximo passo: revisar os 30 frames de 20261025-212903 e homologar ou recusar hover,
+    boost, curva, roll e pouso; depois validar a sensacao em cliente interativo.

@@ -339,3 +339,45 @@ VOO LIVRE E ALINHAMENTO DE POSE (2026-10-25, sobre 5051a36)
   perceptivel a velocidade aplicada e o bob. As capturas sao evidencia, nao aprovacao.
 - Proximo passo: revisar os 24 frames de 20261025-153345 e conceder ou recusar a
   homologacao visual de decolagem, hover, voo nivelado, meia-volta e pouso.
+
+POLIMENTO DO VOO, IDLE DE HOVER E BARREL ROLL (2026-10-25, sobre 62787f9)
+- Escopo: `FlightPoseLibrary`, `FlightPhysics`, `FlightPoseSample`, `FlightMotionSample`,
+  `FlightAnimationController`, `FlightPoseRenderer`, `FlightController`, `FlightManeuvers`,
+  `FlightTuning`, `FlightCaptureHarness`, `FlightGameTests`, `FlightCameraMath` e
+  `PlayerTravelMixin` (novos), `PlayerRendererMixin`, `ascendant.mixins.json`.
+- Boost levemente mais lento: `DEFAULT_BOOST_SPEED = 0.185` (referencia 0.20), terminal
+  de ~3.69 blocos/tick contra ~4.0. O restante do kernel segue as constantes de referencia.
+- Hover ganhou a camada idle de `flight/idle/default.fsk`: fase por tick com offset 0.4,
+  gate `1 - curve(min(1.5*(h + (0.3v)^2), 1))`, sway `0.2*gate*sin(2*pi*phase)`, pitch
+  `-3.5*gate + 5*sway` e offsets 20/5/15 graus de pernas e 10/5/6/10 graus de bracos.
+  Os termos de pitch/yaw da cabeca e yaw do corpo foram omitidos de proposito para o
+  pescoco continuar apontando para a mira real, inclusive olhando para cima.
+- Hover e boost sao misturados pelo timer de 8 ticks da referencia (`curve`), e o boost
+  usa `-(viewPitch + 80)` com cabeca local `-50`, lift de corpo `0.14`, offsets de curva
+  e banco limitado a 28 graus com contra-roll de 50% no pescoco.
+- Barrel roll do Fisk portado para a manobra C/V: duracao 10 ticks, envelope
+  `sin(pi*curve(progress))`; fisica com scrub `1 - 0.06*|sin(pi*p)|` e impulso lateral
+  `0.15*sin(pi*p)*horizontal`, aplicado durante o roll mesmo sem boost. O overlay de
+  bracos/pernas/pitch e desenhado fora do smoothing comum; o corpo de 360 graus continua
+  no canal de manobra. O timer avanca depois do movimento, entao o primeiro passo e
+  progresso 0 e o ultimo 0.9, como no timer de 10 ticks da referencia.
+- Renderer: o corpo segue o yaw real interpolado da mira (correcao sobre o yaw de
+  movimento do vanilla) e o overlay do roll e somado por fora do `POSE_SMOOTHING`.
+- Harness: `hover-level-front` separado do inicio do boost, `boost-turn` estabelece boost
+  reto antes de girar a mira para 75 graus, teclas reafirmadas a cada tick, olhar/sprint
+  travados no pouso, timeout de pouso com 2 retentativas e telemetria de overlay.
+- Testes novos/ajustados: camada idle, overlay e fisica do barrel roll, curva eased de
+  10 ticks, hover com sway e cabeca real; suite em 77/77.
+- Validacao: `runGameTestServer` "All 77 required tests passed"; `build` BUILD SUCCESSFUL;
+  captura `runClient` sessao 20261025-212903 com 30 PNGs, sem recusa e sem timeout.
+- Telemetria da sessao: hover nivelado -15.4/-16.2; boost -80.0 e cabeca -50.0; release
+  -69.9; roll 23.6 -> 140.0 -> 260.7 -> 330.2 com overlay -2.0/-9.2/-7.4/-2.6 e braco
+  4.1/18.3/14.9/5.1; hover olhando para cima corpo -3.2 e cabeca -61.5; boost com olhar
+  para cima corpo -20.0; boost-turn banco -11.7; meia-volta livre banco -1.2 -> -5.2 ->
+  -7.9 sem pacote de manobra; pouso 221.55 -> contato 220.00 -> recuperacao -> vanilla.
+- Limitacoes: sem homologacao visual humana nem inspecao interativa de mouse e teclado;
+  a velocidade terminal do boost ainda nao foi medida em gameplay com chunk loading e
+  render distance reais. Agua/lava seguem sem ativacao, divergencia de seguranca do
+  Ascendant em relacao ao voo reduzido do Fisk.
+- Proximo passo: revisar os 30 frames de 20261025-212903 e homologar ou recusar hover,
+  boost, curva, roll e pouso; depois validar a sensacao em cliente interativo.

@@ -14,9 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Rotates the whole player model into the flight attitude.
  *
  * <p>The injection runs at the tail of {@code setupRotations}, after the vanilla
- * body yaw and before the renderer flips the model. All transforms stay inside
- * the renderer's pose-stack push/pop, so nothing leaks into other entities and
- * no entity orientation fields are modified.</p>
+ * body yaw and before the renderer flips the model. It receives that body yaw
+ * so the flight renderer can replace it with the real look yaw instead of
+ * following the last movement direction. All transforms stay inside the
+ * renderer's pose-stack push/pop, so nothing leaks into other entities and no
+ * entity orientation fields are modified.</p>
  */
 @Mixin(PlayerRenderer.class)
 public abstract class PlayerRendererMixin {
@@ -28,7 +30,7 @@ public abstract class PlayerRendererMixin {
     private void ascendant$applyFlightBody(AbstractClientPlayer player, PoseStack poseStack,
                                            float ageInTicks, float rotationYaw, float partialTick,
                                            CallbackInfo callback) {
-        if (!FlightPoseRenderer.applyBody(poseStack, player, partialTick)) {
+        if (!FlightPoseRenderer.applyBody(poseStack, player, rotationYaw, partialTick)) {
             LocomotionPoseController.applyBody(poseStack, player, partialTick);
         }
     }

@@ -15,10 +15,10 @@ package br.com.ascendant.flight;
  *   <li>{@code bodyPitchDegrees == -90} is horizontal with the head forward;
  *       larger negative values dive, values closer to 0 climb.</li>
  *   <li>{@code bodyRollDegrees > 0} banks to the player's right.</li>
- *   <li>{@code headXRotDegrees} is the absolute local head rotation. A
- *       horizontal body needs roughly -45 degrees so the face looks along the
- *       flight direction instead of at the ground, matching the vanilla elytra
- *       reference. {@code headYRotDegrees} looks into a turn and
+ *   <li>{@code headXRotDegrees} is the absolute local head rotation. The
+ *       reference boost pose uses -50 degrees; hover keeps the real look pitch
+ *       and adds the speed-scaled forward projection on top of it, exactly like
+ *       the reference hover layer. {@code headYRotDegrees} looks into a turn and
  *       {@code headZRotDegrees} keeps the head level while the body banks.</li>
  *   <li>{@code bodyLift} is measured in the pre-flip model frame of
  *       {@code setupRotations}; positive values lower the horizontal body.</li>
