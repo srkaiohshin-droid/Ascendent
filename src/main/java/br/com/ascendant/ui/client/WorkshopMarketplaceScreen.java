@@ -2,10 +2,12 @@ package br.com.ascendant.ui.client;
 
 import br.com.ascendant.pack.PackManager;
 import br.com.ascendant.pack.PackManifest;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -46,6 +48,29 @@ public final class WorkshopMarketplaceScreen extends Screen {
             new ResourceLocation("ascendant", "catalog/hero_archive.json");
     private static final ResourceLocation FEATURE_COVER =
             new ResourceLocation("ascendant", "textures/gui/covers/featured/multiverse.png");
+
+    /**
+     * External community references are informational. Opening a source page never installs
+     * that project or downloads a JAR into Ascendant.
+     */
+    private record CommunityProject(String name, String source, String url, String version,
+                                    String loaders, String description, int accent) {
+    }
+
+    private static final List<CommunityProject> COMMUNITY_PROJECTS = List.of(
+            new CommunityProject("Powerborne Heroes", "MODRINTH",
+                    "https://modrinth.com/project/powerborne-heroes", "1.20.1",
+                    "FORGE / FABRIC", "Herói add-on baseado em Palladium com trajes e poderes.", 0xFF4F8EEA),
+            new CommunityProject("Superhero Plus", "CURSEFORGE",
+                    "https://www.curseforge.com/minecraft/mc-mods/superhero-plus", "1.20.1",
+                    "FORGE", "Sistema comunitário para criar conjuntos de poderes e supertrajes.", 0xFFD8A24D),
+            new CommunityProject("Unlocked Superheroes", "CURSEFORGE",
+                    "https://www.curseforge.com/minecraft/mc-mods/unlocked-superheroes", "1.20.1",
+                    "FORGE / FABRIC", "Add-on de super-heróis com poderes e conjuntos de trajes.", 0xFF8A70D6),
+            new CommunityProject("Syconn's Super Hero Mod", "CURSEFORGE",
+                    "https://www.curseforge.com/minecraft/mc-mods/syconns-super-hero-mod", "1.20.1",
+                    "FORGE / FABRIC", "Projeto comunitário com super-heróis e equipamentos.", 0xFF4BB89A)
+    );
 
     private static final int MARGIN = 12;
     private static final int BLUE = 0xFF4A91FF;
@@ -163,6 +188,18 @@ public final class WorkshopMarketplaceScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("CATÁLOGO / PACKS"),
                         button -> minecraft.setScreen(new PowerCatalogScreen(this)))
                 .bounds(width - 174, height - 28, 162, 20).build());
+
+        int startY = height < 300 ? 84 : 100;
+        int rowHeight = height < 300 ? 30 : 56;
+        for (int i = 0; i < COMMUNITY_PROJECTS.size(); i++) {
+            CommunityProject project = COMMUNITY_PROJECTS.get(i);
+            int rowY = startY + i * rowHeight;
+            int buttonWidth = Math.min(124, Math.max(92, width / 3));
+            addRenderableWidget(Button.builder(Component.literal("FONTE OFICIAL ↗"),
+                            button -> openCommunityProject(project))
+                    .bounds(width - MARGIN - buttonWidth, rowY + Math.max(5, (rowHeight - 18) / 2),
+                            buttonWidth, 18).build());
+        }
     }
 
     private Component roleLabel() {
