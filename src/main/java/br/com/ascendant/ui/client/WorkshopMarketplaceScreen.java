@@ -656,11 +656,11 @@ public final class WorkshopMarketplaceScreen extends Screen {
         if (button == 0) {
             if (page == Page.MARKETPLACE) {
                 int contentWidth = width - MARGIN * 2;
-                int bannerHeight = Math.max(74, Math.min(88, height / 5));
+                int bannerHeight = height < 300 ? 50 : Math.max(74, Math.min(88, height / 5));
                 int cardY = 49 + bannerHeight + 8;
                 int gap = 7;
                 int cardWidth = (contentWidth - gap * 2) / 3;
-                int cardHeight = Math.max(85, Math.min(104, height / 4));
+                int cardHeight = height < 300 ? 54 : Math.max(85, Math.min(104, height / 4));
                 if (contains(mouseX, mouseY, MARGIN, cardY, cardWidth, cardHeight)) {
                     openUniverse("DC");
                     return true;
@@ -674,13 +674,13 @@ public final class WorkshopMarketplaceScreen extends Screen {
                     return true;
                 }
             } else if (page == Page.UNIVERSE) {
-                int gridTop = 119;
+                int gridTop = height < 300 ? 85 : 119;
                 int columns = columns();
                 int gap = 6;
                 int totalWidth = width - MARGIN * 2;
                 int cardWidth = (totalWidth - gap * (columns - 1)) / columns;
                 int availableHeight = height - gridTop - 43;
-                int cardHeight = Math.max(68, Math.min(138, (availableHeight - gap * (rows() - 1)) / rows()));
+                int cardHeight = Math.max(48, Math.min(138, (availableHeight - gap * (rows() - 1)) / rows()));
                 List<CharacterEntry> entries = filteredCharacters();
                 int start = pageIndex * pageSize();
                 int end = Math.min(entries.size(), start + pageSize());
