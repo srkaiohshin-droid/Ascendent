@@ -58,7 +58,7 @@ public final class AscendantClientControls {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || minecraft.level == null) {
-            if (minecraft.screen instanceof PowerCatalogScreen || minecraft.screen instanceof RadialMenuScreen) {
+            if (minecraft.screen instanceof WorkshopMarketplaceScreen || minecraft.screen instanceof PowerCatalogScreen || minecraft.screen instanceof RadialMenuScreen) {
                 minecraft.setScreen(null);
             }
             drainClicks();
@@ -67,8 +67,8 @@ public final class AscendantClientControls {
 
         while (OPEN_CATALOG.consumeClick()) {
             if (minecraft.screen == null) {
-                minecraft.setScreen(new HeroPackScreen(null));
-            } else if (minecraft.screen instanceof HeroPackScreen || minecraft.screen instanceof PowerCatalogScreen) {
+                minecraft.setScreen(new WorkshopMarketplaceScreen(null));
+            } else if (minecraft.screen instanceof WorkshopMarketplaceScreen || minecraft.screen instanceof HeroPackScreen || minecraft.screen instanceof PowerCatalogScreen) {
                 minecraft.setScreen(null);
             }
         }
