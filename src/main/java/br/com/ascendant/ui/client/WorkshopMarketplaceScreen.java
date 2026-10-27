@@ -417,45 +417,49 @@ public final class WorkshopMarketplaceScreen extends Screen {
         int communityY = cardY + cardHeight + 10;
         graphics.drawString(font, Component.literal("COMMUNITY SPOTLIGHT"),
                 MARGIN + 2, communityY, 0xFFFFFFFF, false);
-        graphics.drawString(font, Component.literal("PACKS INSTALADOS / LOCAIS"),
-                width - MARGIN - font.width("PACKS INSTALADOS / LOCAIS") - 2,
+        String localCount = "ASCENDANT PACKS: " + PackManager.getInstalledPacks().size();
+        graphics.drawString(font, localCount, width - MARGIN - font.width(localCount) - 2,
                 communityY, 0xFF88ABDF, false);
 
-        List<PackManifest> packs = PackManager.getInstalledPacks().stream()
-                .sorted(Comparator.comparing(PackManifest::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
         int packY = communityY + 16;
         int packHeight = height < 300 ? Math.max(18, Math.min(26, height - packY - 40))
                 : Math.max(60, height - packY - 43);
-        if (packs.isEmpty()) {
+        if (height < 300) {
             ComicUi.panel(graphics, MARGIN, packY, contentWidth, packHeight, CatalogTheme.fallback(), false);
-            graphics.drawString(font, Component.literal(height < 300
-                            ? "PACKS LOCAIS: " + packs.size() + "  •  ABRA TODOS PARA VER"
-                            : "NENHUM PACK ASCENDANT LOCAL"),
-                    MARGIN + 10, packY + (height < 300 ? 7 : 9), 0xFFFFFFFF, false);
-            if (height >= 300) {
-                ComicUi.wrapped(graphics, font,
-                        "Os manifestos de packs instalados aparecem aqui. Para conteúdo comunitário, use arquivos .zip no formato Ascendant.",
-                        MARGIN + 10, packY + 23, contentWidth - 20, 2, 10, 0xFF9EB0C9);
-            }
-        } else {
-            int visible = Math.min(3, packs.size());
-            int packGap = 6;
-            int itemWidth = (contentWidth - packGap * (visible - 1)) / visible;
-            for (int i = 0; i < visible; i++) {
-                PackManifest pack = packs.get(i);
-                int x = MARGIN + i * (itemWidth + packGap);
-                boolean hover = contains(mouseX, mouseY, x, packY, itemWidth, packHeight);
-                ComicUi.panel(graphics, x, packY, itemWidth, packHeight,
-                        hover ? CatalogTheme.COSMIC : CatalogTheme.fallback(), hover);
-                graphics.drawString(font, ComicUi.fit(font, pack.getName(), itemWidth - 16),
-                        x + 8, packY + 8, 0xFFFFFFFF, false);
-                graphics.drawString(font, "v" + pack.getVersion(), x + 8, packY + 21, 0xFF82B7FF, false);
-                graphics.drawString(font, pack.getPowerCount() + " POWERS", x + 8, packY + 34,
-                        0xFFB5C5DB, false);
-                graphics.drawString(font, pack.getAbilityCount() + " ABILITIES", x + 8, packY + 45,
-                        0xFFB5C5DB, false);
-            }
+            graphics.drawString(font, Component.literal("4 PROJETOS DA COMUNIDADE  •  VER FONTES OFICIAIS →"),
+                    MARGIN + 8, packY + 7, 0xFFFFFFFF, false);
+            return;
+        }
+
+        int packGap = 6;
+        int visible = Math.min(3, COMMUNITY_PROJECTS.size());
+        int itemWidth = (contentWidth - packGap * (visible - 1)) / visible;
+        for (int i = 0; i < visible; i++) {
+            CommunityProject project = COMMUNITY_PROJECTS.get(i);
+            int x = MARGIN + i * (itemWidth + packGap);
+            drawCommunityProjectCard(graphics, project, x, packY, itemWidth, packHeight,
+                    contains(mouseX, mouseY, x, packY, itemWidth, packHeight));
+        }
+    }
+
+    private void drawCommunityProjectCard(GuiGraphics graphics, CommunityProject project,
+                                          int x, int y, int cardWidth, int cardHeight, boolean hover) {
+        graphics.fillGradient(x, y, x + cardWidth, y + cardHeight,
+                ComicUi.withAlpha(project.accent(), 0x36), PANEL);
+        ComicUi.panel(graphics, x, y, cardWidth, cardHeight,
+                hover ? CatalogTheme.COSMIC : CatalogTheme.fallback(), hover);
+        graphics.fill(x + 7, y + 7, x + 10, y + cardHeight - 7, project.accent());
+        graphics.drawString(font, ComicUi.fit(font, project.name(), cardWidth - 24),
+                x + 16, y + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, project.source() + "  •  " + project.version(),
+                x + 16, y + 21, project.accent(), false);
+        graphics.drawString(font, ComicUi.fit(font, project.loaders(), cardWidth - 24),
+                x + 16, y + 34, 0xFFD5DFEF, false);
+        if (cardHeight > 94) {
+            ComicUi.wrapped(graphics, font, project.description(), x + 16, y + 49,
+                    cardWidth - 24, 2, 10, 0xFF9EADC3);
+            graphics.drawString(font, "ABRIR PROJETO ↗", x + 16, y + cardHeight - 15,
+                    0xFF9CC6FF, false);
         }
     }
 
@@ -624,41 +628,65 @@ public final class WorkshopMarketplaceScreen extends Screen {
 
     private void renderCommunityPacks(GuiGraphics graphics, int mouseX, int mouseY) {
         int top = 55;
-        graphics.drawString(font, Component.literal("ASCENDANT COMMUNITY PACKS"),
+        graphics.drawString(font, Component.literal("COMMUNITY PROJECTS / FONTES OFICIAIS"),
                 MARGIN, top, 0xFFFFFFFF, false);
-        graphics.drawString(font, Component.literal("Manifestos locais e pacotes que já estão disponíveis no diretório do mod."),
+        graphics.drawString(font, Component.literal("Projetos externos para explorar. Eles não são instalados automaticamente no Ascendant."),
                 MARGIN, top + 15, 0xFF9FB1CC, false);
-        List<PackManifest> packs = PackManager.getInstalledPacks().stream()
-                .sorted(Comparator.comparing(PackManifest::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        int y = top + 40;
-        int rowHeight = 60;
-        int visibleCount = Math.max(1, (height - y - 45) / rowHeight);
-        if (packs.isEmpty()) {
-            ComicUi.panel(graphics, MARGIN, y, width - MARGIN * 2, 96,
-                    CatalogTheme.fallback(), false);
-            graphics.drawString(font, Component.literal("NENHUM PACK LOCAL ENCONTRADO"),
-                    MARGIN + 10, y + 12, 0xFFFFFFFF, false);
-            ComicUi.wrapped(graphics, font,
-                    "Coloque packs .zip no diretório ascendant_packs para que os manifestos apareçam nesta lista. O marketplace não baixa executáveis ou mods arbitrários.",
-                    MARGIN + 10, y + 31, width - MARGIN * 2 - 20, 3, 11, 0xFFB7C7DD);
+
+        int startY = height < 300 ? 84 : 100;
+        int rowHeight = height < 300 ? 30 : 56;
+        for (int i = 0; i < COMMUNITY_PROJECTS.size(); i++) {
+            CommunityProject project = COMMUNITY_PROJECTS.get(i);
+            int y = startY + i * rowHeight;
+            int rowBottom = y + rowHeight - 4;
+            boolean hover = contains(mouseX, mouseY, MARGIN, y, width - MARGIN * 2, rowHeight - 4);
+            ComicUi.panel(graphics, MARGIN, y, width - MARGIN * 2, rowHeight - 4,
+                    hover ? CatalogTheme.COSMIC : CatalogTheme.fallback(), hover);
+            graphics.fill(MARGIN + 6, y + 5, MARGIN + 9, rowBottom - 5, project.accent());
+            int textWidth = width - MARGIN * 2 - Math.min(130, width / 3) - 34;
+            graphics.drawString(font, ComicUi.fit(font, project.name(), textWidth),
+                    MARGIN + 15, y + 5, 0xFFFFFFFF, false);
+            if (rowHeight > 30) {
+                graphics.drawString(font, project.source() + "  •  Minecraft " + project.version()
+                                + "  •  " + project.loaders(),
+                        MARGIN + 15, y + 19, project.accent(), false);
+                ComicUi.wrapped(graphics, font, project.description(), MARGIN + 15, y + 33,
+                        textWidth, 1, 10, 0xFFB3C4DD);
+            } else {
+                graphics.drawString(font, project.source() + "  •  " + project.version(),
+                        MARGIN + 15, y + 17, 0xFF9CB2D2, false);
+            }
+        }
+
+        if (height >= 380) {
+            List<PackManifest> packs = PackManager.getInstalledPacks().stream()
+                    .sorted(Comparator.comparing(PackManifest::getName, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+            int localY = startY + COMMUNITY_PROJECTS.size() * rowHeight + 3;
+            graphics.drawString(font, "ASCENDANT PACKS LOCAIS: " + packs.size(),
+                    MARGIN + 2, localY, 0xFF88ABDF, false);
+            if (!packs.isEmpty() && localY + 20 < height - 34) {
+                PackManifest pack = packs.get(0);
+                ComicUi.panel(graphics, MARGIN, localY + 14, width - MARGIN * 2, 30,
+                        CatalogTheme.fallback(), false);
+                graphics.drawString(font, ComicUi.fit(font, pack.getName(), width - 28),
+                        MARGIN + 9, localY + 23, 0xFFFFFFFF, false);
+            }
+        }
+    }
+
+    private void openCommunityProject(CommunityProject project) {
+        if (project == null || !(project.url().startsWith("https://modrinth.com/")
+                || project.url().startsWith("https://www.curseforge.com/"))) {
+            feedback = "Fonte externa não permitida.";
             return;
         }
-        int end = Math.min(packs.size(), visibleCount);
-        for (int i = 0; i < end; i++) {
-            PackManifest pack = packs.get(i);
-            boolean hover = contains(mouseX, mouseY, MARGIN, y, width - MARGIN * 2, rowHeight - 5);
-            ComicUi.panel(graphics, MARGIN, y, width - MARGIN * 2, rowHeight - 5,
-                    hover ? CatalogTheme.COSMIC : CatalogTheme.fallback(), hover);
-            graphics.drawString(font, ComicUi.fit(font, pack.getName(), width - 230),
-                    MARGIN + 10, y + 7, 0xFFFFFFFF, false);
-            graphics.drawString(font, pack.getAuthor() + "  •  v" + pack.getVersion(),
-                    MARGIN + 10, y + 21, 0xFF9CB2D2, false);
-            graphics.drawString(font, pack.getPowerCount() + " poderes  /  "
-                    + pack.getAbilityCount() + " habilidades  /  " + pack.getSuitCount() + " trajes",
-                    MARGIN + 10, y + 36, 0xFFB8C8DE, false);
-            y += rowHeight;
-        }
+        minecraft.setScreen(new ConfirmLinkScreen(confirmed -> {
+            if (confirmed) {
+                Util.getPlatform().openUri(project.url());
+            }
+            minecraft.setScreen(this);
+        }, project.url(), false));
     }
 
     private ResourceLocation universeCover(String id) {
