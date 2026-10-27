@@ -104,7 +104,7 @@ public final class WorkshopMarketplaceScreen extends Screen {
     }
 
     private void initUniverse() {
-        searchBox = new EditBox(font, MARGIN + 4, 91, Math.max(90, width - 202), 16,
+        searchBox = new EditBox(font, MARGIN + 4, height < 300 ? 62 : 91, Math.max(90, width - 202), 16,
                 Component.literal("Buscar personagem"));
         searchBox.setMaxLength(64);
         searchBox.setBordered(false);
@@ -126,7 +126,7 @@ public final class WorkshopMarketplaceScreen extends Screen {
                     pageIndex = 0;
                     button.setMessage(roleLabel());
                     updatePagination();
-                }).bounds(width - 184, 89, 91, 20).build();
+                }).bounds(width - 184, height < 300 ? 60 : 89, 91, 20).build();
         addRenderableWidget(roleButton);
 
         addRenderableWidget(Button.builder(Component.literal("← MARKETPLACE"), button -> openMarketplace())
@@ -214,11 +214,11 @@ public final class WorkshopMarketplaceScreen extends Screen {
     }
 
     private int columns() {
-        return width < 620 ? 2 : 4;
+        return width < 520 ? 2 : 4;
     }
 
     private int rows() {
-        return width < 620 ? 4 : 2;
+        return 2;
     }
 
     private List<CharacterEntry> filteredCharacters() {
@@ -341,7 +341,7 @@ public final class WorkshopMarketplaceScreen extends Screen {
     private void renderMarketplace(GuiGraphics graphics, int mouseX, int mouseY) {
         int contentWidth = width - MARGIN * 2;
         int bannerY = 49;
-        int bannerHeight = Math.max(74, Math.min(88, height / 5));
+        int bannerHeight = height < 300 ? 50 : Math.max(74, Math.min(88, height / 5));
         ResourceLocation banner = available(FEATURE_COVER) ? FEATURE_COVER : CatalogTheme.COSMIC.background();
         if (banner != null) {
             blitCover(graphics, banner, MARGIN, bannerY, contentWidth, bannerHeight);
@@ -354,14 +354,19 @@ public final class WorkshopMarketplaceScreen extends Screen {
                 0xFF8FBCFF, false);
         graphics.drawString(font, Component.literal("YOUR NEXT LEGEND STARTS HERE"),
                 MARGIN + 12, bannerY + 27, 0xFFFFFFFF, false);
-        ComicUi.wrapped(graphics, font,
-                "Descubra universos, capas, trajes e packs criados para expandir o Ascendant.",
-                MARGIN + 12, bannerY + 44, contentWidth - 24, 2, 10, 0xFFD1DDF0);
+        if (bannerHeight < 60) {
+            graphics.drawString(font, Component.literal("Packs, heróis, vilões e trajes"),
+                    MARGIN + 12, bannerY + 36, 0xFFD1DDF0, false);
+        } else {
+            ComicUi.wrapped(graphics, font,
+                    "Descubra universos, capas, trajes e packs criados para expandir o Ascendant.",
+                    MARGIN + 12, bannerY + 44, contentWidth - 24, 2, 10, 0xFFD1DDF0);
+        }
 
         int cardY = bannerY + bannerHeight + 8;
         int gap = 7;
         int cardWidth = (contentWidth - gap * 2) / 3;
-        int cardHeight = Math.max(85, Math.min(104, height / 4));
+        int cardHeight = height < 300 ? 54 : Math.max(85, Math.min(104, height / 4));
         drawUniverseCard(graphics, mouseX, mouseY, MARGIN, cardY, cardWidth, cardHeight,
                 "DC", "DC UNIVERSE", "HERÓIS • VILÕES • EQUIPES", 0xFF3B83E6,
                 "textures/gui/covers/universes/dc.png");
@@ -383,14 +388,19 @@ public final class WorkshopMarketplaceScreen extends Screen {
                 .sorted(Comparator.comparing(PackManifest::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
         int packY = communityY + 16;
-        int packHeight = Math.max(60, height - packY - 43);
+        int packHeight = height < 300 ? Math.max(18, Math.min(26, height - packY - 40))
+                : Math.max(60, height - packY - 43);
         if (packs.isEmpty()) {
             ComicUi.panel(graphics, MARGIN, packY, contentWidth, packHeight, CatalogTheme.fallback(), false);
-            graphics.drawString(font, Component.literal("NENHUM PACK ASCENDANT LOCAL"),
-                    MARGIN + 10, packY + 9, 0xFFFFFFFF, false);
-            ComicUi.wrapped(graphics, font,
-                    "Os manifestos de packs instalados aparecem aqui. Para conteúdo comunitário, use arquivos .zip no formato Ascendant.",
-                    MARGIN + 10, packY + 23, contentWidth - 20, 2, 10, 0xFF9EB0C9);
+            graphics.drawString(font, Component.literal(height < 300
+                            ? "PACKS LOCAIS: " + packs.size() + "  •  ABRA TODOS PARA VER"
+                            : "NENHUM PACK ASCENDANT LOCAL"),
+                    MARGIN + 10, packY + (height < 300 ? 7 : 9), 0xFFFFFFFF, false);
+            if (height >= 300) {
+                ComicUi.wrapped(graphics, font,
+                        "Os manifestos de packs instalados aparecem aqui. Para conteúdo comunitário, use arquivos .zip no formato Ascendant.",
+                        MARGIN + 10, packY + 23, contentWidth - 20, 2, 10, 0xFF9EB0C9);
+            }
         } else {
             int visible = Math.min(3, packs.size());
             int packGap = 6;
@@ -450,16 +460,18 @@ public final class WorkshopMarketplaceScreen extends Screen {
         int accent = universeColor(universe);
         graphics.drawString(font, Component.literal(universe + " UNIVERSE  /  CHARACTER FILES"),
                 MARGIN, 51, 0xFFFFFFFF, false);
-        graphics.drawString(font, Component.literal("ARQUIVO LOCAL • CAPAS PERSONALIZÁVEIS • PAGINAÇÃO"),
-                MARGIN, 65, 0xFF8FA5C4, false);
-        int gridTop = 119;
+        if (height >= 300) {
+            graphics.drawString(font, Component.literal("ARQUIVO LOCAL • CAPAS PERSONALIZÁVEIS • PAGINAÇÃO"),
+                    MARGIN, 65, 0xFF8FA5C4, false);
+        }
+        int gridTop = height < 300 ? 85 : 119;
         int columns = columns();
         int rows = rows();
         int gap = 6;
         int totalWidth = width - MARGIN * 2;
         int cardWidth = (totalWidth - gap * (columns - 1)) / columns;
         int availableHeight = height - gridTop - 43;
-        int cardHeight = Math.max(68, Math.min(138, (availableHeight - gap * (rows - 1)) / rows));
+        int cardHeight = Math.max(48, Math.min(138, (availableHeight - gap * (rows - 1)) / rows));
         List<CharacterEntry> entries = filteredCharacters();
         int start = pageIndex * pageSize();
         int end = Math.min(entries.size(), start + pageSize());
@@ -482,18 +494,21 @@ public final class WorkshopMarketplaceScreen extends Screen {
             drawCharacterCard(graphics, entry, x, y, cardWidth, cardHeight, hover, accent);
         }
 
-        graphics.drawString(font, "REGISTROS: " + entries.size(),
-                MARGIN + 4, height - 22, 0xFF8EA5C5, false);
-        graphics.drawString(font, "PÁGINA " + (pageIndex + 1) + " / "
-                        + Math.max(1, (entries.size() + pageSize() - 1) / pageSize()),
-                width / 2 - font.width("PÁGINA 000 / 000") / 2, height - 22, 0xFF8EA5C5, false);
+        if (height >= 300) {
+            graphics.drawString(font, "REGISTROS: " + entries.size(),
+                    MARGIN + 4, height - 42, 0xFF8EA5C5, false);
+            String pageLabel = "PÁGINA " + (pageIndex + 1) + " / "
+                    + Math.max(1, (entries.size() + pageSize() - 1) / pageSize());
+            graphics.drawString(font, pageLabel,
+                    width / 2 - font.width(pageLabel) / 2, height - 42, 0xFF8EA5C5, false);
+        }
     }
 
     private void drawCharacterCard(GuiGraphics graphics, CharacterEntry entry, int x, int y,
                                    int cardWidth, int cardHeight, boolean hover, int fallbackAccent) {
         int border = entry.accent() == 0 ? fallbackAccent : entry.accent();
         graphics.fill(x, y, x + cardWidth, y + cardHeight, PANEL);
-        int artHeight = Math.max(36, cardHeight - 27);
+        int artHeight = Math.max(24, cardHeight - 27);
         if (entry.cover() != null && available(entry.cover())) {
             blitCover(graphics, entry.cover(), x + 1, y + 1, cardWidth - 2, artHeight);
             graphics.fill(x + 1, y + 1, x + cardWidth - 1, y + artHeight,
